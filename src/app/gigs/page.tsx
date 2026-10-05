@@ -43,7 +43,7 @@ export default async function GigsPage({ searchParams }: PageProps<"/gigs">) {
       <PageHeader
         title="Grania"
         action={
-          <Button asChild size="icon-lg" className="rounded-full">
+          <Button asChild size="icon-lg" className="rounded-[10px]">
             <Link href="/gigs/new" aria-label="Nowe granie">
               <Plus className="size-5" />
             </Link>

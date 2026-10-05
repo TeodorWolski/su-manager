@@ -102,7 +102,7 @@ export function LogForm({
 
       {/* 1. Jak mi poszło — jeden tap */}
       <div>
-        <div className="text-muted-foreground mb-1.5 px-4 text-[13px] font-medium uppercase">Jak mi poszło</div>
+        <div className="text-muted-foreground mb-1.5 px-1 text-[12.5px] font-medium">Jak mi poszło</div>
         <RatingPicker value={rating} onChange={setRating} hints={RATING_HINT} />
       </div>
 
@@ -119,7 +119,7 @@ export function LogForm({
 
       {/* 3. Miejsce — osobno od występu */}
       <div>
-        <div className="text-muted-foreground mb-1.5 px-4 text-[13px] font-medium uppercase">
+        <div className="text-muted-foreground mb-1.5 px-1 text-[12.5px] font-medium">
           Miejsce <span className="normal-case">· sala, publika, organizacja</span>
         </div>
         <RatingPicker value={venueRating} onChange={setVenueRating} hints={VENUE_HINT} size="sm" clearable />
@@ -144,7 +144,7 @@ export function LogForm({
 
       {/* 5. Kontekst */}
       <div>
-        <div className="text-muted-foreground mb-1.5 px-4 text-[13px] font-medium uppercase">Kontekst</div>
+        <div className="text-muted-foreground mb-1.5 px-1 text-[12.5px] font-medium">Kontekst</div>
         <div className="bg-muted grid grid-cols-5 gap-1 rounded-xl p-1">
           {(Object.keys(GIG_CONTEXT_LABEL) as GigContext[]).map((c) => (
             <button
@@ -175,9 +175,9 @@ export function LogForm({
 
       {/* 6. Bity */}
       <div>
-        <div className="mb-1.5 flex justify-between px-4 text-[13px] font-medium uppercase">
+        <div className="mb-1.5 flex justify-between px-1 text-[12.5px] font-medium">
           <span className="text-muted-foreground">Zagrane bity</span>
-          {picked.size > 0 && <span className="text-primary normal-case">{picked.size} · ~{pickedMinutes} min</span>}
+          {picked.size > 0 && <span className="text-foreground">{picked.size} · ~{pickedMinutes} min</span>}
         </div>
         {options.bits.length === 0 ? (
           <p className="text-muted-foreground px-4 text-[15px]">Dodaj bity w zakładce Materiał — tu pojawią się do wyboru.</p>

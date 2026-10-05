@@ -162,7 +162,7 @@ function GroupCard({ g }: { g: OpportunityGroup }) {
 function Muted({ groups }: { groups: OpportunityGroup[] }) {
   return (
     <details className="group/muted mb-7">
-      <summary className="text-muted-foreground mb-1.5 flex cursor-pointer list-none items-center gap-1 px-4 text-[13px] font-medium uppercase [&::-webkit-details-marker]:hidden">
+      <summary className="text-muted-foreground mb-1.5 flex cursor-pointer list-none items-center gap-1 px-1 text-[12.5px] font-medium [&::-webkit-details-marker]:hidden">
         Wyciszeni · {groups.length}
         <ChevronDown className="size-3.5 transition-transform group-open/muted:rotate-180" />
       </summary>

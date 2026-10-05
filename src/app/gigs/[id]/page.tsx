@@ -6,9 +6,17 @@ import { ConfirmButton, PendingButton } from "@/components/form";
 import { PageHeader, Pill, Row, Section, Stat } from "@/components/ios";
 import { Button } from "@/components/ui/button";
 import { GIG_CONTEXT_LABEL, GIG_PIPELINE, GIG_STATUS_LABEL, GIG_STATUS_TONE } from "@/lib/labels";
-import { getGig } from "@/lib/queries";
+import { getGig, type GigStatus } from "@/lib/queries";
 import { effectiveStart, fmtDateTime, nowLocal } from "@/lib/time";
 import { cn } from "@/lib/utils";
+
+/** Aktywny krok w kolorze swojego statusu (szary → niebieski → ochra → zieleń). */
+const STEP_ACTIVE: Partial<Record<GigStatus, string>> = {
+  interested: "bg-st-int text-white",
+  contacted: "bg-st-con text-white",
+  waiting: "bg-st-wai text-white",
+  confirmed: "bg-st-ok text-white",
+};
 
 export default async function GigPage({ params }: PageProps<"/gigs/[id]">) {
   const { id } = await params;
@@ -47,9 +55,9 @@ export default async function GigPage({ params }: PageProps<"/gigs/[id]">) {
                   className={cn(
                     "flex h-16 w-full min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-0.5 text-[11px] leading-tight font-medium transition-all active:scale-95 sm:text-[12px] [&>span:last-child]:max-w-full [&>span:last-child]:truncate",
                     i === stepIndex
-                      ? "bg-primary text-primary-foreground"
+                      ? STEP_ACTIVE[s]
                       : i < stepIndex
-                        ? "bg-primary/12 text-primary"
+                        ? "bg-muted text-foreground"
                         : "text-muted-foreground hover:bg-muted",
                   )}
                 >
@@ -66,7 +74,7 @@ export default async function GigPage({ params }: PageProps<"/gigs/[id]">) {
               <form key={s} action={setGigStatus.bind(null, gig.id, s)} className="flex-1 [&:not(:last-child)]:border-r">
                 <PendingButton
                   type="submit"
-                  className={cn("h-11 w-full text-[15px]", gig.status === s ? "text-destructive font-semibold" : "text-muted-foreground")}
+                  className={cn("h-11 w-full text-[15px]", gig.status === s ? (s === "rejected" ? "text-st-rej font-semibold" : "text-foreground font-semibold line-through") : "text-muted-foreground")}
                 >
                   {GIG_STATUS_LABEL[s]}
                 </PendingButton>

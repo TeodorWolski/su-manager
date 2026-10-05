@@ -16,7 +16,7 @@ export default async function GoalsPage() {
 
       <div className="mb-7 space-y-3">
         <GigGoalCard goals={goals} link={false} />
-        <form action={saveMonthGoal} className="bg-card flex items-center gap-3 rounded-2xl px-4 py-2">
+        <form action={saveMonthGoal} className="bg-card border-border flex items-center gap-3 rounded-[14px] border px-4 py-2">
           <input type="hidden" name="month" value={month.month} />
           <label className="flex flex-1 items-center gap-3">
             <span className="text-[16px]">
@@ -32,7 +32,7 @@ export default async function GoalsPage() {
       </div>
 
       <div className="mb-7 space-y-3">
-        <MaterialGoalCard goals={goals} link={false} />
+        <MaterialGoalCard goals={goals} />
         <form action={saveMaterialGoal}>
           <Section footer="Liczy się sprawdzony materiał (status bitu „Sprawdzony” i jego długość). Domyślnie 15 min do końca roku.">
             <FieldRow label="Cel (min)">

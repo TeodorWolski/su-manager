@@ -24,7 +24,7 @@ export default async function ContactsPage() {
         title="Ludzie"
         subtitle={plural(all.length, "kontakt", "kontakty", "kontaktów")}
         action={
-          <Button asChild size="icon-lg" className="rounded-full">
+          <Button asChild size="icon-lg" className="rounded-[10px]">
             <Link href="/contacts/new" aria-label="Nowy kontakt">
               <Plus className="size-5" />
             </Link>
@@ -62,7 +62,7 @@ export default async function ContactsPage() {
       })}
       {ignored.length > 0 && (
         <details className="group mb-7">
-          <summary className="text-muted-foreground mb-1.5 flex cursor-pointer list-none items-center gap-1 px-4 text-[13px] font-medium uppercase [&::-webkit-details-marker]:hidden">
+          <summary className="text-muted-foreground mb-1.5 flex cursor-pointer list-none items-center gap-1 px-1 text-[12.5px] font-medium [&::-webkit-details-marker]:hidden">
             Pomijani w Okazjach · {ignored.length}
             <ChevronDown className="size-3.5 transition-transform group-open:rotate-180" />
           </summary>

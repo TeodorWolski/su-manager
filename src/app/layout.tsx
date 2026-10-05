@@ -1,10 +1,17 @@
 import type { Metadata, Viewport } from "next";
+import { Instrument_Sans } from "next/font/google";
 import { connection } from "next/server";
 import { ReviewGate } from "@/components/review-gate";
 import { TabBar } from "@/components/tab-bar";
 import { ThemeProvider } from "@/components/theme";
 import { getFormOptions, getPendingReviews } from "@/lib/queries";
 import "./globals.css";
+
+const instrument = Instrument_Sans({
+  subsets: ["latin", "latin-ext"],
+  variable: "--font-instrument",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "SU Manager",
@@ -15,8 +22,8 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   viewportFit: "cover",
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#f3f7f4" },
-    { media: "(prefers-color-scheme: dark)", color: "#111a15" },
+    { media: "(prefers-color-scheme: light)", color: "#f4f3ef" },
+    { media: "(prefers-color-scheme: dark)", color: "#131312" },
   ],
 };
 
@@ -27,7 +34,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   const options = pending.length ? await getFormOptions() : null;
 
   return (
-    <html lang="pl" suppressHydrationWarning className="h-full antialiased">
+    <html lang="pl" suppressHydrationWarning className={`${instrument.variable} h-full antialiased`}>
       <body className="min-h-full">
         <ThemeProvider>
           <TabBar />

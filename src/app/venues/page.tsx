@@ -13,11 +13,11 @@ import { cn } from "@/lib/utils";
 type VenueItem = Awaited<ReturnType<typeof listVenues>>[number];
 
 const QUICK_STYLE: Record<VenueVerdict, string> = {
-  never: "bg-destructive/12 text-destructive",
-  weak: "bg-warning/15 text-amber-700 dark:text-warning",
+  never: "bg-st-rej/12 text-st-rej",
+  weak: "bg-st-wai/14 text-st-wai",
   meh: "bg-secondary text-secondary-foreground",
-  good: "bg-primary/14 text-primary",
-  great: "bg-primary text-primary-foreground",
+  good: "bg-st-ok/12 text-st-ok",
+  great: "bg-st-ok text-white",
 };
 
 const subtitle = (v: VenueItem) =>
@@ -80,7 +80,7 @@ export default async function VenuesPage() {
         title="Sceny"
         back={{ href: "/more", label: "Więcej" }}
         action={
-          <Button asChild size="icon-lg" className="rounded-full">
+          <Button asChild size="icon-lg" className="rounded-[10px]">
             <Link href="/venues/new" aria-label="Nowa scena">
               <Plus className="size-5" />
             </Link>

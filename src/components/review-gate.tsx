@@ -22,7 +22,7 @@ export function ReviewGate({
   return (
     <div className="bg-background fixed inset-0 z-50 overflow-y-auto overscroll-contain">
       <div className="mx-auto max-w-lg px-4 pt-[max(1.5rem,env(safe-area-inset-top))]">
-        <div className="text-primary text-[13px] font-semibold tracking-wide uppercase">
+        <div className="text-muted-foreground text-[13px] font-medium">
           Jak wypadło granie?{remaining > 1 && ` · jeszcze ${remaining - 1}`}
         </div>
         <h1 className="mt-1 text-[28px] leading-tight font-bold tracking-tight text-balance">{gig.title}</h1>

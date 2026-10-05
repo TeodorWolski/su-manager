@@ -8,8 +8,8 @@ export default function manifest(): MetadataRoute.Manifest {
     description: "Grania, ludzie, materiał.",
     start_url: "/",
     display: "standalone",
-    background_color: "#f3f7f4",
-    theme_color: "#f3f7f4",
+    background_color: "#f4f3ef",
+    theme_color: "#f4f3ef",
     lang: "pl",
     icons: [
       { src: "/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },

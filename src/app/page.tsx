@@ -1,7 +1,7 @@
 import { Plus } from "lucide-react";
 import Link from "next/link";
 import { GigRow } from "@/components/gig-row";
-import { GigGoalCard, MaterialGoalCard } from "@/components/goals";
+import { GigGoalCard, MaterialTile, RatingTile } from "@/components/goals";
 import { Empty, PageHeader, Rating, Row, Section } from "@/components/ios";
 import { Button } from "@/components/ui/button";
 import { getDashboard } from "@/lib/queries";
@@ -18,7 +18,7 @@ export default async function Home() {
         title="Dziś"
         subtitle={<span className="capitalize">{fmtDateLong(today)}</span>}
         action={
-          <Button asChild size="icon-lg" className="rounded-full">
+          <Button asChild size="icon-lg" className="rounded-[10px]">
             <Link href="/gigs/new" aria-label="Nowe granie">
               <Plus className="size-5" />
             </Link>
@@ -26,13 +26,16 @@ export default async function Home() {
         }
       />
 
-      <div className="mb-7 grid gap-3 md:grid-cols-2">
-        <GigGoalCard goals={goals} avgRating={month.avg} />
-        <MaterialGoalCard goals={goals} />
+      <div className="mb-7 space-y-2.5">
+        <GigGoalCard goals={goals} />
+        <div className="grid grid-cols-2 gap-2.5">
+          <MaterialTile goals={goals} />
+          <RatingTile avg={month.avg} count={month.count} />
+        </div>
       </div>
 
       <Section title="Nadchodzące">
-        {upcoming.length ? upcoming.map((g) => <GigRow key={g.id} gig={g} />) : <Empty>Brak potwierdzonych grań.</Empty>}
+        {upcoming.length ? upcoming.map((g) => <GigRow key={g.id} gig={g} showStatus />) : <Empty>Brak potwierdzonych grań.</Empty>}
       </Section>
 
       {pipeline.length > 0 && (

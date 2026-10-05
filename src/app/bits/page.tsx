@@ -15,7 +15,7 @@ export default async function BitsPage() {
         back={{ href: "/more", label: "Więcej" }}
         subtitle={totalTested ? `${totalTested} min sprawdzonego materiału` : undefined}
         action={
-          <Button asChild size="icon-lg" className="rounded-full">
+          <Button asChild size="icon-lg" className="rounded-[10px]">
             <Link href="/bits/new" aria-label="Nowy bit">
               <Plus className="size-5" />
             </Link>

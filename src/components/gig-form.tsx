@@ -80,7 +80,7 @@ export function GigForm({
       </Section>
 
       <div className="mb-7">
-        <div className="text-muted-foreground mb-1.5 px-4 text-[13px] font-medium uppercase">Kto jeszcze gra</div>
+        <div className="text-muted-foreground mb-1.5 px-1 text-[12.5px] font-medium">Kto jeszcze gra</div>
         <Chips
           name="lineup"
           selected={lineup}
