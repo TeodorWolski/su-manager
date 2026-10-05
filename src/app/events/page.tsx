@@ -2,6 +2,7 @@ import { ChevronDown, ExternalLink } from "lucide-react";
 import Link from "next/link";
 import { eventToGig, hidePerformer, setCityTravel, snoozePerformer, unsnoozeContact } from "@/app/actions";
 import { Empty, PageHeader, Pill, Section } from "@/components/ios";
+import { isMonth, MonthChips, monthCounts } from "@/components/month-chips";
 import { RELATION_LABEL, RELATION_TONE } from "@/lib/labels";
 import {
   COOLDOWN_DAYS,
@@ -13,7 +14,7 @@ import {
   type OpportunityGroup,
 } from "@/lib/opportunities";
 import { plural } from "@/lib/text";
-import { fmtDate, fmtDateTime, fmtTravel } from "@/lib/time";
+import { fmtDate, fmtDateTime, fmtTravel, nowLocal } from "@/lib/time";
 import { cn } from "@/lib/utils";
 
 const TABS = {
@@ -239,11 +240,23 @@ function UnknownCities({ items }: { items: Opportunity[] }) {
 export default async function EventsPage({ searchParams }: PageProps<"/events">) {
   const sp = await searchParams;
   const tab: TabKey = typeof sp.tab === "string" && sp.tab in TABS ? (sp.tab as TabKey) : "friends";
-  const onlyNew = sp.all !== "1";
+  const month = isMonth(sp.m) ? sp.m : null;
+  // Wybrany miesiąc = planuję go w całości, więc pokazuję wszystkie terminy, nie tylko nowe.
+  const onlyNew = !month && sp.all !== "1";
   const limit = Math.max(PAGE, Number(sp.limit) || PAGE);
 
-  const all = await getOpportunities();
+  const everything = await getOpportunities();
+  const all = month ? everything.filter((o) => o.event.startsAt.startsWith(month)) : everything;
   const of = (t: Opportunity["tab"]) => all.filter((o) => o.tab === t);
+  const tabItems = everything.filter((o) => o.tab === tab);
+  const months = monthCounts(tabItems, (o) => o.event.startsAt).map(({ month: m }) => ({
+    month: m,
+    // dla zakładek z kartami liczymy komików, dla „Uzupełnij” — miasta
+    count:
+      tab === "unknownCity"
+        ? new Set(tabItems.filter((o) => o.event.startsAt.startsWith(m)).map((o) => o.event.cityName)).size
+        : groupByPerformer(tabItems.filter((o) => o.event.startsAt.startsWith(m))).length,
+  }));
   const groups = {
     friends: groupByPerformer(of("friends")),
     inRange: groupByPerformer(of("inRange")),
@@ -263,7 +276,8 @@ export default async function EventsPage({ searchParams }: PageProps<"/events">)
   const shown = filtered.slice(0, limit);
   const newCount = [...groups.friends, ...groups.inRange, ...groups.openMic].filter((g) => g.isNew).length;
   const qs = (extra: Record<string, string>) =>
-    `/events?${new URLSearchParams({ tab, ...(onlyNew ? {} : { all: "1" }), ...extra })}`;
+    `/events?${new URLSearchParams({ tab, ...(month ? { m: month } : {}), ...(onlyNew || month ? {} : { all: "1" }), ...extra })}`;
+  const monthHref = (m: string | null) => `/events?${new URLSearchParams({ tab, ...(m ? { m } : {}) })}`;
 
   return (
     <>
@@ -276,7 +290,7 @@ export default async function EventsPage({ searchParams }: PageProps<"/events">)
         {(Object.keys(TABS) as TabKey[]).map((t) => (
           <Link
             key={t}
-            href={`/events?tab=${t}`}
+            href={`/events?${new URLSearchParams({ tab: t, ...(month ? { m: month } : {}) })}`}
             className={cn(
               "flex h-11 flex-col items-center justify-center rounded-lg text-[12px] leading-tight font-medium transition-all sm:text-[13px]",
               t === tab ? "bg-card text-foreground shadow-sm" : "text-muted-foreground",
@@ -288,6 +302,8 @@ export default async function EventsPage({ searchParams }: PageProps<"/events">)
         ))}
       </div>
 
+      <MonthChips months={months} active={month} href={monthHref} thisYear={nowLocal().slice(0, 4)} />
+
       {tab === "unknownCity" ? (
         unknown.length ? (
           <UnknownCities items={unknown} />
@@ -298,16 +314,18 @@ export default async function EventsPage({ searchParams }: PageProps<"/events">)
         )
       ) : (
         <>
-          <div className="mb-4 flex justify-end px-1 text-[14px]">
-            <Link href={onlyNew ? qs({ all: "1" }) : `/events?tab=${tab}`} className="text-primary">
-              {onlyNew ? `Pokaż wszystkich (${list.length})` : "Tylko z nowymi terminami"}
-            </Link>
-          </div>
+          {!month && (
+            <div className="mb-4 flex justify-end px-1 text-[14px]">
+              <Link href={onlyNew ? qs({ all: "1" }) : `/events?tab=${tab}`} className="text-primary">
+                {onlyNew ? `Pokaż wszystkich (${list.length})` : "Tylko z nowymi terminami"}
+              </Link>
+            </div>
+          )}
           <Section>
             {shown.length ? (
               shown.map((g) => <GroupCard key={g.performer.key} g={g} />)
             ) : (
-              <Empty>{onlyNew ? "Nic nowego w tym tygodniu." : "Pusto."}</Empty>
+              <Empty>{onlyNew ? "Nic nowego w tym tygodniu." : month ? "Nic w tym miesiącu." : "Pusto."}</Empty>
             )}
           </Section>
           {filtered.length > shown.length && (
