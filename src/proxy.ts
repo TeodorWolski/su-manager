@@ -24,5 +24,6 @@ export function proxy(request: NextRequest) {
 
 export const config = {
   // /calendar/<token>.ics — feed dla Google Calendar, chroniony tokenem w adresie zamiast hasła.
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|icon|calendar/).*)"],
+  // Ikony i manifest bez hasła — iOS/Android pobierają je w tle przy dodawaniu do ekranu początkowego.
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|icon|apple-icon|calendar/).*)"],
 };

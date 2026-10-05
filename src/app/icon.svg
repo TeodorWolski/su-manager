@@ -1,0 +1,16 @@
+<!-- Favicon SU Manager: pogrubiona wersja ikony (design/icon-master.svg), czytelna w 16–32 px. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3EDC93"/>
+      <stop offset="1" stop-color="#17985A"/>
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="1024" rx="228" fill="url(#bg)"/>
+  <g fill="#fff">
+    <rect x="342" y="120" width="340" height="430" rx="170"/>
+    <path d="M422 560h180l-34 150h-112z"/>
+    <rect x="474" y="690" width="76" height="140" rx="20"/>
+    <rect x="282" y="810" width="460" height="96" rx="48"/>
+  </g>
+</svg>
