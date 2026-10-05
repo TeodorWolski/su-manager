@@ -1,9 +1,9 @@
 <!-- Ikona SU Manager: mikrofon jako wykrzyknik (głowica z siatką = kreska, podstawa = kropka).
      Limonka + tusz z motywu „Kartka”. Wersja z zaokrąglonymi rogami — favicon i ikona „any” w manifeście. -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
-  <rect width="1024" height="1024" rx="228" fill="#C8E263"/>
+  <rect width="1024" height="1024" rx="228" fill="#E4F323"/>
   <rect x="402" y="150" width="220" height="470" rx="110" fill="#141413"/>
-  <g stroke="#C8E263" stroke-width="22" stroke-linecap="round">
+  <g stroke="#E4F323" stroke-width="22" stroke-linecap="round">
     <line x1="452" y1="270" x2="572" y2="270"/>
     <line x1="446" y1="330" x2="578" y2="330"/>
     <line x1="452" y1="390" x2="572" y2="390"/>

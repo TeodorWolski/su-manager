@@ -88,9 +88,9 @@
   --border: oklch(0.905 0.008 95);
   --input: oklch(0.87 0.008 95);
   --ring: oklch(0.19 0.003 100);
-  --lime: oklch(0.86 0.15 120);
-  --lime-dim: oklch(0.55 0.08 120);
-  --lime-foreground: oklch(0.3 0.06 120);
+  --lime: #e4f323;
+  --lime-dim: color-mix(in oklch, #e4f323 42%, oklch(0.19 0.003 100));
+  --lime-foreground: #141413;
   --ink-card: oklch(0.19 0.003 100);
   --ink-card-foreground: oklch(0.96 0.005 95);
   --ink-card-muted: oklch(0.72 0.008 95);
@@ -102,7 +102,7 @@
   --st-rej: oklch(0.55 0.13 35);
   --st-can: oklch(0.7 0.01 95);
   --chart-1: oklch(0.52 0.08 145);
-  --chart-2: oklch(0.86 0.15 120);
+  --chart-2: #e4f323;
   --chart-3: oklch(0.54 0.07 245);
   --chart-4: oklch(0.63 0.12 75);
   --chart-5: oklch(0.55 0.13 35);
@@ -137,9 +137,9 @@
   --border: oklch(1 0 0 / 9%);
   --input: oklch(1 0 0 / 14%);
   --ring: oklch(0.94 0.006 95);
-  --lime: oklch(0.88 0.16 120);
-  --lime-dim: oklch(0.5 0.08 120);
-  --lime-foreground: oklch(0.25 0.05 120);
+  --lime: #e4f323;
+  --lime-dim: color-mix(in oklch, #e4f323 42%, oklch(0.25 0.006 110));
+  --lime-foreground: #141413;
   --ink-card: oklch(0.25 0.006 110);
   --ink-card-foreground: oklch(0.96 0.005 95);
   --ink-card-muted: oklch(0.7 0.008 95);
@@ -151,7 +151,7 @@
   --st-rej: oklch(0.68 0.13 35);
   --st-can: oklch(0.5 0.01 95);
   --chart-1: oklch(0.72 0.1 145);
-  --chart-2: oklch(0.88 0.16 120);
+  --chart-2: #e4f323;
   --chart-3: oklch(0.7 0.07 245);
   --chart-4: oklch(0.76 0.12 75);
   --chart-5: oklch(0.68 0.13 35);
