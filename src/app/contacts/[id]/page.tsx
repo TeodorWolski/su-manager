@@ -1,11 +1,20 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { addInteraction, deleteContact, deleteInteraction } from "@/app/actions";
+import {
+  addInteraction,
+  deleteContact,
+  deleteInteraction,
+  setContactSnooze,
+  snoozeContact,
+  unhideContact,
+  unsnoozeContact,
+} from "@/app/actions";
 import { ConfirmButton, FieldRow, Select, SubmitButton, TextInput } from "@/components/form";
 import { GigRow } from "@/components/gig-row";
 import { Empty, PageHeader, Pill, Row, Section } from "@/components/ios";
 import { Button } from "@/components/ui/button";
-import { RELATION_LABEL, RELATION_TONE, ROLE_LABEL } from "@/lib/labels";
+import { IGNORE_REASON_LABEL, RELATION_LABEL, RELATION_TONE, ROLE_LABEL } from "@/lib/labels";
+import { COOLDOWN_DAYS, mutedUntil } from "@/lib/opportunities";
 import { getContact } from "@/lib/queries";
 import { fmtDate, nowLocal } from "@/lib/time";
 
@@ -16,6 +25,11 @@ export default async function ContactPage({ params }: PageProps<"/contacts/[id]"
   const data = await getContact(Number(id));
   if (!data) notFound();
   const { contact, history } = data;
+  const today = nowLocal().slice(0, 10);
+  const lastPlayedTogether =
+    data.gigs.filter((g) => g.status === "confirmed" && g.startsAt < today).map((g) => g.startsAt).sort().at(-1) ?? null;
+  const muted = mutedUntil({ snoozeUntil: contact.snoozeUntil, lastPlayedTogether }, today);
+  const manualSnooze = contact.snoozeUntil != null;
 
   return (
     <>
@@ -27,7 +41,7 @@ export default async function ContactPage({ params }: PageProps<"/contacts/[id]"
             {contact.relation !== "none" && (
               <Pill tone={RELATION_TONE[contact.relation]}>{RELATION_LABEL[contact.relation]}</Pill>
             )}
-            {contact.ignoreInReport && <Pill tone="muted">pomijany w raporcie</Pill>}
+            {contact.ignoreInReport && <Pill tone="muted">pomijany w Okazjach</Pill>}
           </span>
         }
         back={{ href: "/contacts", label: "Ludzie" }}
@@ -43,6 +57,49 @@ export default async function ContactPage({ params }: PageProps<"/contacts/[id]"
           {contact.contactInfo && <Row title="Kontakt" detail={<span className="select-all">{contact.contactInfo}</span>} />}
           {contact.aliases && <Row title="Aliasy" detail={contact.aliases} />}
           {contact.notes && <p className="px-4 py-3 text-[16px] whitespace-pre-wrap">{contact.notes}</p>}
+        </Section>
+      )}
+
+      {contact.role === "comedian" && (
+        <Section
+          title="Okazje"
+          footer={
+            contact.ignoreInReport
+              ? "Jego występy nie pojawiają się w Okazjach ani w mailu."
+              : muted && !manualSnooze
+                ? `Automatycznie: ${COOLDOWN_DAYS} dni po wspólnym wieczorze (${fmtDate(lastPlayedTogether!)}).`
+                : manualSnooze && !muted
+                  ? "Pokazywany mimo niedawnego wspólnego wieczoru."
+                  : undefined
+          }
+        >
+          <div className="flex min-h-12 flex-wrap items-center gap-2 px-4 py-2.5">
+            <span className="flex-1 text-[16px]">
+              {contact.ignoreInReport
+                ? `Pomijany · ${contact.ignoreReason ? IGNORE_REASON_LABEL[contact.ignoreReason] : "bez powodu"}`
+                : muted
+                  ? `Wyciszony do ${fmtDate(muted)}`
+                  : "Widoczny"}
+            </span>
+            {contact.ignoreInReport ? (
+              <form action={unhideContact.bind(null, contact.id)}>
+                <button type="submit" className="text-primary h-9 text-[15px]">Przywróć</button>
+              </form>
+            ) : muted ? (
+              <form action={unsnoozeContact.bind(null, contact.id)}>
+                <button type="submit" className="text-primary h-9 text-[15px]">Pokaż teraz</button>
+              </form>
+            ) : (
+              <form action={snoozeContact.bind(null, contact.id, 90)}>
+                <button type="submit" className="text-primary h-9 text-[15px]">Wycisz na 3 mies.</button>
+              </form>
+            )}
+            {manualSnooze && !contact.ignoreInReport && (
+              <form action={setContactSnooze.bind(null, contact.id, null)}>
+                <button type="submit" className="text-muted-foreground h-9 text-[15px]">Automatycznie</button>
+              </form>
+            )}
+          </div>
         </Section>
       )}
 

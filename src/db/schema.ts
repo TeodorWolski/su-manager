@@ -40,6 +40,9 @@ export const CONTACT_RELATIONS = [
   "declined",
 ] as const;
 
+/** Dlaczego komik jest pomijany w Okazjach. */
+export const IGNORE_REASONS = ["not_interested", "no_openers", "other"] as const;
+
 export const contacts = sqliteTable("contacts", {
   id: id(),
   name: text("name").notNull(),
@@ -52,6 +55,12 @@ export const contacts = sqliteTable("contacts", {
     .default("none"),
   /** Pomijaj w raporcie nowych grań (np. gwiazdy, które nie biorą supportów). */
   ignoreInReport: integer("ignore_in_report", { mode: "boolean" }).notNull().default(false),
+  ignoreReason: text("ignore_reason", { enum: IGNORE_REASONS }),
+  /**
+   * Do kiedy nie pokazywać w Okazjach. Puste = automatycznie 90 dni po ostatnim wspólnym wieczorze.
+   * Data w przeszłości = „pokazuj już teraz” mimo niedawnego wspólnego grania.
+   */
+  snoozeUntil: text("snooze_until"),
   notes: text("notes"),
   createdAt: createdAt(),
 });
@@ -211,3 +220,4 @@ export type Event = typeof events.$inferSelect;
 export type GigStatus = (typeof GIG_STATUSES)[number];
 export type GigContext = (typeof GIG_CONTEXTS)[number];
 export type VenueVerdict = (typeof VENUE_VERDICTS)[number];
+export type IgnoreReason = (typeof IGNORE_REASONS)[number];

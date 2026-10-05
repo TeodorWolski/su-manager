@@ -159,6 +159,7 @@ export async function listContacts() {
       role: contacts.role,
       relation: contacts.relation,
       ignoreInReport: contacts.ignoreInReport,
+      ignoreReason: contacts.ignoreReason,
       lastPlayedTogether: sql<string | null>`(
         select max(g.starts_at) from gigs g
         where g.status = 'confirmed' and ${rawStart("g")} < ${now}

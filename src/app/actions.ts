@@ -19,7 +19,7 @@ import {
   gigContacts,
   gigLogs,
   gigs,
-  hiddenTitles,
+  IGNORE_REASONS,
   interactions,
   VENUE_VERDICTS,
   venues,
@@ -144,6 +144,7 @@ export async function saveContact(fd: FormData) {
     relation:
 oneOf(CONTACT_RELATIONS, str(fd, "relation")) ?? "none",
     ignoreInReport: bool(fd, "ignoreInReport"),
+    ignoreReason: bool(fd, "ignoreInReport") ? oneOf(IGNORE_REASONS, str(fd, "ignoreReason")) : null,
     notes: str(fd, "notes"),
   };
   if (id) {
@@ -269,16 +270,56 @@ export async function dismissEvent(id: number) {
   revalidatePath("/", "layout");
 }
 
-/** „Ukryj ten program wszędzie” — także w przyszłych przebiegach scrapera. */
-export async function hideEventTitle(id: number) {
-  const [e] = await db.select({ title: events.title }).from(events).where(eq(events.id, id));
-  if (!e) return;
+/** Kontakt dla komika z Okazji: istniejący (dopasowany po nazwisku/aliasach) albo nowy. */
+async function performerContactId(name: string) {
+  const people = await db.select({ id: contacts.id, name: contacts.name, aliases: contacts.aliases }).from(contacts);
+  const found = matchContacts(name, people)[0];
+  if (found) return found.id;
+  const [row] = await db.insert(contacts).values({ name, role: "comedian" }).returning({ id: contacts.id });
+  return row.id;
+}
+
+/** „Ukryj komika” — nie pokazuj go w Okazjach, z powodem zapisanym w CRM. */
+export async function hidePerformer(fd: FormData) {
+  const name = required(str(fd, "name"), "komik");
+  const id = int(fd, "contactId") ?? (await performerContactId(name));
   await db
-    .insert(hiddenTitles)
-    .values({ normalizedTitle: normalize(e.title), title: e.title })
-    .onConflictDoNothing();
+    .update(contacts)
+    .set({ ignoreInReport: true, ignoreReason: oneOf(IGNORE_REASONS, str(fd, "reason")) ?? "not_interested" })
+    .where(eq(contacts.id, id));
   revalidatePath("/", "layout");
 }
+
+/** Wycisz komika w Okazjach na `days` dni (np. właśnie do niego napisałem). */
+export async function snoozePerformer(fd: FormData) {
+  const name = required(str(fd, "name"), "komik");
+  const id = int(fd, "contactId") ?? (await performerContactId(name));
+  await setContactSnooze(id, isoDate(int(fd, "days") ?? 90));
+}
+
+/** `until` = data, do której wyciszony; data w przeszłości = „pokazuj już teraz”; null = automatycznie. */
+export async function setContactSnooze(id: number, until: string | null) {
+  await db.update(contacts).set({ snoozeUntil: until }).where(eq(contacts.id, id));
+  revalidatePath("/", "layout");
+}
+
+/** Wycisz kontakt w Okazjach na `days` dni (z karty kontaktu). */
+export async function snoozeContact(id: number, days: number) {
+  await setContactSnooze(id, isoDate(days));
+}
+
+/** Przestań pomijać komika w Okazjach. */
+export async function unhideContact(id: number) {
+  await db.update(contacts).set({ ignoreInReport: false, ignoreReason: null }).where(eq(contacts.id, id));
+  revalidatePath("/", "layout");
+}
+
+/** „Pokaż teraz” — znosi wyciszenie, także automatyczne po wspólnym wieczorze. */
+export async function unsnoozeContact(id: number) {
+  await setContactSnooze(id, isoDate(-1));
+}
+
+const isoDate = (daysFromNow: number) => new Date(Date.now() + daysFromNow * 864e5).toISOString().slice(0, 10);
 
 /** „Chcę zagrać” — zakłada granie w pipeline (status: zainteresowany) i podpina wydarzenie. */
 export async function eventToGig(id: number) {

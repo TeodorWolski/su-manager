@@ -77,7 +77,7 @@ async function main() {
   if (firstRun) {
     log("pierwszy przebieg — tylko zasilam bazę, bez maila");
   } else if (newIds.size) {
-    const fresh = (await getOpportunities(newIds)).filter((o) => !o.myGigId);
+    const fresh = (await getOpportunities(newIds)).filter((o) => !o.myGigId && o.tab !== "muted");
     if (fresh.length) await sendReport(fresh, log);
     else log("nowe wydarzenia, ale żadne nie jest okazją — bez maila");
   } else {

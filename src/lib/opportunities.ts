@@ -5,6 +5,7 @@
 import { and, eq, gte, sql } from "drizzle-orm";
 import { cities, contacts, db, events, gigs, hiddenTitles, venues, type City, type Contact, type Event } from "@/db";
 import { matchContacts } from "./match";
+import { isWantedLanguage, performerKey, performerName } from "./performer";
 import { normalize } from "./text";
 import { nowLocal } from "./time";
 
@@ -12,10 +13,16 @@ import { nowLocal } from "./time";
 export const MAX_TRAVEL_MIN = 180;
 /** Ile dni wydarzenie jest „nowe” w aplikacji. */
 export const NEW_FOR_DAYS = 7;
+/** Po wspólnym wieczorze nie proponuj tego komika przez tyle dni (chyba że kontakt ma własne „wyciszony do”). */
+export const COOLDOWN_DAYS = 90;
 
-export type MatchedContact = Pick<Contact, "id" | "name" | "relation" | "ignoreInReport"> & {
+export type MatchedContact = Pick<Contact, "id" | "name" | "relation" | "ignoreInReport" | "snoozeUntil"> & {
   lastPlayedTogether: string | null;
+  /** Do kiedy wyciszony w Okazjach (data), null = widoczny. */
+  mutedUntil: string | null;
 };
+
+export type Tab = "friends" | "inRange" | "openMic" | "unknownCity" | "muted";
 
 export type Opportunity = {
   event: Event;
@@ -26,7 +33,18 @@ export type Opportunity = {
   isOpenMic: boolean;
   /** Moje granie tego dnia z tym headlinerem albo w tym mieście (dodane ręcznie lub wcześniej z Okazji). */
   myGigId: number | null;
-  group: "friends" | "inRange" | "unknownCity";
+  /** Kto występuje: kontakt z CRM albo nazwa wyciągnięta z tytułu. Klucz grupuje terminy jednego komika. */
+  performer: { key: string; name: string; contactId: number | null };
+  tab: Tab;
+};
+
+/** Wszystkie terminy jednego komika w danej zakładce: najbliższy w zasięgu + reszta jako alternatywy. */
+export type OpportunityGroup = {
+  performer: Opportunity["performer"];
+  primary: Opportunity;
+  others: Opportunity[];
+  matches: MatchedContact[];
+  isNew: boolean;
 };
 
 export const dedupeKey = (title: string, startsAt: string, venue: string | null) =>
@@ -34,8 +52,18 @@ export const dedupeKey = (title: string, startsAt: string, venue: string | null)
 
 export const isOpenMic = (title: string) => /open[\s-]?mi[ck]|\bom\b/.test(normalize(title));
 
+const addDays = (date: string, days: number) =>
+  new Date(Date.parse(date.slice(0, 10)) + days * 864e5).toISOString().slice(0, 10);
+
+/** Do kiedy kontakt jest wyciszony: ręczne „wyciszony do” albo COOLDOWN_DAYS po wspólnym wieczorze. */
+export function mutedUntil(c: { snoozeUntil: string | null; lastPlayedTogether: string | null }, today: string) {
+  const until = c.snoozeUntil ?? (c.lastPlayedTogether ? addDays(c.lastPlayedTogether, COOLDOWN_DAYS) : null);
+  return until && until > today ? until : null;
+}
+
 async function loadContext() {
   const now = nowLocal();
+  const today = now.slice(0, 10);
   const [allCities, people, never, hidden, myGigs] = await Promise.all([
     db.select().from(cities),
     db
@@ -45,6 +73,7 @@ async function loadContext() {
         aliases: contacts.aliases,
         relation: contacts.relation,
         ignoreInReport: contacts.ignoreInReport,
+        snoozeUntil: contacts.snoozeUntil,
         lastPlayedTogether: sql<string | null>`(
           select max(g.starts_at) from gigs g
           where g.status = 'confirmed' and g.starts_at < ${now}
@@ -68,11 +97,11 @@ async function loadContext() {
           (select c.name from venues v join cities c on c.id = v.city_id where v.id = ${gigs.venueId}))`,
       })
       .from(gigs)
-      .where(and(gte(gigs.startsAt, now.slice(0, 10)), sql`${gigs.status} not in ('rejected', 'cancelled')`)),
+      .where(and(gte(gigs.startsAt, today), sql`${gigs.status} not in ('rejected', 'cancelled')`)),
   ]);
   return {
     citiesByName: new Map(allCities.map((c) => [normalize(c.name), c])),
-    people,
+    people: people.map((p) => ({ ...p, mutedUntil: mutedUntil(p, today) })),
     blacklist: new Set(never.map((v) => `${normalize(v.name)}|${normalize(v.cityName ?? "")}`)),
     hidden: new Set(hidden.map((h) => h.t)),
     myGigs,
@@ -83,31 +112,44 @@ type Ctx = Awaited<ReturnType<typeof loadContext>>;
 
 function classify(e: Event, ctx: Ctx, newSince: string): Opportunity | null {
   if (e.dismissed || ctx.hidden.has(normalize(e.title))) return null;
+  if (!isWantedLanguage(`${e.title} ${e.performers ?? ""}`)) return null;
   if (ctx.blacklist.has(`${normalize(e.venueName ?? "")}|${normalize(e.cityName ?? "")}`)) return null;
 
-  const city = e.cityName ? (ctx.citiesByName.get(normalize(e.cityName)) ?? null) : null;
-  const inRange = !!city && (city.hasLodging || (city.travelMinutes != null && city.travelMinutes <= MAX_TRAVEL_MIN));
   const all = matchContacts(`${e.title} ${e.performers ?? ""}`, ctx.people);
   const matches = all.filter((m) => !m.ignoreInReport);
-  if (all.length && !matches.length) return null; // sami „pomijani w raporcie”
+  if (all.length && !matches.length) return null; // sami „pomijani” (nie interesuje / nie robi open miców)
 
-  const group = matches.length ? "friends" : !city || city.travelMinutes == null ? "unknownCity" : inRange ? "inRange" : null;
-  if (!group) return null;
+  const city = e.cityName ? (ctx.citiesByName.get(normalize(e.cityName)) ?? null) : null;
+  const known = !!city && city.travelMinutes != null;
+  const inRange = !!city && (city.hasLodging || (city.travelMinutes != null && city.travelMinutes <= MAX_TRAVEL_MIN));
+  const openMic = isOpenMic(e.title);
+
+  let tab: Tab | null;
+  if (matches.length) tab = matches.every((m) => m.mutedUntil) ? "muted" : "friends";
+  else if (!known) tab = "unknownCity";
+  else if (!inRange) tab = null;
+  else tab = openMic ? "openMic" : "inRange";
+  if (!tab) return null;
+
   const day = e.startsAt.slice(0, 10);
   const myGig = ctx.myGigs.find(
     (g) =>
       g.startsAt.slice(0, 10) === day &&
       (all.some((m) => m.id === g.headlinerId) || (!!g.cityName && normalize(g.cityName) === normalize(e.cityName ?? ""))),
   );
+  const lead = matches.find((m) => !m.mutedUntil) ?? matches[0];
   return {
     event: e,
     city,
     inRange,
     matches,
     isNew: e.firstSeenAt >= newSince,
-    isOpenMic: isOpenMic(e.title),
+    isOpenMic: openMic,
     myGigId: e.gigId ?? myGig?.id ?? null,
-    group,
+    performer: lead
+      ? { key: `c${lead.id}`, name: lead.name, contactId: lead.id }
+      : { key: performerKey(e.title), name: performerName(e.title), contactId: null },
+    tab,
   };
 }
 
@@ -126,4 +168,25 @@ export async function getOpportunities(onlyIds?: Set<number>) {
     .filter((e) => !onlyIds || onlyIds.has(e.id))
     .map((e) => classify(e, ctx, newSince))
     .filter((o): o is Opportunity => o !== null);
+}
+
+/**
+ * Jedna karta na komika zamiast wszystkich jego terminów.
+ * Główny termin: najbliższy w zasięgu (albo po prostu najbliższy); reszta jako alternatywy.
+ */
+export function groupByPerformer(items: Opportunity[]): OpportunityGroup[] {
+  const groups = new Map<string, Opportunity[]>();
+  for (const o of items) groups.set(o.performer.key, [...(groups.get(o.performer.key) ?? []), o]);
+  return [...groups.values()]
+    .map((list) => {
+      const primary = list.find((o) => o.myGigId) ?? list.find((o) => o.inRange) ?? list[0];
+      return {
+        performer: primary.performer,
+        primary,
+        others: list.filter((o) => o !== primary),
+        matches: primary.matches,
+        isNew: list.some((o) => o.isNew),
+      };
+    })
+    .sort((a, b) => a.primary.event.startsAt.localeCompare(b.primary.event.startsAt));
 }

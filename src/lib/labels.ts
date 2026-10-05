@@ -1,4 +1,4 @@
-import type { Bit, Contact, GigContext, GigStatus, VenueVerdict } from "@/db/schema";
+import type { Bit, Contact, GigContext, GigStatus, IgnoreReason, VenueVerdict } from "@/db/schema";
 
 export const GIG_STATUS_LABEL: Record<GigStatus, string> = {
   interested: "Zainteresowany",
@@ -92,6 +92,12 @@ export const VERDICT_TONE: Record<VenueVerdict, Tone> = {
   meh: "neutral",
   good: "success",
   great: "success",
+};
+
+export const IGNORE_REASON_LABEL: Record<IgnoreReason, string> = {
+  not_interested: "Nie interesuje mnie",
+  no_openers: "Nie robi open miców przed sobą",
+  other: "Inny powód",
 };
 
 export type Tone = "neutral" | "info" | "warning" | "success" | "danger" | "muted";

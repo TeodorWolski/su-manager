@@ -1,6 +1,6 @@
 import { saveContact } from "@/app/actions";
 import type { Contact } from "@/db/schema";
-import { RELATION_LABEL, ROLE_LABEL } from "@/lib/labels";
+import { IGNORE_REASON_LABEL, RELATION_LABEL, ROLE_LABEL } from "@/lib/labels";
 import { FieldRow, Select, SubmitButton, TextArea, TextInput, Toggle } from "./form";
 import { Section } from "./ios";
 
@@ -38,9 +38,16 @@ export function ContactForm({ contact }: { contact?: Contact }) {
         </FieldRow>
       </Section>
 
-      <Section footer="Np. gwiazdy, które nie biorą supportów — nie będą zaśmiecać raportu nowych grań.">
-        <FieldRow label="Pomijaj w raporcie">
+      <Section footer="Pomijany komik znika z Okazji i z maila — np. gwiazdy, które nie biorą open miców przed sobą.">
+        <FieldRow label="Pomijaj w Okazjach">
           <Toggle name="ignoreInReport" defaultChecked={contact?.ignoreInReport} />
+        </FieldRow>
+        <FieldRow label="Powód">
+          <Select
+            name="ignoreReason"
+            defaultValue={contact?.ignoreReason ?? ""}
+            options={Object.entries(IGNORE_REASON_LABEL).map(([value, label]) => ({ value, label }))}
+          />
         </FieldRow>
       </Section>
 
