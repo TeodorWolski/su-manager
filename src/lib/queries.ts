@@ -21,6 +21,8 @@ import { normalize } from "./text";
 export const REVIEW_DELAY_MIN = 90;
 /** Grania bez wpisanej godziny: formularz o tej porze w dniu grania. */
 export const REVIEW_TIME_DATE_ONLY = "21:00";
+/** Formularz nigdy nie wcześniej niż o tej porze w dniu grania (wypełniam wieczorem). */
+export const REVIEW_EARLIEST = "20:00";
 
 const headliner = alias(contacts, "headliner");
 
@@ -29,10 +31,14 @@ const startExpr = sql<string>`(case when length(${gigs.startsAt}) = 10 then ${gi
 const rawStart = (alias: string) =>
   sql.raw(`(case when length(${alias}.starts_at) = 10 then ${alias}.starts_at || 'T${DEFAULT_START_TIME}' else ${alias}.starts_at end)`);
 
-/** Czy nadeszła pora formularza oceny (granie „się odbyło”). */
+/**
+ * Czy nadeszła pora formularza oceny: 90 min po starcie, ale nie wcześniej niż REVIEW_EARLIEST
+ * (wypełniam wieczorem); granie bez godziny — o REVIEW_TIME_DATE_ONLY tego dnia.
+ */
 const reviewDue = () => sql`(case when length(${gigs.startsAt}) = 10
   then ${gigs.startsAt} || 'T' || ${REVIEW_TIME_DATE_ONLY} <= ${nowLocal()}
-  else ${gigs.startsAt} <= ${nowLocal(-REVIEW_DELAY_MIN)} end)`;
+  else ${gigs.startsAt} <= ${nowLocal(-REVIEW_DELAY_MIN)}
+    and substr(${gigs.startsAt}, 1, 10) || 'T' || ${REVIEW_EARLIEST} <= ${nowLocal()} end)`;
 
 const gigListSelect = {
   id: gigs.id,

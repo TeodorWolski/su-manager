@@ -5,7 +5,7 @@
  * Uruchom: pnpm tsx scripts/import-gigs.ts   (na Turso: z DATABASE_URL + DATABASE_AUTH_TOKEN)
  */
 import "dotenv/config";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { cities, contacts, db, gigContacts, gigs, venues, type Contact, type GigContext } from "../src/db";
 import { nowLocal } from "../src/lib/time";
 
@@ -99,12 +99,12 @@ const GIGS: Row[] = [
   { date: "2026-09-30", title: "Ewa Stasiewicz — „Centrum zarządzania światem”", venue: "Praska Perliczka", city: "Warszawa", context: "opener", headliner: "Ewa Stasiewicz" },
   { date: "2026-10-03", title: "Open mic Świetlica Wolności", venue: "Świetlica Wolności", city: "Warszawa", context: "open_mic" },
   // ── zaplanowane ──
-  { date: "2026-10-08", title: "Sebastian Rejent — „Ku lepszej Polsce”", venue: "Publiczna Biblioteka", city: "Piaseczno", context: "opener", headliner: "Sebastian Rejent" },
-  { date: "2026-10-09", title: "Roman Kostelecki — „Ognisko”", venue: "Hotel Campanile", city: "Łódź", context: "opener", headliner: "Roman Kostelecki" },
-  { date: "2026-10-17", title: "Wiktor Sumliński — „Profesja”", venue: "Graciarnia", city: "Gdańsk", context: "opener", headliner: "Wiktor Sumliński" },
-  { date: "2026-10-21", title: "Open mic Stand-up Lokal", venue: "Stand-up Lokal", city: "Warszawa", context: "open_mic" },
-  { date: "2026-10-25", title: "Planetarny Stand-up", venue: "Coffee Planet", city: "Wrocław", context: "open_mic" },
-  { date: "2026-10-27", title: "Dziadowski Open-mic", venue: null, city: "Wrocław", context: "open_mic", organizer: "Arnold Cytrowski", notes: "Miejsce jeszcze nieznane." },
+  { date: "2026-10-08T18:00", title: "Sebastian Rejent — „Ku lepszej Polsce”", venue: "Publiczna Biblioteka", city: "Piaseczno", context: "opener", headliner: "Sebastian Rejent" },
+  { date: "2026-10-09T19:00", title: "Roman Kostelecki — „Ognisko”", venue: "Hotel Campanile", city: "Łódź", context: "opener", headliner: "Roman Kostelecki" },
+  { date: "2026-10-17T19:00", title: "Wiktor Sumliński — „Profesja”", venue: "Graciarnia", city: "Gdańsk", context: "opener", headliner: "Wiktor Sumliński" },
+  { date: "2026-10-21T19:00", title: "Open mic Stand-up Lokal", venue: "Stand-up Lokal", city: "Warszawa", context: "open_mic" },
+  { date: "2026-10-25T19:00", title: "Planetarny Stand-up", venue: "Coffee Planet", city: "Wrocław", context: "open_mic" },
+  { date: "2026-10-27T19:00", title: "Dziadowski Open-mic", venue: "Dziady i Koktajle", city: "Wrocław", context: "open_mic", organizer: "Arnold Cytrowski" },
 ];
 
 async function cityId(name: string | null) {
@@ -151,7 +151,8 @@ async function main() {
     const [exists] = await db
       .select({ id: gigs.id })
       .from(gigs)
-      .where(and(eq(gigs.title, g.title), eq(gigs.startsAt, g.date)));
+      // po samej dacie — godzina mogła zostać dopisana później
+      .where(and(eq(gigs.title, g.title), sql`substr(${gigs.startsAt}, 1, 10) = ${g.date.slice(0, 10)}`));
     if (exists) continue;
 
     const city = await cityId(g.city);
@@ -166,7 +167,7 @@ async function main() {
         context: g.context ?? null,
         headlinerId: g.headliner ? await contactId(g.headliner) : null,
         notes: g.notes ?? null,
-        skipReview: g.date < today,
+        skipReview: g.date.slice(0, 10) < today,
       })
       .returning({ id: gigs.id });
 
