@@ -1,0 +1,35 @@
+name: Kopia zapasowa bazy
+
+on:
+  schedule:
+    - cron: "0 3 * * 0" # co niedzielę ~4:00–5:00 czasu polskiego
+  workflow_dispatch: # ręcznie z zakładki Actions
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Zrzut bazy produkcyjnej
+        run: |
+          FILE="su-manager-$(date -u +%Y-%m-%d).sql"
+          pnpm backup "$FILE"
+          gzip -9 "$FILE"
+          echo "FILE=$FILE.gz" >> "$GITHUB_ENV"
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DATABASE_AUTH_TOKEN: ${{ secrets.DATABASE_AUTH_TOKEN }}
+      # Kopie leżą w zakładce Actions → ten przebieg → Artifacts, przez 90 dni (maksimum dla GitHuba).
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.FILE }}
+          path: ${{ env.FILE }}
+          retention-days: 90
+          if-no-files-found: error
