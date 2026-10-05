@@ -3,18 +3,23 @@
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { matchContacts } from "@/lib/match";
+import { isOpenMic } from "@/lib/opportunities";
+import { normalize } from "@/lib/text";
 import {
   bits,
   cities,
   CONTACT_RELATIONS,
   contacts,
   db,
+  events,
   GIG_CONTEXTS,
   GIG_STATUSES,
   gigBits,
   gigContacts,
   gigLogs,
   gigs,
+  hiddenTitles,
   interactions,
   VENUE_VERDICTS,
   venues,
@@ -255,4 +260,65 @@ export async function saveCity(fd: FormData) {
 export async function deleteCity(id: number) {
   await db.delete(cities).where(eq(cities.id, id));
   done("/cities");
+}
+
+// ── Okazje (scraper) ────────────────────────────────────────────────────
+
+export async function dismissEvent(id: number) {
+  await db.update(events).set({ dismissed: true }).where(eq(events.id, id));
+  revalidatePath("/", "layout");
+}
+
+/** „Ukryj ten program wszędzie” — także w przyszłych przebiegach scrapera. */
+export async function hideEventTitle(id: number) {
+  const [e] = await db.select({ title: events.title }).from(events).where(eq(events.id, id));
+  if (!e) return;
+  await db
+    .insert(hiddenTitles)
+    .values({ normalizedTitle: normalize(e.title), title: e.title })
+    .onConflictDoNothing();
+  revalidatePath("/", "layout");
+}
+
+/** „Chcę zagrać” — zakłada granie w pipeline (status: zainteresowany) i podpina wydarzenie. */
+export async function eventToGig(id: number) {
+  const [e] = await db.select().from(events).where(eq(events.id, id));
+  if (!e) throw new Error("Nie ma takiego wydarzenia");
+  if (e.gigId) done(`/gigs/${e.gigId}`);
+
+  const allCities = await db.select({ id: cities.id, name: cities.name }).from(cities);
+  const city = allCities.find((c) => normalize(c.name) === normalize(e.cityName ?? ""));
+  const cityVenues = city ? await db.select({ id: venues.id, name: venues.name }).from(venues).where(eq(venues.cityId, city.id)) : [];
+  const venue = cityVenues.find((v) => normalize(v.name) === normalize(e.venueName ?? ""));
+  const people = await db
+    .select({ id: contacts.id, name: contacts.name, aliases: contacts.aliases, ignoreInReport: contacts.ignoreInReport })
+    .from(contacts);
+  const headliner = matchContacts(`${e.title} ${e.performers ?? ""}`, people).find((c) => !c.ignoreInReport);
+  const openMic = isOpenMic(e.title);
+
+  const [gig] = await db
+    .insert(gigs)
+    .values({
+      title: e.title,
+      startsAt: e.startsAt,
+      venueId: venue?.id ?? null,
+      cityId: venue ? null : (city?.id ?? null),
+      status: "interested",
+      context: openMic ? "open_mic" : "opener",
+      headlinerId: openMic ? null : (headliner?.id ?? null),
+      url: e.url,
+      notes: venue ? null : [e.venueName, e.cityName].filter(Boolean).join(", ") || null,
+    })
+    .returning({ id: gigs.id });
+  await db.update(events).set({ gigId: gig.id }).where(eq(events.id, id));
+  done(`/gigs/${gig.id}`);
+}
+
+/** Szybkie przypisanie czasu dojazdu miastu z raportu („~2 h”, „dalej”). */
+export async function setCityTravel(name: string, minutes: number) {
+  await db
+    .insert(cities)
+    .values({ name, travelMinutes: minutes, notes: "szybka ocena z Okazji" })
+    .onConflictDoUpdate({ target: cities.name, set: { travelMinutes: minutes } });
+  revalidatePath("/", "layout");
 }

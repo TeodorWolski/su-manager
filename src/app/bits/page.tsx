@@ -12,6 +12,7 @@ export default async function BitsPage() {
     <>
       <PageHeader
         title="Materiał"
+        back={{ href: "/more", label: "Więcej" }}
         subtitle={totalTested ? `${totalTested} min sprawdzonego materiału` : undefined}
         action={
           <Button asChild size="icon-lg" className="rounded-full">

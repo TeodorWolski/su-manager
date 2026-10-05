@@ -11,10 +11,12 @@
     "db:migrate": "drizzle-kit migrate",
     "db:seed": "tsx src/db/seed.ts",
     "db:studio": "drizzle-kit studio",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "scrape": "tsx scripts/scrape.ts"
   },
   "dependencies": {
     "@libsql/client": "^0.18.0",
+    "cheerio": "^1.2.0",
     "class-variance-authority": "^0.7.1",
     "cn": "^0.4.0",
     "date-fns": "^4.4.0",

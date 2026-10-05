@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import {
   integer,
   primaryKey,
+  uniqueIndex,
   sqliteTable,
   text,
 } from "drizzle-orm/sqlite-core";
@@ -67,7 +68,8 @@ export const interactions = sqliteTable("interactions", {
   createdAt: createdAt(),
 });
 
-export const VENUE_VERDICTS = ["good", "meh", "never"] as const;
+/** Ogólna ocena miejsca, 5 stopni od najgorszej. "never" = czarna lista. */
+export const VENUE_VERDICTS = ["never", "weak", "meh", "good", "great"] as const;
 
 export const venues = sqliteTable("venues", {
   id: id(),
@@ -166,6 +168,38 @@ export const gigBits = sqliteTable(
   (t) => [primaryKey({ columns: [t.gigId, t.bitId] })],
 );
 
+/** Wydarzenia zebrane przez scraper z bileterii. */
+export const events = sqliteTable(
+  "events",
+  {
+    id: id(),
+    source: text("source").notNull(),
+    sourceId: text("source_id").notNull(),
+    url: text("url").notNull(),
+    title: text("title").notNull(),
+    /** Lokalny czas Warszawy: "2026-10-14T20:00" albo sama data. */
+    startsAt: text("starts_at").notNull(),
+    cityName: text("city_name"),
+    venueName: text("venue_name"),
+    /** Występujący / organizator, jeśli serwis ich podaje — dodatkowy tekst do dopasowania. */
+    performers: text("performers"),
+    /** normalize(tytuł)|data|normalize(miejsce) — deduplikacja między serwisami. */
+    dedupeKey: text("dedupe_key").notNull().unique(),
+    firstSeenAt: createdAt(),
+    lastSeenAt: text("last_seen_at").notNull(),
+    dismissed: integer("dismissed", { mode: "boolean" }).notNull().default(false),
+    gigId: integer("gig_id").references(() => gigs.id, { onDelete: "set null" }),
+  },
+  (t) => [uniqueIndex("events_source_id").on(t.source, t.sourceId)],
+);
+
+/** Programy wyciszone w raporcie („Ukryj ten program wszędzie”) — po znormalizowanym tytule. */
+export const hiddenTitles = sqliteTable("hidden_titles", {
+  normalizedTitle: text("normalized_title").primaryKey(),
+  title: text("title").notNull(),
+  createdAt: createdAt(),
+});
+
 export type City = typeof cities.$inferSelect;
 export type Contact = typeof contacts.$inferSelect;
 export type Interaction = typeof interactions.$inferSelect;
@@ -173,6 +207,7 @@ export type Venue = typeof venues.$inferSelect;
 export type Bit = typeof bits.$inferSelect;
 export type Gig = typeof gigs.$inferSelect;
 export type GigLog = typeof gigLogs.$inferSelect;
+export type Event = typeof events.$inferSelect;
 export type GigStatus = (typeof GIG_STATUSES)[number];
 export type GigContext = (typeof GIG_CONTEXTS)[number];
 export type VenueVerdict = (typeof VENUE_VERDICTS)[number];

@@ -1,6 +1,6 @@
 "use client";
 
-import { BookOpen, CalendarDays, Ellipsis, House, Users } from "lucide-react";
+import { CalendarDays, Ellipsis, House, Sparkles, Users } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -9,12 +9,12 @@ const TABS = [
   { href: "/", label: "Dziś", icon: House, match: (p: string) => p === "/" },
   { href: "/gigs", label: "Grania", icon: CalendarDays, match: (p: string) => p.startsWith("/gigs") },
   { href: "/contacts", label: "Ludzie", icon: Users, match: (p: string) => p.startsWith("/contacts") },
-  { href: "/bits", label: "Materiał", icon: BookOpen, match: (p: string) => p.startsWith("/bits") },
+  { href: "/events", label: "Okazje", icon: Sparkles, match: (p: string) => p.startsWith("/events") },
   {
     href: "/more",
     label: "Więcej",
     icon: Ellipsis,
-    match: (p: string) => ["/more", "/venues", "/cities", "/thoughts"].some((x) => p.startsWith(x)),
+    match: (p: string) => ["/more", "/bits", "/venues", "/cities", "/thoughts"].some((x) => p.startsWith(x)),
   },
 ];
 

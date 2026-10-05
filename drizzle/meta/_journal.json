@@ -29,6 +29,20 @@
       "when": 1791206921741,
       "tag": "0003_fluffy_dragon_lord",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1791219125712,
+      "tag": "0004_peaceful_dark_beast",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1791219671834,
+      "tag": "0005_sweet_toro",
+      "breakpoints": true
     }
   ]
 }

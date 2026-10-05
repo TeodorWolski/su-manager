@@ -43,7 +43,7 @@ export function VenueForm({ venue, options }: { venue?: Venue; options: FormOpti
             name="verdict"
             placeholder="nie oceniłem"
             defaultValue={venue?.verdict ?? ""}
-            options={VENUE_VERDICTS.map((v) => ({ value: v, label: VERDICT_LABEL[v] }))}
+            options={[...VENUE_VERDICTS].reverse().map((v) => ({ value: v, label: VERDICT_LABEL[v] }))}
           />
         </FieldRow>
         <FieldRow label="Dlaczego">

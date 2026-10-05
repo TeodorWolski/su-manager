@@ -70,15 +70,28 @@ export const BIT_STATUS_TONE: Record<Bit["status"], Tone> = {
 };
 
 export const VERDICT_LABEL: Record<VenueVerdict, string> = {
-  good: "Fajne",
-  meh: "Meh, ale ujdzie",
   never: "Nie wracam",
+  weak: "Słabo",
+  meh: "Meh, ale ujdzie",
+  good: "Fajne",
+  great: "Świetne",
+};
+
+/** Krótkie etykiety do przycisków szybkiej oceny. */
+export const VERDICT_SHORT: Record<VenueVerdict, string> = {
+  never: "Nie wracam",
+  weak: "Słabo",
+  meh: "Meh",
+  good: "Fajne",
+  great: "Świetne",
 };
 
 export const VERDICT_TONE: Record<VenueVerdict, Tone> = {
-  good: "success",
-  meh: "warning",
   never: "danger",
+  weak: "warning",
+  meh: "neutral",
+  good: "success",
+  great: "success",
 };
 
 export type Tone = "neutral" | "info" | "warning" | "success" | "danger" | "muted";

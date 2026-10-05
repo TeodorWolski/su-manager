@@ -3,19 +3,21 @@ import Link from "next/link";
 import { setVenueVerdict } from "@/app/actions";
 import { Empty, PageHeader, Pill, Rating, Row, Section } from "@/components/ios";
 import { Button } from "@/components/ui/button";
-import { VENUE_VERDICTS } from "@/db/schema";
-import { VERDICT_LABEL, VERDICT_TONE } from "@/lib/labels";
+import { VENUE_VERDICTS, type VenueVerdict } from "@/db/schema";
+import { VERDICT_LABEL, VERDICT_SHORT, VERDICT_TONE } from "@/lib/labels";
 import { listVenues } from "@/lib/queries";
 import { fmtTravel } from "@/lib/time";
 import { cn } from "@/lib/utils";
 
 type VenueItem = Awaited<ReturnType<typeof listVenues>>[number];
 
-const QUICK = [
-  { verdict: "good", label: "Fajne", className: "bg-primary/14 text-primary" },
-  { verdict: "meh", label: "Meh", className: "bg-warning/15 text-amber-700 dark:text-warning" },
-  { verdict: "never", label: "Nie wracam", className: "bg-destructive/12 text-destructive" },
-] as const;
+const QUICK_STYLE: Record<VenueVerdict, string> = {
+  never: "bg-destructive/12 text-destructive",
+  weak: "bg-warning/15 text-amber-700 dark:text-warning",
+  meh: "bg-secondary text-secondary-foreground",
+  good: "bg-primary/14 text-primary",
+  great: "bg-primary text-primary-foreground",
+};
 
 const subtitle = (v: VenueItem) =>
   [v.cityName, v.recurrence, fmtTravel(v.travelMinutes), v.hasLodging && "nocleg"].filter(Boolean).join(" · ");
@@ -48,11 +50,17 @@ function UnratedRow({ v }: { v: VenueItem }) {
         <div className="truncate text-[16px]">{v.name}</div>
         <div className="text-muted-foreground truncate text-[13px]">{subtitle(v)}</div>
       </Link>
-      <div className="mt-2 grid grid-cols-3 gap-2">
-        {QUICK.map((q) => (
-          <form key={q.verdict} action={setVenueVerdict.bind(null, v.id, q.verdict)}>
-            <button type="submit" className={cn("h-9 w-full rounded-lg text-[14px] font-medium active:scale-95", q.className)}>
-              {q.label}
+      <div className="mt-2 grid grid-cols-5 gap-1.5">
+        {VENUE_VERDICTS.map((verdict) => (
+          <form key={verdict} action={setVenueVerdict.bind(null, v.id, verdict)}>
+            <button
+              type="submit"
+              className={cn(
+                "h-11 w-full rounded-lg px-0.5 text-[12px] leading-tight font-medium active:scale-95 sm:text-[13px]",
+                QUICK_STYLE[verdict],
+              )}
+            >
+              {VERDICT_SHORT[verdict]}
             </button>
           </form>
         ))}
@@ -90,7 +98,7 @@ export default async function VenuesPage() {
           ))}
         </Section>
       )}
-      {VENUE_VERDICTS.map((verdict) => {
+      {[...VENUE_VERDICTS].reverse().map((verdict) => {
         const items = all.filter((v) => v.verdict === verdict);
         if (!items.length) return null;
         return (
