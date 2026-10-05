@@ -46,6 +46,7 @@ const gigListSelect = {
   headlinerName: headliner.name,
   rating: gigLogs.rating,
   venueRating: gigLogs.venueRating,
+  createdAt: gigs.createdAt,
 };
 
 function gigListQuery() {

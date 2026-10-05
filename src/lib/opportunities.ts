@@ -14,13 +14,19 @@ export const MAX_TRAVEL_MIN = 180;
 /** Ile dni wydarzenie jest „nowe” w aplikacji. */
 export const NEW_FOR_DAYS = 7;
 /** Po wspólnym wieczorze nie proponuj tego komika przez tyle dni (chyba że kontakt ma własne „wyciszony do”). */
-export const COOLDOWN_DAYS = 90;
+export const COOLDOWN_DAYS = 30;
+/** Statusy grania, przy których nie piszę do komika o kolejny termin. */
+export const ACTIVE_GIG: readonly string[] = ["interested", "contacted", "waiting", "confirmed"];
 
 export type MatchedContact = Pick<Contact, "id" | "name" | "relation" | "ignoreInReport" | "snoozeUntil"> & {
   lastPlayedTogether: string | null;
   /** Do kiedy wyciszony w Okazjach (data), null = widoczny. */
   mutedUntil: string | null;
+  muteReason: MuteReason | null;
 };
+
+/** manual = sam wyciszyłem, gig = mamy granie w toku, played = niedawno graliśmy. */
+export type MuteReason = "manual" | "gig" | "played";
 
 export type Tab = "friends" | "inRange" | "openMic" | "unknownCity" | "muted";
 
@@ -55,11 +61,41 @@ export const isOpenMic = (title: string) => /open[\s-]?mi[ck]|\bom\b/.test(norma
 const addDays = (date: string, days: number) =>
   new Date(Date.parse(date.slice(0, 10)) + days * 864e5).toISOString().slice(0, 10);
 
-/** Do kiedy kontakt jest wyciszony: ręczne „wyciszony do” albo COOLDOWN_DAYS po wspólnym wieczorze. */
-export function mutedUntil(c: { snoozeUntil: string | null; lastPlayedTogether: string | null }, today: string) {
-  const until = c.snoozeUntil ?? (c.lastPlayedTogether ? addDays(c.lastPlayedTogether, COOLDOWN_DAYS) : null);
-  return until && until > today ? until : null;
+type MuteInput = {
+  snoozeUntil: string | null;
+  lastPlayedTogether: string | null;
+  nextGig: string | null;
+  nextGigCreatedAt: string | null;
+};
+
+/**
+ * Czy (i do kiedy) komik jest wyciszony w Okazjach:
+ * 1. ręcznie („Wycisz na miesiąc”) — snoozeUntil w przyszłości,
+ * 2. mamy granie w toku (od „zainteresowany” do „potwierdzone”) — do dnia tego grania,
+ * 3. niedawno graliśmy — COOLDOWN_DAYS po wspólnym wieczorze.
+ * snoozeUntil w przeszłości = „Pokaż teraz”: znosi 2. i 3., ale tylko jeśli powód powstał przed kliknięciem.
+ */
+export function muteState(c: MuteInput, today: string): { until: string; reason: MuteReason } | null {
+  if (c.snoozeUntil && c.snoozeUntil > today) return { until: c.snoozeUntil, reason: "manual" };
+  const shownSince = c.snoozeUntil; // dzień przed kliknięciem „Pokaż teraz”
+  if (c.nextGig && !(shownSince && c.nextGigCreatedAt && shownSince >= c.nextGigCreatedAt.slice(0, 10))) {
+    return { until: c.nextGig.slice(0, 10), reason: "gig" };
+  }
+  if (c.lastPlayedTogether) {
+    const until = addDays(c.lastPlayedTogether, COOLDOWN_DAYS);
+    const overridden = shownSince && shownSince >= c.lastPlayedTogether.slice(0, 10);
+    if (until > today && !overridden) return { until, reason: "played" };
+  }
+  return null;
 }
+
+/** Najbliższe granie w toku z tym kontaktem (jako headliner albo w lineupie). */
+const nextGigSql = (column: string) =>
+  sql.raw(`select ${column} from gigs g
+    where g.status in (${ACTIVE_GIG.map((s) => `'${s}'`).join(", ")}) and g.starts_at >= date('now')
+      and (g.headliner_id = contacts.id
+        or exists (select 1 from gig_contacts gc where gc.gig_id = g.id and gc.contact_id = contacts.id))
+    order by g.starts_at limit 1`);
 
 async function loadContext() {
   const now = nowLocal();
@@ -79,6 +115,8 @@ async function loadContext() {
           where g.status = 'confirmed' and g.starts_at < ${now}
             and (g.headliner_id = contacts.id
               or exists (select 1 from gig_contacts gc where gc.gig_id = g.id and gc.contact_id = contacts.id)))`,
+        nextGig: sql<string | null>`(${nextGigSql("g.starts_at")})`,
+        nextGigCreatedAt: sql<string | null>`(${nextGigSql("g.created_at")})`,
       })
       .from(contacts),
     db
@@ -101,7 +139,10 @@ async function loadContext() {
   ]);
   return {
     citiesByName: new Map(allCities.map((c) => [normalize(c.name), c])),
-    people: people.map((p) => ({ ...p, mutedUntil: mutedUntil(p, today) })),
+    people: people.map((p) => {
+      const m = muteState(p, today);
+      return { ...p, mutedUntil: m?.until ?? null, muteReason: m?.reason ?? null };
+    }),
     blacklist: new Set(never.map((v) => `${normalize(v.name)}|${normalize(v.cityName ?? "")}`)),
     hidden: new Set(hidden.map((h) => h.t)),
     myGigs,

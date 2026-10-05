@@ -14,7 +14,7 @@ import { GigRow } from "@/components/gig-row";
 import { Empty, PageHeader, Pill, Row, Section } from "@/components/ios";
 import { Button } from "@/components/ui/button";
 import { IGNORE_REASON_LABEL, RELATION_LABEL, RELATION_TONE, ROLE_LABEL } from "@/lib/labels";
-import { COOLDOWN_DAYS, mutedUntil } from "@/lib/opportunities";
+import { ACTIVE_GIG, COOLDOWN_DAYS, muteState } from "@/lib/opportunities";
 import { getContact } from "@/lib/queries";
 import { fmtDate, nowLocal } from "@/lib/time";
 
@@ -28,8 +28,25 @@ export default async function ContactPage({ params }: PageProps<"/contacts/[id]"
   const today = nowLocal().slice(0, 10);
   const lastPlayedTogether =
     data.gigs.filter((g) => g.status === "confirmed" && g.startsAt < today).map((g) => g.startsAt).sort().at(-1) ?? null;
-  const muted = mutedUntil({ snoozeUntil: contact.snoozeUntil, lastPlayedTogether }, today);
+  const nextGig = data.gigs
+    .filter((g) => ACTIVE_GIG.includes(g.status) && g.startsAt >= today)
+    .sort((a, b) => a.startsAt.localeCompare(b.startsAt))[0];
+  const mute = muteState(
+    {
+      snoozeUntil: contact.snoozeUntil,
+      lastPlayedTogether,
+      nextGig: nextGig?.startsAt ?? null,
+      nextGigCreatedAt: nextGig?.createdAt ?? null,
+    },
+    today,
+  );
+  const muted = mute?.until ?? null;
   const manualSnooze = contact.snoozeUntil != null;
+  const muteNote = {
+    manual: "Wyciszony ręcznie.",
+    gig: `Macie granie w toku (${nextGig ? fmtDate(nextGig.startsAt) : ""}) — nie proponuję kolejnych terminów. Potem jeszcze ${COOLDOWN_DAYS} dni przerwy.`,
+    played: `${COOLDOWN_DAYS} dni po wspólnym wieczorze (${lastPlayedTogether ? fmtDate(lastPlayedTogether) : ""}).`,
+  };
 
   return (
     <>
@@ -66,9 +83,9 @@ export default async function ContactPage({ params }: PageProps<"/contacts/[id]"
           footer={
             contact.ignoreInReport
               ? "Jego występy nie pojawiają się w Okazjach ani w mailu."
-              : muted && !manualSnooze
-                ? `Automatycznie: ${COOLDOWN_DAYS} dni po wspólnym wieczorze (${fmtDate(lastPlayedTogether!)}).`
-                : manualSnooze && !muted
+              : mute
+                ? muteNote[mute.reason]
+                : manualSnooze
                   ? "Pokazywany mimo niedawnego wspólnego wieczoru."
                   : undefined
           }
@@ -90,8 +107,8 @@ export default async function ContactPage({ params }: PageProps<"/contacts/[id]"
                 <button type="submit" className="text-primary h-9 text-[15px]">Pokaż teraz</button>
               </form>
             ) : (
-              <form action={snoozeContact.bind(null, contact.id, 90)}>
-                <button type="submit" className="text-primary h-9 text-[15px]">Wycisz na 3 mies.</button>
+              <form action={snoozeContact.bind(null, contact.id, 30)}>
+                <button type="submit" className="text-primary h-9 text-[15px]">Wycisz na miesiąc</button>
               </form>
             )}
             {manualSnooze && !contact.ignoreInReport && (

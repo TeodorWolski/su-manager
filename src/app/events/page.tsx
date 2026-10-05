@@ -25,6 +25,8 @@ const TABS = {
 type TabKey = keyof typeof TABS;
 const PAGE = 40;
 
+const MUTE_LABEL = { manual: "wyciszony", gig: "macie granie", played: "niedawno graliście" } as const;
+
 const QUICK_TRAVEL = [
   { label: "~1 h", minutes: 60 },
   { label: "~2 h", minutes: 120 },
@@ -67,7 +69,7 @@ function GigButton({ o, small }: { o: Opportunity; small?: boolean }) {
   );
 }
 
-/** „Ukryj ▾”: komik ląduje w CRM jako pomijany (z powodem) albo wyciszony na 3 miesiące. */
+/** „Ukryj ▾”: komik ląduje w CRM jako pomijany (z powodem) albo wyciszony na miesiąc. */
 function HideMenu({ g }: { g: OpportunityGroup }) {
   const button = "bg-card h-10 w-full rounded-lg px-3 text-left text-[14px] active:scale-[0.98]";
   return (
@@ -88,7 +90,7 @@ function HideMenu({ g }: { g: OpportunityGroup }) {
           Nie robi open miców przed sobą
         </button>
         <button type="submit" formAction={snoozePerformer} className={button}>
-          Wycisz na 3 miesiące <span className="text-muted-foreground">(np. już pisałem)</span>
+          Wycisz na miesiąc <span className="text-muted-foreground">(np. już pisałem)</span>
         </button>
       </form>
     </details>
@@ -161,7 +163,9 @@ function Muted({ groups }: { groups: OpportunityGroup[] }) {
         Wyciszeni · {groups.length}
         <ChevronDown className="size-3.5 transition-transform group-open/muted:rotate-180" />
       </summary>
-      <Section footer={`Po wspólnym wieczorze komik znika z Okazji na ${COOLDOWN_DAYS} dni. Zmienisz to też na karcie kontaktu.`}>
+      <Section
+        footer={`Komik znika z Okazji, gdy macie granie w toku, i jeszcze na ${COOLDOWN_DAYS} dni po wspólnym wieczorze. Zmienisz to też na karcie kontaktu.`}
+      >
         {groups.map((g) => {
           const m = g.matches.find((x) => x.mutedUntil) ?? g.matches[0];
           return (
@@ -169,7 +173,7 @@ function Muted({ groups }: { groups: OpportunityGroup[] }) {
               <Link href={`/contacts/${m.id}`} className="min-w-0 flex-1">
                 <div className="truncate text-[16px]">{m.name}</div>
                 <div className="text-muted-foreground truncate text-[13px]">
-                  wyciszony do {m.mutedUntil ? fmtDate(m.mutedUntil) : "—"} ·{" "}
+                  {m.muteReason ? MUTE_LABEL[m.muteReason] : "wyciszony"} do {m.mutedUntil ? fmtDate(m.mutedUntil) : "—"} ·{" "}
                   {plural(g.others.length + 1, "termin", "terminy", "terminów")}
                 </div>
               </Link>

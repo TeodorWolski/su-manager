@@ -294,7 +294,7 @@ export async function hidePerformer(fd: FormData) {
 export async function snoozePerformer(fd: FormData) {
   const name = required(str(fd, "name"), "komik");
   const id = int(fd, "contactId") ?? (await performerContactId(name));
-  await setContactSnooze(id, isoDate(int(fd, "days") ?? 90));
+  await setContactSnooze(id, isoDate(int(fd, "days") ?? 30));
 }
 
 /** `until` = data, do której wyciszony; data w przeszłości = „pokazuj już teraz”; null = automatycznie. */
