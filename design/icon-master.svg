@@ -1,28 +1,13 @@
-<!-- Wzór ikony SU Manager: mikrofon na statywie, biały na zieleni Bolta.
-     Pełne tło bez zaokrągleń — zaokrąglenia dodaje system (iOS) albo wersja icon.svg. -->
+<!-- Ikona SU Manager: mikrofon jako wykrzyknik (głowica z siatką = kreska, podstawa = kropka).
+     Limonka + tusz z motywu „Kartka”. Pełne tło bez zaokrągleń — zaokrąglenia dodaje system (iOS)
+     albo wersja src/app/icon.svg. -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
-  <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#3EDC93"/>
-      <stop offset="1" stop-color="#17985A"/>
-    </linearGradient>
-  </defs>
-  <rect width="1024" height="1024" fill="url(#bg)"/>
-  <g fill="#fff">
-    <!-- głowica -->
-    <rect x="387" y="168" width="250" height="340" rx="125"/>
-    <!-- szyjka -->
-    <path d="M452 520h120l-24 118h-72z"/>
-    <!-- statyw -->
-    <rect x="496" y="630" width="32" height="178" rx="10"/>
-    <!-- podstawa -->
-    <rect x="352" y="796" width="320" height="52" rx="26"/>
+  <rect width="1024" height="1024" fill="#C8E263"/>
+  <rect x="402" y="150" width="220" height="470" rx="110" fill="#141413"/>
+  <g stroke="#C8E263" stroke-width="22" stroke-linecap="round">
+    <line x1="452" y1="270" x2="572" y2="270"/>
+    <line x1="446" y1="330" x2="578" y2="330"/>
+    <line x1="452" y1="390" x2="572" y2="390"/>
   </g>
-  <!-- siatka głowicy -->
-  <g stroke="#17985A" stroke-opacity=".35" stroke-width="16" stroke-linecap="round">
-    <line x1="430" y1="262" x2="594" y2="262"/>
-    <line x1="420" y1="318" x2="604" y2="318"/>
-    <line x1="420" y1="374" x2="604" y2="374"/>
-    <line x1="430" y1="430" x2="594" y2="430"/>
-  </g>
+  <circle cx="512" cy="790" r="96" fill="#141413"/>
 </svg>
