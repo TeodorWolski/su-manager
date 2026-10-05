@@ -285,3 +285,25 @@ export async function getFormOptions() {
 
 export type FormOptions = Awaited<ReturnType<typeof getFormOptions>>;
 export type { GigStatus };
+
+/** Potwierdzone grania do feedu kalendarza (.ics). */
+export async function listCalendarGigs() {
+  return db
+    .select({
+      id: gigs.id,
+      title: gigs.title,
+      startsAt: gigs.startsAt,
+      url: gigs.url,
+      notes: gigs.notes,
+      context: gigs.context,
+      venueName: gigListSelect.venueName,
+      cityName: gigListSelect.cityName,
+      headlinerName: gigListSelect.headlinerName,
+    })
+    .from(gigs)
+    .leftJoin(venues, eq(gigs.venueId, venues.id))
+    .leftJoin(cities, eq(gigs.cityId, cities.id))
+    .leftJoin(headliner, eq(gigs.headlinerId, headliner.id))
+    .where(eq(gigs.status, "confirmed"))
+    .orderBy(asc(gigs.startsAt));
+}

@@ -23,5 +23,6 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|icon).*)"],
+  // /calendar/<token>.ics — feed dla Google Calendar, chroniony tokenem w adresie zamiast hasła.
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|icon|calendar/).*)"],
 };
