@@ -1,13 +1,15 @@
 import { Plus } from "lucide-react";
 import Link from "next/link";
 import { GigRow } from "@/components/gig-row";
-import { Empty, PageHeader, Rating, Row, Section, Stat } from "@/components/ios";
+import { GigGoalCard, MaterialGoalCard } from "@/components/goals";
+import { Empty, PageHeader, Rating, Row, Section } from "@/components/ios";
 import { Button } from "@/components/ui/button";
 import { getDashboard } from "@/lib/queries";
-import { fmtDate, fmtDateLong, fmtMonth, nowLocal } from "@/lib/time";
+import { getGoals } from "@/lib/goals";
+import { fmtDate, fmtDateLong, nowLocal } from "@/lib/time";
 
 export default async function Home() {
-  const { upcoming, pipeline, month, recent } = await getDashboard();
+  const [{ upcoming, pipeline, month, recent }, goals] = await Promise.all([getDashboard(), getGoals()]);
   const today = nowLocal();
 
   return (
@@ -24,9 +26,9 @@ export default async function Home() {
         }
       />
 
-      <div className="mb-7 grid grid-cols-2 gap-3">
-        <Stat label={<span className="capitalize">Grania · {fmtMonth(today)}</span>} value={month.count} />
-        <Stat label="Średnia ocena" value={month.avg ? <Rating value={month.avg} /> : "—"} />
+      <div className="mb-7 grid gap-3 md:grid-cols-2">
+        <GigGoalCard goals={goals} avgRating={month.avg} />
+        <MaterialGoalCard goals={goals} />
       </div>
 
       <Section title="Nadchodzące">

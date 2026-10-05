@@ -2,7 +2,7 @@ import { Check, ExternalLink } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { deleteGig, setGigStatus } from "@/app/actions";
-import { ConfirmButton } from "@/components/form";
+import { ConfirmButton, PendingButton } from "@/components/form";
 import { PageHeader, Pill, Row, Section, Stat } from "@/components/ios";
 import { Button } from "@/components/ui/button";
 import { GIG_CONTEXT_LABEL, GIG_PIPELINE, GIG_STATUS_LABEL, GIG_STATUS_TONE } from "@/lib/labels";
@@ -42,7 +42,7 @@ export default async function GigPage({ params }: PageProps<"/gigs/[id]">) {
           <div className="grid grid-cols-4 gap-1 p-2">
             {GIG_PIPELINE.map((s, i) => (
               <form key={s} action={setGigStatus.bind(null, gig.id, s)}>
-                <button
+                <PendingButton
                   type="submit"
                   className={cn(
                     "flex h-16 w-full min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-0.5 text-[11px] leading-tight font-medium transition-all active:scale-95 sm:text-[12px] [&>span:last-child]:max-w-full [&>span:last-child]:truncate",
@@ -57,19 +57,19 @@ export default async function GigPage({ params }: PageProps<"/gigs/[id]">) {
                     {i < stepIndex ? <Check className="size-3.5" /> : i + 1}
                   </span>
                   <span>{GIG_STATUS_LABEL[s]}</span>
-                </button>
+                </PendingButton>
               </form>
             ))}
           </div>
           <div className="flex border-t">
             {(["rejected", "cancelled"] as const).map((s) => (
               <form key={s} action={setGigStatus.bind(null, gig.id, s)} className="flex-1 [&:not(:last-child)]:border-r">
-                <button
+                <PendingButton
                   type="submit"
                   className={cn("h-11 w-full text-[15px]", gig.status === s ? "text-destructive font-semibold" : "text-muted-foreground")}
                 >
                   {GIG_STATUS_LABEL[s]}
-                </button>
+                </PendingButton>
               </form>
             ))}
           </div>

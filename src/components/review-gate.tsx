@@ -1,3 +1,4 @@
+import { PendingButton } from "@/components/form";
 import { markGigCancelled } from "@/app/actions";
 import type { FormOptions, GigListItem } from "@/lib/queries";
 import { fmtDateTime } from "@/lib/time";
@@ -40,9 +41,9 @@ export function ReviewGate({
         />
 
         <form action={cancel} className="pb-10 text-center">
-          <button type="submit" className="text-muted-foreground text-[15px] underline-offset-4 hover:underline">
+          <PendingButton className="text-muted-foreground text-[15px] underline-offset-4 hover:underline">
             Nie zagrałem — granie się nie odbyło
-          </button>
+          </PendingButton>
         </form>
       </div>
     </div>

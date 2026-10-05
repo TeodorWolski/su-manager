@@ -209,6 +209,19 @@ export const hiddenTitles = sqliteTable("hidden_titles", {
   createdAt: createdAt(),
 });
 
+/**
+ * Cele. Klucze: "gigs:YYYY-MM" — liczba grań w miesiącu; "material" — minuty materiału do `deadline`.
+ * Brak wiersza = wartość domyślna (patrz src/lib/goals.ts), więc nic nie jest na sztywno.
+ */
+export const goals = sqliteTable("goals", {
+  key: text("key").primaryKey(),
+  target: integer("target").notNull(),
+  deadline: text("deadline"),
+  updatedAt: text("updated_at")
+    .notNull()
+    .default(sql`(datetime('now'))`),
+});
+
 export type City = typeof cities.$inferSelect;
 export type Contact = typeof contacts.$inferSelect;
 export type Interaction = typeof interactions.$inferSelect;

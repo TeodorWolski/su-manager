@@ -102,20 +102,23 @@ export async function getPendingReviews() {
 }
 
 export async function getGig(id: number) {
-  const [row] = await gigListQuery().where(eq(gigs.id, id));
-  if (!row) return null;
-  const [gig] = await db.select().from(gigs).where(eq(gigs.id, id));
-  const [log] = await db.select().from(gigLogs).where(eq(gigLogs.gigId, id));
-  const playedBits = await db
-    .select({ id: bits.id, name: bits.name })
-    .from(gigBits)
-    .innerJoin(bits, eq(gigBits.bitId, bits.id))
-    .where(eq(gigBits.gigId, id));
-  const lineup = await db
-    .select({ id: contacts.id, name: contacts.name })
-    .from(gigContacts)
-    .innerJoin(contacts, eq(gigContacts.contactId, contacts.id))
-    .where(eq(gigContacts.gigId, id));
+  // Równolegle — każde zapytanie to osobny round-trip do Turso.
+  const [[row], [gig], [log], playedBits, lineup] = await Promise.all([
+    gigListQuery().where(eq(gigs.id, id)),
+    db.select().from(gigs).where(eq(gigs.id, id)),
+    db.select().from(gigLogs).where(eq(gigLogs.gigId, id)),
+    db
+      .select({ id: bits.id, name: bits.name })
+      .from(gigBits)
+      .innerJoin(bits, eq(gigBits.bitId, bits.id))
+      .where(eq(gigBits.gigId, id)),
+    db
+      .select({ id: contacts.id, name: contacts.name })
+      .from(gigContacts)
+      .innerJoin(contacts, eq(gigContacts.contactId, contacts.id))
+      .where(eq(gigContacts.gigId, id)),
+  ]);
+  if (!row || !gig) return null;
   return { ...row, gig, log: log ?? null, bits: playedBits, lineup };
 }
 
@@ -173,18 +176,20 @@ export async function listContacts() {
 }
 
 export async function getContact(id: number) {
-  const [contact] = await db.select().from(contacts).where(eq(contacts.id, id));
+  const [[contact], history, sharedGigs, asHeadliner] = await Promise.all([
+    db.select().from(contacts).where(eq(contacts.id, id)),
+    db
+      .select()
+      .from(interactions)
+      .where(eq(interactions.contactId, id))
+      .orderBy(desc(interactions.date), desc(interactions.id)),
+    gigListQuery()
+      .innerJoin(gigContacts, eq(gigContacts.gigId, gigs.id))
+      .where(eq(gigContacts.contactId, id))
+      .orderBy(desc(gigs.startsAt)),
+    gigListQuery().where(eq(gigs.headlinerId, id)).orderBy(desc(gigs.startsAt)),
+  ]);
   if (!contact) return null;
-  const history = await db
-    .select()
-    .from(interactions)
-    .where(eq(interactions.contactId, id))
-    .orderBy(desc(interactions.date), desc(interactions.id));
-  const sharedGigs = await gigListQuery()
-    .innerJoin(gigContacts, eq(gigContacts.gigId, gigs.id))
-    .where(eq(gigContacts.contactId, id))
-    .orderBy(desc(gigs.startsAt));
-  const asHeadliner = await gigListQuery().where(eq(gigs.headlinerId, id)).orderBy(desc(gigs.startsAt));
   return { contact, history, gigs: dedupeById([...sharedGigs, ...asHeadliner]) };
 }
 

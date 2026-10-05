@@ -9,7 +9,7 @@ import {
   unhideContact,
   unsnoozeContact,
 } from "@/app/actions";
-import { ConfirmButton, FieldRow, Select, SubmitButton, TextInput } from "@/components/form";
+import { ConfirmButton, FieldRow, Select, SubmitButton, TextInput, PendingButton } from "@/components/form";
 import { GigRow } from "@/components/gig-row";
 import { Empty, PageHeader, Pill, Row, Section } from "@/components/ios";
 import { Button } from "@/components/ui/button";
@@ -100,20 +100,20 @@ export default async function ContactPage({ params }: PageProps<"/contacts/[id]"
             </span>
             {contact.ignoreInReport ? (
               <form action={unhideContact.bind(null, contact.id)}>
-                <button type="submit" className="text-primary h-9 text-[15px]">Przywróć</button>
+                <PendingButton className="text-primary h-9 text-[15px]">Przywróć</PendingButton>
               </form>
             ) : muted ? (
               <form action={unsnoozeContact.bind(null, contact.id)}>
-                <button type="submit" className="text-primary h-9 text-[15px]">Pokaż teraz</button>
+                <PendingButton className="text-primary h-9 text-[15px]">Pokaż teraz</PendingButton>
               </form>
             ) : (
               <form action={snoozeContact.bind(null, contact.id, 30)}>
-                <button type="submit" className="text-primary h-9 text-[15px]">Wycisz na miesiąc</button>
+                <PendingButton className="text-primary h-9 text-[15px]">Wycisz na miesiąc</PendingButton>
               </form>
             )}
             {manualSnooze && !contact.ignoreInReport && (
               <form action={setContactSnooze.bind(null, contact.id, null)}>
-                <button type="submit" className="text-muted-foreground h-9 text-[15px]">Automatycznie</button>
+                <PendingButton className="text-muted-foreground h-9 text-[15px]">Automatycznie</PendingButton>
               </form>
             )}
           </div>
@@ -132,9 +132,9 @@ export default async function ContactPage({ params }: PageProps<"/contacts/[id]"
               </div>
               {i.replied != null && <Pill tone={i.replied ? "success" : "warning"}>{i.replied ? "odpisał" : "cisza"}</Pill>}
               <form action={deleteInteraction.bind(null, i.id, contact.id)}>
-                <button type="submit" className="text-muted-foreground/60 hover:text-destructive px-1 text-lg" aria-label="Usuń wpis">
+                <PendingButton className="text-muted-foreground/60 hover:text-destructive px-1 text-lg" aria-label="Usuń wpis">
                   ×
-                </button>
+                </PendingButton>
               </form>
             </div>
           ))

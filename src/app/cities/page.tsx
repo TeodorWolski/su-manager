@@ -1,6 +1,6 @@
 import { ChevronRight } from "lucide-react";
 import { deleteCity, saveCity } from "@/app/actions";
-import { FieldRow, NumberInput, Select, SubmitButton, TextInput, Toggle } from "@/components/form";
+import { FieldRow, NumberInput, Select, SubmitButton, TextInput, Toggle, PendingButton } from "@/components/form";
 import { PageHeader, Pill, Section } from "@/components/ios";
 import type { City } from "@/db/schema";
 import { listCities } from "@/lib/queries";
@@ -61,9 +61,9 @@ export default async function CitiesPage() {
                   <CityFields city={c} />
                   <div className="flex items-center gap-3 px-4 py-3">
                     <SubmitButton className="h-10 flex-1">Zapisz</SubmitButton>
-                    <button formAction={deleteCity.bind(null, c.id)} className="text-destructive h-10 px-3 text-[15px]">
+                    <PendingButton formAction={deleteCity.bind(null, c.id)} className="text-destructive h-10 px-3 text-[15px]">
                       Usuń
-                    </button>
+                    </PendingButton>
                   </div>
                 </form>
               </div>

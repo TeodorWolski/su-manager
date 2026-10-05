@@ -85,6 +85,34 @@ export function SubmitButton({ children, className }: { children: React.ReactNod
   );
 }
 
+/**
+ * Przycisk wysyłający formularz akcji serwerowej z natychmiastową reakcją:
+ * w chwili kliknięcia blokuje się i pokazuje kręciołek, a rodzic z
+ * `has-[[data-pending]]:…` może przygasić całą kartę, zanim odpowie serwer.
+ */
+export function PendingButton({ children, className, type = "submit", disabled, ...props }: React.ComponentProps<"button">) {
+  const { pending } = useFormStatus();
+  return (
+    <button
+      {...props}
+      type={type}
+      disabled={pending || disabled}
+      data-pending={pending || undefined}
+      aria-busy={pending}
+      className={cn(className, "transition-opacity disabled:cursor-wait", pending && "opacity-70")}
+    >
+      {pending ? (
+        <span className="inline-flex items-center justify-center gap-1.5">
+          <Loader2 className="size-3.5 shrink-0 animate-spin" />
+          {children}
+        </span>
+      ) : (
+        children
+      )}
+    </button>
+  );
+}
+
 /** Przycisk akcji serwerowej z potwierdzeniem (np. usuwanie). */
 export function ConfirmButton({
   action,
@@ -104,9 +132,7 @@ export function ConfirmButton({
         if (!window.confirm(confirm)) e.preventDefault();
       }}
     >
-      <button type="submit" className={cn("text-destructive h-12 w-full text-[17px]", className)}>
-        {children}
-      </button>
+      <PendingButton className={cn("text-destructive h-12 w-full text-[17px]", className)}>{children}</PendingButton>
     </form>
   );
 }

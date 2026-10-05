@@ -14,7 +14,7 @@ const TABS = [
     href: "/more",
     label: "Więcej",
     icon: Ellipsis,
-    match: (p: string) => ["/more", "/bits", "/venues", "/cities", "/thoughts"].some((x) => p.startsWith(x)),
+    match: (p: string) => ["/more", "/goals", "/bits", "/venues", "/cities", "/thoughts"].some((x) => p.startsWith(x)),
   },
 ];
 

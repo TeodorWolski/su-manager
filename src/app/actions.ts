@@ -1,10 +1,10 @@
 "use server";
 
-import { eq } from "drizzle-orm";
-import { revalidatePath } from "next/cache";
+import { eq, sql } from "drizzle-orm";
+import { refresh, updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { matchContacts } from "@/lib/match";
-import { isOpenMic } from "@/lib/opportunities";
+import { EVENTS_TAG, isOpenMic } from "@/lib/opportunities";
 import { normalize } from "@/lib/text";
 import {
   bits,
@@ -19,6 +19,7 @@ import {
   gigContacts,
   gigLogs,
   gigs,
+  goals,
   IGNORE_REASONS,
   interactions,
   VENUE_VERDICTS,
@@ -50,8 +51,12 @@ function required<T>(v: T | null, field: string): T {
   return v;
 }
 
+/**
+ * Po mutacji z przejściem na inną stronę. Wszystkie strony są dynamiczne, więc docelowa
+ * renderuje się ze świeżych danych — nie czyścimy całej pamięci routera (revalidatePath
+ * na layoucie wywoływał lawinę ponownych prefetchy i spowalniał każde kliknięcie).
+ */
 function done(path: string): never {
-  revalidatePath("/", "layout");
   redirect(path);
 }
 
@@ -86,7 +91,7 @@ export async function saveGig(fd: FormData) {
 
 export async function setGigStatus(id: number, status: GigStatus) {
   await db.update(gigs).set({ status }).where(eq(gigs.id, id));
-  revalidatePath("/", "layout");
+  refresh();
 }
 
 export async function deleteGig(id: number) {
@@ -211,7 +216,7 @@ export async function saveVenue(fd: FormData) {
 /** Szybka ocena z listy scen — bez wchodzenia w edycję. */
 export async function setVenueVerdict(id: number, verdict: VenueVerdict | null) {
   await db.update(venues).set({ verdict }).where(eq(venues.id, id));
-  revalidatePath("/", "layout");
+  refresh();
 }
 
 export async function deleteVenue(id: number) {
@@ -267,7 +272,8 @@ export async function deleteCity(id: number) {
 
 export async function dismissEvent(id: number) {
   await db.update(events).set({ dismissed: true }).where(eq(events.id, id));
-  revalidatePath("/", "layout");
+  updateTag(EVENTS_TAG);
+  refresh();
 }
 
 /** Kontakt dla komika z Okazji: istniejący (dopasowany po nazwisku/aliasach) albo nowy. */
@@ -287,7 +293,7 @@ export async function hidePerformer(fd: FormData) {
     .update(contacts)
     .set({ ignoreInReport: true, ignoreReason: oneOf(IGNORE_REASONS, str(fd, "reason")) ?? "not_interested" })
     .where(eq(contacts.id, id));
-  revalidatePath("/", "layout");
+  refresh();
 }
 
 /** Wycisz komika w Okazjach na `days` dni (np. właśnie do niego napisałem). */
@@ -300,7 +306,7 @@ export async function snoozePerformer(fd: FormData) {
 /** `until` = data, do której wyciszony; data w przeszłości = „pokazuj już teraz”; null = automatycznie. */
 export async function setContactSnooze(id: number, until: string | null) {
   await db.update(contacts).set({ snoozeUntil: until }).where(eq(contacts.id, id));
-  revalidatePath("/", "layout");
+  refresh();
 }
 
 /** Wycisz kontakt w Okazjach na `days` dni (z karty kontaktu). */
@@ -311,7 +317,7 @@ export async function snoozeContact(id: number, days: number) {
 /** Przestań pomijać komika w Okazjach. */
 export async function unhideContact(id: number) {
   await db.update(contacts).set({ ignoreInReport: false, ignoreReason: null }).where(eq(contacts.id, id));
-  revalidatePath("/", "layout");
+  refresh();
 }
 
 /** „Pokaż teraz” — znosi wyciszenie, także automatyczne po wspólnym wieczorze. */
@@ -352,6 +358,7 @@ export async function eventToGig(id: number) {
     })
     .returning({ id: gigs.id });
   await db.update(events).set({ gigId: gig.id }).where(eq(events.id, id));
+  updateTag(EVENTS_TAG);
   done(`/gigs/${gig.id}`);
 }
 
@@ -361,5 +368,32 @@ export async function setCityTravel(name: string, minutes: number) {
     .insert(cities)
     .values({ name, travelMinutes: minutes, notes: "szybka ocena z Okazji" })
     .onConflictDoUpdate({ target: cities.name, set: { travelMinutes: minutes } });
-  revalidatePath("/", "layout");
+  refresh();
+}
+
+// ── Cele ────────────────────────────────────────────────────────────────
+
+/** Cel liczby grań na miesiąc ("YYYY-MM"). */
+export async function setMonthGoal(month: string, target: number) {
+  const value = Math.max(1, Math.min(60, Math.round(target)));
+  await db
+    .insert(goals)
+    .values({ key: `gigs:${month}`, target: value })
+    .onConflictDoUpdate({ target: goals.key, set: { target: value, updatedAt: sql`(datetime('now'))` } });
+  refresh();
+}
+
+export async function saveMonthGoal(fd: FormData) {
+  await setMonthGoal(required(str(fd, "month"), "miesiąc"), required(int(fd, "target"), "cel"));
+}
+
+/** Cel materiału: ile minut do kiedy. */
+export async function saveMaterialGoal(fd: FormData) {
+  const target = Math.max(1, required(int(fd, "target"), "minuty"));
+  const deadline = required(str(fd, "deadline"), "termin");
+  await db
+    .insert(goals)
+    .values({ key: "material", target, deadline })
+    .onConflictDoUpdate({ target: goals.key, set: { target, deadline, updatedAt: sql`(datetime('now'))` } });
+  refresh();
 }

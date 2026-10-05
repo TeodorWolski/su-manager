@@ -1,5 +1,6 @@
 import { ChevronDown, ExternalLink } from "lucide-react";
 import Link from "next/link";
+import { PendingButton } from "@/components/form";
 import { eventToGig, hidePerformer, setCityTravel, snoozePerformer, unsnoozeContact } from "@/app/actions";
 import { Empty, PageHeader, Pill, Section } from "@/components/ios";
 import { isMonth, MonthChips, monthCounts } from "@/components/month-chips";
@@ -13,6 +14,7 @@ import {
   type Opportunity,
   type OpportunityGroup,
 } from "@/lib/opportunities";
+import { loadUpcomingEventsCached } from "@/lib/events-cache";
 import { plural } from "@/lib/text";
 import { fmtDate, fmtDateTime, fmtTravel, nowLocal } from "@/lib/time";
 import { cn } from "@/lib/utils";
@@ -56,7 +58,7 @@ function GigButton({ o, small }: { o: Opportunity; small?: boolean }) {
     </Link>
   ) : (
     <form action={eventToGig.bind(null, o.event.id)}>
-      <button
+      <PendingButton
         type="submit"
         className={cn(
           "rounded-lg font-medium whitespace-nowrap active:scale-95",
@@ -65,7 +67,7 @@ function GigButton({ o, small }: { o: Opportunity; small?: boolean }) {
         )}
       >
         Chcę zagrać
-      </button>
+      </PendingButton>
     </form>
   );
 }
@@ -84,15 +86,15 @@ function HideMenu({ g }: { g: OpportunityGroup }) {
           <span className="text-muted-foreground shrink-0">Komik</span>
           <input name="name" defaultValue={g.performer.name} required className="min-w-0 flex-1 bg-transparent text-[15px] outline-none" />
         </label>
-        <button type="submit" name="reason" value="not_interested" className={button}>
+        <PendingButton name="reason" value="not_interested" className={button}>
           Nie interesuje mnie
-        </button>
-        <button type="submit" name="reason" value="no_openers" className={button}>
+        </PendingButton>
+        <PendingButton name="reason" value="no_openers" className={button}>
           Nie robi open miców przed sobą
-        </button>
-        <button type="submit" formAction={snoozePerformer} className={button}>
+        </PendingButton>
+        <PendingButton formAction={snoozePerformer} className={button}>
           Wycisz na miesiąc <span className="text-muted-foreground">(np. już pisałem)</span>
-        </button>
+        </PendingButton>
       </form>
     </details>
   );
@@ -101,7 +103,7 @@ function HideMenu({ g }: { g: OpportunityGroup }) {
 function GroupCard({ g }: { g: OpportunityGroup }) {
   const o = g.primary;
   return (
-    <div className="border-border/70 px-4 py-3 [&:not(:last-child)]:border-b">
+    <div className="border-border/70 px-4 py-3 [&:not(:last-child)]:border-b transition-opacity has-[[data-pending]]:pointer-events-none has-[[data-pending]]:opacity-50">
       <a href={o.event.url} target="_blank" rel="noreferrer" className="group block">
         <div className="flex items-start gap-2">
           <span className="min-w-0 flex-1 text-[16px] leading-snug group-hover:underline">{o.event.title}</span>
@@ -170,7 +172,7 @@ function Muted({ groups }: { groups: OpportunityGroup[] }) {
         {groups.map((g) => {
           const m = g.matches.find((x) => x.mutedUntil) ?? g.matches[0];
           return (
-            <div key={g.performer.key} className="border-border/70 flex items-center gap-3 px-4 py-2.5 [&:not(:last-child)]:border-b">
+            <div key={g.performer.key} className="border-border/70 flex items-center gap-3 px-4 py-2.5 [&:not(:last-child)]:border-b transition-opacity has-[[data-pending]]:pointer-events-none has-[[data-pending]]:opacity-50">
               <Link href={`/contacts/${m.id}`} className="min-w-0 flex-1">
                 <div className="truncate text-[16px]">{m.name}</div>
                 <div className="text-muted-foreground truncate text-[13px]">
@@ -179,9 +181,9 @@ function Muted({ groups }: { groups: OpportunityGroup[] }) {
                 </div>
               </Link>
               <form action={unsnoozeContact.bind(null, m.id)}>
-                <button type="submit" className="text-primary h-9 px-1 text-[14px] whitespace-nowrap">
+                <PendingButton className="text-primary h-9 px-1 text-[14px] whitespace-nowrap">
                   Pokaż teraz
-                </button>
+                </PendingButton>
               </form>
             </div>
           );
@@ -203,7 +205,7 @@ function UnknownCities({ items }: { items: Opportunity[] }) {
       footer={`Czas dojazdu z Warszawy w jedną stronę. W zasięgu: ≤ ${MAX_TRAVEL_MIN / 60} h albo nocleg. Dokładne wartości poprawisz w Miastach.`}
     >
       {rows.map(([city, list]) => (
-        <div key={city} className="border-border/70 px-4 py-3 [&:not(:last-child)]:border-b">
+        <div key={city} className="border-border/70 px-4 py-3 [&:not(:last-child)]:border-b transition-opacity has-[[data-pending]]:pointer-events-none has-[[data-pending]]:opacity-50">
           <div className="flex items-baseline justify-between gap-2">
             <span className="text-[16px] font-medium">{city}</span>
             <span className="text-muted-foreground text-[13px]">{plural(list.length, "wydarzenie", "wydarzenia", "wydarzeń")}</span>
@@ -218,7 +220,7 @@ function UnknownCities({ items }: { items: Opportunity[] }) {
             <div className="mt-2 grid grid-cols-4 gap-1.5">
               {QUICK_TRAVEL.map((q) => (
                 <form key={q.label} action={setCityTravel.bind(null, city, q.minutes)}>
-                  <button
+                  <PendingButton
                     type="submit"
                     className={cn(
                       "h-9 w-full rounded-lg text-[14px] font-medium active:scale-95",
@@ -226,7 +228,7 @@ function UnknownCities({ items }: { items: Opportunity[] }) {
                     )}
                   >
                     {q.label}
-                  </button>
+                  </PendingButton>
                 </form>
               ))}
             </div>
@@ -245,7 +247,7 @@ export default async function EventsPage({ searchParams }: PageProps<"/events">)
   const onlyNew = !month && sp.all !== "1";
   const limit = Math.max(PAGE, Number(sp.limit) || PAGE);
 
-  const everything = await getOpportunities();
+  const everything = await getOpportunities(undefined, loadUpcomingEventsCached);
   const all = month ? everything.filter((o) => o.event.startsAt.startsWith(month)) : everything;
   const of = (t: Opportunity["tab"]) => all.filter((o) => o.tab === t);
   const tabItems = everything.filter((o) => o.tab === tab);

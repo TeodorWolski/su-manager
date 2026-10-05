@@ -1,5 +1,6 @@
 import { Plus } from "lucide-react";
 import Link from "next/link";
+import { PendingButton } from "@/components/form";
 import { setVenueVerdict } from "@/app/actions";
 import { Empty, PageHeader, Pill, Rating, Row, Section } from "@/components/ios";
 import { Button } from "@/components/ui/button";
@@ -45,7 +46,7 @@ function VenueRow({ v }: { v: VenueItem }) {
 /** Wiersz z szybką oceną — formularze nie mogą siedzieć w linku, więc osobny układ. */
 function UnratedRow({ v }: { v: VenueItem }) {
   return (
-    <div className="border-border/70 px-4 py-2.5 [&:not(:last-child)]:border-b">
+    <div className="border-border/70 px-4 py-2.5 [&:not(:last-child)]:border-b transition-opacity has-[[data-pending]]:pointer-events-none has-[[data-pending]]:opacity-50">
       <Link href={`/venues/${v.id}`} className="block">
         <div className="truncate text-[16px]">{v.name}</div>
         <div className="text-muted-foreground truncate text-[13px]">{subtitle(v)}</div>
@@ -53,7 +54,7 @@ function UnratedRow({ v }: { v: VenueItem }) {
       <div className="mt-2 grid grid-cols-5 gap-1.5">
         {VENUE_VERDICTS.map((verdict) => (
           <form key={verdict} action={setVenueVerdict.bind(null, v.id, verdict)}>
-            <button
+            <PendingButton
               type="submit"
               className={cn(
                 "h-11 w-full rounded-lg px-0.5 text-[12px] leading-tight font-medium active:scale-95 sm:text-[13px]",
@@ -61,7 +62,7 @@ function UnratedRow({ v }: { v: VenueItem }) {
               )}
             >
               {VERDICT_SHORT[verdict]}
-            </button>
+            </PendingButton>
           </form>
         ))}
       </div>

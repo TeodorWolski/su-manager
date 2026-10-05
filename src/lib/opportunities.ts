@@ -31,7 +31,7 @@ export type MuteReason = "manual" | "gig" | "played";
 export type Tab = "friends" | "inRange" | "openMic" | "unknownCity" | "muted";
 
 export type Opportunity = {
-  event: Event;
+  event: EventRow;
   city: City | null;
   inRange: boolean;
   matches: MatchedContact[];
@@ -151,7 +151,7 @@ async function loadContext() {
 
 type Ctx = Awaited<ReturnType<typeof loadContext>>;
 
-function classify(e: Event, ctx: Ctx, newSince: string): Opportunity | null {
+function classify(e: EventRow, ctx: Ctx, newSince: string): Opportunity | null {
   if (e.dismissed || ctx.hidden.has(normalize(e.title))) return null;
   if (!isWantedLanguage(`${e.title} ${e.performers ?? ""}`)) return null;
   if (ctx.blacklist.has(`${normalize(e.venueName ?? "")}|${normalize(e.cityName ?? "")}`)) return null;
@@ -194,17 +194,46 @@ function classify(e: Event, ctx: Ctx, newSince: string): Opportunity | null {
   };
 }
 
-/** Nadchodzące okazje. `onlyIds` — tylko te wydarzenia (np. nowe z dzisiejszego przebiegu crona). */
-export async function getOpportunities(onlyIds?: Set<number>) {
-  const ctx = await loadContext();
-  const today = nowLocal().slice(0, 10);
-  // firstSeenAt jest w UTC (datetime('now')) — porównujemy w tym samym formacie.
-  const newSince = new Date(Date.now() - NEW_FOR_DAYS * 864e5).toISOString().replace("T", " ").slice(0, 19);
-  const rows = await db
-    .select()
+/** Tag pamięci podręcznej wydarzeń w aplikacji — unieważniany przy zmianie wydarzenia. */
+export const EVENTS_TAG = "events";
+
+export type EventRow = Pick<
+  Event,
+  "id" | "url" | "title" | "startsAt" | "cityName" | "venueName" | "performers" | "firstSeenAt" | "dismissed" | "gigId"
+>;
+
+/** Nadchodzące, nieukryte wydarzenia — tylko kolumny potrzebne w raporcie (mniej danych z bazy). */
+export function loadUpcomingEvents(today: string): Promise<EventRow[]> {
+  return db
+    .select({
+      id: events.id,
+      url: events.url,
+      title: events.title,
+      startsAt: events.startsAt,
+      cityName: events.cityName,
+      venueName: events.venueName,
+      performers: events.performers,
+      firstSeenAt: events.firstSeenAt,
+      dismissed: events.dismissed,
+      gigId: events.gigId,
+    })
     .from(events)
     .where(and(gte(events.startsAt, today), eq(events.dismissed, false)))
     .orderBy(events.startsAt);
+}
+
+/**
+ * Nadchodzące okazje. `onlyIds` — tylko te wydarzenia (np. nowe z dzisiejszego przebiegu crona).
+ * `loadEvents` — aplikacja podaje wersję z pamięci podręcznej; skrypt crona czyta bazę wprost.
+ */
+export async function getOpportunities(
+  onlyIds?: Set<number>,
+  loadEvents: (today: string) => Promise<EventRow[]> = loadUpcomingEvents,
+) {
+  const today = nowLocal().slice(0, 10);
+  const [ctx, rows] = await Promise.all([loadContext(), loadEvents(today)]);
+  // firstSeenAt jest w UTC (datetime('now')) — porównujemy w tym samym formacie.
+  const newSince = new Date(Date.now() - NEW_FOR_DAYS * 864e5).toISOString().replace("T", " ").slice(0, 19);
   return rows
     .filter((e) => !onlyIds || onlyIds.has(e.id))
     .map((e) => classify(e, ctx, newSince))
