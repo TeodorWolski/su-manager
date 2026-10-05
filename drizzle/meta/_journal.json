@@ -1,0 +1,34 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1791204864375,
+      "tag": "0000_parched_sabretooth",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1791206097780,
+      "tag": "0001_silky_fat_cobra",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1791206099608,
+      "tag": "0002_late_gamma_corps",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1791206921741,
+      "tag": "0003_fluffy_dragon_lord",
+      "breakpoints": true
+    }
+  ]
+}

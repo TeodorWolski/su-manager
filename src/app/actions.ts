@@ -1,0 +1,258 @@
+"use server";
+
+import { eq } from "drizzle-orm";
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import {
+  bits,
+  cities,
+  CONTACT_RELATIONS,
+  contacts,
+  db,
+  GIG_CONTEXTS,
+  GIG_STATUSES,
+  gigBits,
+  gigContacts,
+  gigLogs,
+  gigs,
+  interactions,
+  VENUE_VERDICTS,
+  venues,
+  type GigStatus,
+  type VenueVerdict,
+} from "@/db";
+
+// Uwierzytelnianie robi proxy.ts (basic auth na każdym requeście, także POST akcji).
+
+const str = (fd: FormData, k: string) => {
+  const v = fd.get(k);
+  return typeof v === "string" && v.trim() ? v.trim() : null;
+};
+const int = (fd: FormData, k: string) => {
+  const v = str(fd, k);
+  const n = v == null ? NaN : Number(v);
+  return Number.isFinite(n) ? Math.round(n) : null;
+};
+const bool = (fd: FormData, k: string) => fd.get(k) === "on" || fd.get(k) === "true";
+const ids = (fd: FormData, k: string) =>
+  fd.getAll(k).map(Number).filter((n) => Number.isInteger(n) && n > 0);
+function oneOf<T extends string>(values: readonly T[], v: string | null): T | null {
+  return v && (values as readonly string[]).includes(v) ? (v as T) : null;
+}
+const clamp = (n: number) => Math.min(5, Math.max(1, n));
+function required<T>(v: T | null, field: string): T {
+  if (v == null) throw new Error(`Brak pola: ${field}`);
+  return v;
+}
+
+function done(path: string): never {
+  revalidatePath("/", "layout");
+  redirect(path);
+}
+
+// ── Grania ──────────────────────────────────────────────────────────────
+
+export async function saveGig(fd: FormData) {
+  const id = int(fd, "id");
+  const values = {
+    title: required(str(fd, "title"), "nazwa"),
+    startsAt: required(str(fd, "startsAt"), "data"),
+    venueId: int(fd, "venueId"),
+    cityId: int(fd, "cityId"),
+    status: oneOf(GIG_STATUSES, str(fd, "status")) ?? "interested",
+    context: oneOf(GIG_CONTEXTS, str(fd, "context")),
+    headlinerId: int(fd, "headlinerId"),
+    url: str(fd, "url"),
+    notes: str(fd, "notes"),
+  };
+  let gigId = id;
+  if (gigId) {
+    await db.update(gigs).set(values).where(eq(gigs.id, gigId));
+  } else {
+    [{ id: gigId }] = await db.insert(gigs).values(values).returning({ id: gigs.id });
+  }
+  const lineup = ids(fd, "lineup");
+  await db.delete(gigContacts).where(eq(gigContacts.gigId, gigId));
+  if (lineup.length) {
+    await db.insert(gigContacts).values(lineup.map((contactId) => ({ gigId: gigId!, contactId })));
+  }
+  done(`/gigs/${gigId}`);
+}
+
+export async function setGigStatus(id: number, status: GigStatus) {
+  await db.update(gigs).set({ status }).where(eq(gigs.id, id));
+  revalidatePath("/", "layout");
+}
+
+export async function deleteGig(id: number) {
+  await db.delete(gigs).where(eq(gigs.id, id));
+  done("/gigs");
+}
+
+export async function saveLog(fd: FormData) {
+  const gigId = required(int(fd, "gigId"), "granie");
+  const rating = required(int(fd, "rating"), "ocena");
+  const venueRating = int(fd, "venueRating");
+  const log = {
+    rating: clamp(rating),
+    venueRating: venueRating ? clamp(venueRating) : null,
+    attendance: int(fd, "attendance"),
+    minutesPlayed: int(fd, "minutesPlayed"),
+    minutesAvailable: int(fd, "minutesAvailable"),
+    thoughts: str(fd, "thoughts"),
+  };
+  await db
+    .insert(gigLogs)
+    .values({ gigId, ...log })
+    .onConflictDoUpdate({ target: gigLogs.gigId, set: log });
+
+  await db
+    .update(gigs)
+    .set({
+      context: oneOf(GIG_CONTEXTS, str(fd, "context")),
+      headlinerId: int(fd, "headlinerId"),
+    })
+    .where(eq(gigs.id, gigId));
+
+  const played = ids(fd, "bits");
+  await db.delete(gigBits).where(eq(gigBits.gigId, gigId));
+  if (played.length) {
+    await db.insert(gigBits).values(played.map((bitId) => ({ gigId, bitId })));
+  }
+  done(str(fd, "returnTo") ?? `/gigs/${gigId}`);
+}
+
+/** Ucieczka z bramki oceny, gdy granie się nie odbyło. */
+export async function markGigCancelled(id: number) {
+  await setGigStatus(id, "cancelled");
+}
+
+// ── Kontakty ────────────────────────────────────────────────────────────
+
+export async function saveContact(fd: FormData) {
+  const id = int(fd, "id");
+  const values = {
+    name: required(str(fd, "name"), "imię i nazwisko"),
+    aliases: str(fd, "aliases"),
+    role: oneOf(["comedian", "organizer", "venue"] as const, str(fd, "role")) ?? "comedian",
+    contactInfo: str(fd, "contactInfo"),
+    relation:
+oneOf(CONTACT_RELATIONS, str(fd, "relation")) ?? "none",
+    ignoreInReport: bool(fd, "ignoreInReport"),
+    notes: str(fd, "notes"),
+  };
+  if (id) {
+    await db.update(contacts).set(values).where(eq(contacts.id, id));
+    done(`/contacts/${id}`);
+  }
+  const [row] = await db.insert(contacts).values(values).returning({ id: contacts.id });
+  done(`/contacts/${row.id}`);
+}
+
+export async function deleteContact(id: number) {
+  await db.delete(contacts).where(eq(contacts.id, id));
+  done("/contacts");
+}
+
+export async function addInteraction(fd: FormData) {
+  const contactId = required(int(fd, "contactId"), "kontakt");
+  const replied = str(fd, "replied");
+  await db.insert(interactions).values({
+    contactId,
+    date: required(str(fd, "date"), "data"),
+    channel: str(fd, "channel") ?? "inne",
+    topic: str(fd, "topic"),
+    replied: replied === "yes" ? true : replied === "no" ? false : null,
+  });
+  // „Pisałem, brak odpowiedzi” ustawiamy automatycznie, jeśli kontakt nie miał relacji.
+  if (replied === "no") {
+    const [c] = await db.select({ relation: contacts.relation }).from(contacts).where(eq(contacts.id, contactId));
+    if (c?.relation === "none" || c?.relation === "want_to_play") {
+      await db.update(contacts).set({ relation: "no_reply" }).where(eq(contacts.id, contactId));
+    }
+  }
+  done(`/contacts/${contactId}`);
+}
+
+export async function deleteInteraction(id: number, contactId: number) {
+  await db.delete(interactions).where(eq(interactions.id, id));
+  done(`/contacts/${contactId}`);
+}
+
+// ── Sceny ───────────────────────────────────────────────────────────────
+
+export async function saveVenue(fd: FormData) {
+  const id = int(fd, "id");
+  const values = {
+    name: required(str(fd, "name"), "nazwa"),
+    cityId: int(fd, "cityId"),
+    recurrence: str(fd, "recurrence"),
+    organizerId: int(fd, "organizerId"),
+    travelMinutes: int(fd, "travelMinutes"),
+    hasLodging: bool(fd, "hasLodging"),
+    verdict: oneOf(VENUE_VERDICTS, str(fd, "verdict")),
+    verdictNote: str(fd, "verdictNote"),
+    notes: str(fd, "notes"),
+  };
+  if (id) {
+    await db.update(venues).set(values).where(eq(venues.id, id));
+    done(`/venues/${id}`);
+  }
+  const [row] = await db.insert(venues).values(values).returning({ id: venues.id });
+  done(`/venues/${row.id}`);
+}
+
+/** Szybka ocena z listy scen — bez wchodzenia w edycję. */
+export async function setVenueVerdict(id: number, verdict: VenueVerdict | null) {
+  await db.update(venues).set({ verdict }).where(eq(venues.id, id));
+  revalidatePath("/", "layout");
+}
+
+export async function deleteVenue(id: number) {
+  await db.delete(venues).where(eq(venues.id, id));
+  done("/venues");
+}
+
+// ── Materiał ────────────────────────────────────────────────────────────
+
+export async function saveBit(fd: FormData) {
+  const id = int(fd, "id");
+  const values = {
+    name: required(str(fd, "name"), "nazwa"),
+    status: oneOf(["tested", "testing", "vomit"] as const, str(fd, "status")) ?? "testing",
+    lengthMin: int(fd, "lengthMin"),
+    notes: str(fd, "notes"),
+  };
+  if (id) {
+    await db.update(bits).set(values).where(eq(bits.id, id));
+    done(`/bits/${id}`);
+  }
+  const [row] = await db.insert(bits).values(values).returning({ id: bits.id });
+  done(`/bits/${row.id}`);
+}
+
+export async function deleteBit(id: number) {
+  await db.delete(bits).where(eq(bits.id, id));
+  done("/bits");
+}
+
+// ── Miasta ──────────────────────────────────────────────────────────────
+
+export async function saveCity(fd: FormData) {
+  const id = int(fd, "id");
+  const values = {
+    name: required(str(fd, "name"), "nazwa"),
+    travelMinutes: int(fd, "travelMinutes"),
+    hasLodging: bool(fd, "hasLodging"),
+    priority: int(fd, "priority") ?? 3,
+    notes: str(fd, "notes"),
+  };
+  if (id) await db.update(cities).set(values).where(eq(cities.id, id));
+  else await db.insert(cities).values(values);
+  done("/cities");
+}
+
+export async function deleteCity(id: number) {
+  await db.delete(cities).where(eq(cities.id, id));
+  done("/cities");
+}

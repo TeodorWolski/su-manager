@@ -1,0 +1,1 @@
+ALTER TABLE `gig_logs` ADD `venue_rating` integer;

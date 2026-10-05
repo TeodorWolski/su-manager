@@ -1,0 +1,280 @@
+import "server-only";
+import { and, asc, desc, eq, gte, inArray, isNull, lt, ne, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/sqlite-core";
+import {
+  bits,
+  cities,
+  contacts,
+  db,
+  gigBits,
+  gigContacts,
+  gigLogs,
+  gigs,
+  interactions,
+  venues,
+  type GigStatus,
+} from "@/db";
+import { DEFAULT_START_TIME, nowLocal } from "./time";
+import { normalize } from "./text";
+
+/** Ile minut po starcie grania wyskakuje formularz oceny. */
+export const REVIEW_DELAY_MIN = 90;
+/** Grania bez wpisanej godziny: formularz o tej porze w dniu grania. */
+export const REVIEW_TIME_DATE_ONLY = "21:00";
+
+const headliner = alias(contacts, "headliner");
+
+/** Start grania do porównań — dla grań bez godziny dokleja DEFAULT_START_TIME. */
+const startExpr = sql<string>`(case when length(${gigs.startsAt}) = 10 then ${gigs.startsAt} || 'T' || ${DEFAULT_START_TIME} else ${gigs.startsAt} end)`;
+const rawStart = (alias: string) =>
+  sql.raw(`(case when length(${alias}.starts_at) = 10 then ${alias}.starts_at || 'T${DEFAULT_START_TIME}' else ${alias}.starts_at end)`);
+
+/** Czy nadeszła pora formularza oceny (granie „się odbyło”). */
+const reviewDue = () => sql`(case when length(${gigs.startsAt}) = 10
+  then ${gigs.startsAt} || 'T' || ${REVIEW_TIME_DATE_ONLY} <= ${nowLocal()}
+  else ${gigs.startsAt} <= ${nowLocal(-REVIEW_DELAY_MIN)} end)`;
+
+const gigListSelect = {
+  id: gigs.id,
+  title: gigs.title,
+  startsAt: gigs.startsAt,
+  status: gigs.status,
+  context: gigs.context,
+  venueId: gigs.venueId,
+  venueName: venues.name,
+  cityName: sql<string | null>`coalesce(${cities.name}, (select c.name from cities c where c.id = ${venues.cityId}))`,
+  headlinerName: headliner.name,
+  rating: gigLogs.rating,
+  venueRating: gigLogs.venueRating,
+};
+
+function gigListQuery() {
+  return db
+    .select(gigListSelect)
+    .from(gigs)
+    .leftJoin(venues, eq(gigs.venueId, venues.id))
+    .leftJoin(cities, eq(gigs.cityId, cities.id))
+    .leftJoin(headliner, eq(gigs.headlinerId, headliner.id))
+    .leftJoin(gigLogs, eq(gigLogs.gigId, gigs.id));
+}
+
+export type GigListItem = Awaited<ReturnType<typeof listGigs>>[number];
+
+export async function listGigs(view: "upcoming" | "pipeline" | "past" | "all" = "upcoming") {
+  const now = nowLocal();
+  const q = gigListQuery();
+  switch (view) {
+    case "upcoming":
+      return q
+        .where(and(eq(gigs.status, "confirmed"), sql`not ${reviewDue()}`))
+        .orderBy(asc(gigs.startsAt));
+    case "pipeline":
+      return q
+        .where(
+          and(
+            inArray(gigs.status, ["interested", "contacted", "waiting"]),
+            gte(gigs.startsAt, now.slice(0, 10)),
+          ),
+        )
+        .orderBy(asc(gigs.startsAt));
+    case "past":
+      return q
+        .where(and(eq(gigs.status, "confirmed"), lt(startExpr, now)))
+        .orderBy(desc(gigs.startsAt));
+    case "all":
+      return q.orderBy(desc(gigs.startsAt));
+  }
+}
+
+/** Potwierdzone grania, które już minęły, a nie mają logu — to one blokują apkę. */
+export async function getPendingReviews() {
+  return gigListQuery()
+    .where(
+      and(
+        eq(gigs.status, "confirmed"),
+        eq(gigs.skipReview, false),
+        reviewDue(),
+        isNull(gigLogs.gigId),
+      ),
+    )
+    .orderBy(asc(gigs.startsAt));
+}
+
+export async function getGig(id: number) {
+  const [row] = await gigListQuery().where(eq(gigs.id, id));
+  if (!row) return null;
+  const [gig] = await db.select().from(gigs).where(eq(gigs.id, id));
+  const [log] = await db.select().from(gigLogs).where(eq(gigLogs.gigId, id));
+  const playedBits = await db
+    .select({ id: bits.id, name: bits.name })
+    .from(gigBits)
+    .innerJoin(bits, eq(gigBits.bitId, bits.id))
+    .where(eq(gigBits.gigId, id));
+  const lineup = await db
+    .select({ id: contacts.id, name: contacts.name })
+    .from(gigContacts)
+    .innerJoin(contacts, eq(gigContacts.contactId, contacts.id))
+    .where(eq(gigContacts.gigId, id));
+  return { ...row, gig, log: log ?? null, bits: playedBits, lineup };
+}
+
+export async function listCities() {
+  return db.select().from(cities).orderBy(asc(cities.priority), asc(cities.travelMinutes), asc(cities.name));
+}
+
+export async function listVenues() {
+  const now = nowLocal();
+  return db
+    .select({
+      id: venues.id,
+      name: venues.name,
+      cityId: venues.cityId,
+      cityName: cities.name,
+      recurrence: venues.recurrence,
+      travelMinutes: sql<number | null>`coalesce(${venues.travelMinutes}, ${cities.travelMinutes})`,
+      hasLodging: sql<boolean>`(${venues.hasLodging} or coalesce(${cities.hasLodging}, 0))`,
+      verdict: venues.verdict,
+      gigCount: sql<number>`(select count(*) from gigs g where g.venue_id = venues.id and g.status = 'confirmed' and ${rawStart("g")} < ${now})`,
+      myAvg: sql<number | null>`(select avg(l.rating) from gig_logs l join gigs g on g.id = l.gig_id where g.venue_id = venues.id)`,
+      venueAvg: sql<number | null>`(select avg(l.venue_rating) from gig_logs l join gigs g on g.id = l.gig_id where g.venue_id = venues.id)`,
+    })
+    .from(venues)
+    .leftJoin(cities, eq(venues.cityId, cities.id))
+    .orderBy(asc(cities.priority), asc(venues.name));
+}
+
+export async function getVenue(id: number) {
+  const [venue] = await db.select().from(venues).where(eq(venues.id, id));
+  if (!venue) return null;
+  const venueGigs = await gigListQuery().where(eq(gigs.venueId, id)).orderBy(desc(gigs.startsAt));
+  return { venue, gigs: venueGigs };
+}
+
+export async function listContacts() {
+  const now = nowLocal();
+  return db
+    .select({
+      id: contacts.id,
+      name: contacts.name,
+      role: contacts.role,
+      relation: contacts.relation,
+      ignoreInReport: contacts.ignoreInReport,
+      lastPlayedTogether: sql<string | null>`(
+        select max(g.starts_at) from gigs g
+        where g.status = 'confirmed' and ${rawStart("g")} < ${now}
+          and (g.headliner_id = contacts.id
+            or exists (select 1 from gig_contacts gc where gc.gig_id = g.id and gc.contact_id = contacts.id)))`,
+      lastInteraction: sql<string | null>`(select max(i.date) from interactions i where i.contact_id = contacts.id)`,
+    })
+    .from(contacts)
+    .orderBy(asc(contacts.name));
+}
+
+export async function getContact(id: number) {
+  const [contact] = await db.select().from(contacts).where(eq(contacts.id, id));
+  if (!contact) return null;
+  const history = await db
+    .select()
+    .from(interactions)
+    .where(eq(interactions.contactId, id))
+    .orderBy(desc(interactions.date), desc(interactions.id));
+  const sharedGigs = await gigListQuery()
+    .innerJoin(gigContacts, eq(gigContacts.gigId, gigs.id))
+    .where(eq(gigContacts.contactId, id))
+    .orderBy(desc(gigs.startsAt));
+  const asHeadliner = await gigListQuery().where(eq(gigs.headlinerId, id)).orderBy(desc(gigs.startsAt));
+  return { contact, history, gigs: dedupeById([...sharedGigs, ...asHeadliner]) };
+}
+
+function dedupeById<T extends { id: number }>(items: T[]) {
+  return [...new Map(items.map((i) => [i.id, i])).values()];
+}
+
+export async function listBits() {
+  return db
+    .select({
+      id: bits.id,
+      name: bits.name,
+      status: bits.status,
+      lengthMin: bits.lengthMin,
+      timesPlayed: sql<number>`(select count(*) from gig_bits gb join gig_logs l on l.gig_id = gb.gig_id where gb.bit_id = bits.id)`,
+      avgRating: sql<number | null>`(select avg(l.rating) from gig_bits gb join gig_logs l on l.gig_id = gb.gig_id where gb.bit_id = bits.id)`,
+    })
+    .from(bits)
+    .orderBy(sql`case ${bits.status} when 'tested' then 0 when 'testing' then 1 else 2 end`, asc(bits.name));
+}
+
+export async function getBit(id: number) {
+  const [bit] = await db.select().from(bits).where(eq(bits.id, id));
+  if (!bit) return null;
+  const bitGigs = await gigListQuery()
+    .innerJoin(gigBits, eq(gigBits.gigId, gigs.id))
+    .where(eq(gigBits.bitId, id))
+    .orderBy(desc(gigs.startsAt));
+  return { bit, gigs: bitGigs };
+}
+
+export async function listThoughts(query?: string) {
+  const rows = await db
+    .select({
+      gigId: gigs.id,
+      title: gigs.title,
+      startsAt: gigs.startsAt,
+      venueName: venues.name,
+      rating: gigLogs.rating,
+      thoughts: gigLogs.thoughts,
+    })
+    .from(gigLogs)
+    .innerJoin(gigs, eq(gigLogs.gigId, gigs.id))
+    .leftJoin(venues, eq(gigs.venueId, venues.id))
+    .where(and(sql`${gigLogs.thoughts} is not null`, ne(gigLogs.thoughts, "")))
+    .orderBy(desc(gigs.startsAt));
+  if (!query?.trim()) return rows;
+  // SQLite LIKE nie rozumie polskich znaków — przy setkach logów filtr w JS jest w zupełności OK.
+  const terms = normalize(query).split(/\s+/);
+  return rows.filter((r) => {
+    const hay = normalize(`${r.thoughts} ${r.title} ${r.venueName ?? ""}`);
+    return terms.every((t) => hay.includes(t));
+  });
+}
+
+export async function getDashboard() {
+  const now = nowLocal();
+  const monthStart = `${now.slice(0, 7)}-01`;
+  const [upcoming, pipeline, [month], recent] = await Promise.all([
+    listGigs("upcoming"),
+    listGigs("pipeline"),
+    // Liczymy wszystkie zagrane w tym miesiącu (też bez logu); średnia — tylko z ocenionych.
+    db
+      .select({
+        count: sql<number>`count(*)`,
+        avg: sql<number | null>`avg(${gigLogs.rating})`,
+      })
+      .from(gigs)
+      .leftJoin(gigLogs, eq(gigLogs.gigId, gigs.id))
+      .where(and(eq(gigs.status, "confirmed"), gte(gigs.startsAt, monthStart), lt(startExpr, now))),
+    listThoughts().then((r) => r.slice(0, 3)),
+  ]);
+  return { upcoming, pipeline, month, recent };
+}
+
+/** Opcje do selectów w formularzach. */
+export async function getFormOptions() {
+  const [allVenues, allCities, allContacts, allBits] = await Promise.all([
+    db
+      .select({ id: venues.id, name: venues.name, cityName: cities.name })
+      .from(venues)
+      .leftJoin(cities, eq(venues.cityId, cities.id))
+      .orderBy(asc(venues.name)),
+    db.select({ id: cities.id, name: cities.name }).from(cities).orderBy(asc(cities.name)),
+    db.select({ id: contacts.id, name: contacts.name, role: contacts.role }).from(contacts).orderBy(asc(contacts.name)),
+    db
+      .select({ id: bits.id, name: bits.name, status: bits.status, lengthMin: bits.lengthMin })
+      .from(bits)
+      .orderBy(asc(bits.name)),
+  ]);
+  return { venues: allVenues, cities: allCities, contacts: allContacts, bits: allBits };
+}
+
+export type FormOptions = Awaited<ReturnType<typeof getFormOptions>>;
+export type { GigStatus };
