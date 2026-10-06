@@ -61,12 +61,14 @@ export const BIT_STATUS_LABEL: Record<Bit["status"], string> = {
   tested: "Sprawdzony",
   testing: "W testach",
   vomit: "Vomit",
+  rejected: "Odrzucony",
 };
 
 export const BIT_STATUS_TONE: Record<Bit["status"], Tone> = {
   tested: "success",
   testing: "warning",
   vomit: "muted",
+  rejected: "danger",
 };
 
 export const VERDICT_LABEL: Record<VenueVerdict, string> = {

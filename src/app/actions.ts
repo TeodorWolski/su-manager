@@ -7,6 +7,7 @@ import { matchContacts } from "@/lib/match";
 import { EVENTS_TAG, isOpenMic } from "@/lib/opportunities";
 import { normalize } from "@/lib/text";
 import {
+  BIT_STATUSES,
   bits,
   cities,
   CONTACT_RELATIONS,
@@ -230,7 +231,7 @@ export async function saveBit(fd: FormData) {
   const id = int(fd, "id");
   const values = {
     name: required(str(fd, "name"), "nazwa"),
-    status: oneOf(["tested", "testing", "vomit"] as const, str(fd, "status")) ?? "testing",
+    status: oneOf(BIT_STATUSES, str(fd, "status")) ?? "testing",
     lengthMin: int(fd, "lengthMin"),
     notes: str(fd, "notes"),
   };

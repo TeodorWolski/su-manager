@@ -1,5 +1,5 @@
 import "server-only";
-import { eq, sql } from "drizzle-orm";
+import { eq, ne, sql } from "drizzle-orm";
 import { bits, db, gigs, goals } from "@/db";
 import { effectiveStart, nowLocal } from "./time";
 
@@ -35,6 +35,7 @@ export async function getGoals() {
     db
       .select({ status: bits.status, minutes: sql<number>`coalesce(sum(${bits.lengthMin}), 0)`, count: sql<number>`count(*)` })
       .from(bits)
+      .where(ne(bits.status, "rejected"))
       .groupBy(bits.status),
   ]);
   const goalMap = new Map(goalRows.map((g) => [g.key, g]));

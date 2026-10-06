@@ -79,6 +79,8 @@ export function LogForm({
   const [venueRating, setVenueRating] = useState(defaults.venueRating ?? 0);
   const [context, setContext] = useState<GigContext | "">(defaults.context ?? "");
   const [picked, setPicked] = useState(new Set(defaults.bitIds ?? []));
+  // Odrzucone bity znikają z wyboru — chyba że były już zapisane w tym logu.
+  const bits = options.bits.filter((b) => b.status !== "rejected" || defaults.bitIds?.includes(b.id));
 
   const toggleBit = (id: number) =>
     setPicked((prev) => {
@@ -88,7 +90,7 @@ export function LogForm({
       return next;
     });
 
-  const pickedMinutes = options.bits
+  const pickedMinutes = bits
     .filter((b) => picked.has(b.id))
     .reduce((sum, b) => sum + (b.lengthMin ?? 0), 0);
 
@@ -179,11 +181,11 @@ export function LogForm({
           <span className="text-muted-foreground">Zagrane bity</span>
           {picked.size > 0 && <span className="text-foreground">{picked.size} · ~{pickedMinutes} min</span>}
         </div>
-        {options.bits.length === 0 ? (
+        {bits.length === 0 ? (
           <p className="text-muted-foreground px-4 text-[15px]">Dodaj bity w zakładce Materiał — tu pojawią się do wyboru.</p>
         ) : (
           <div className="flex flex-wrap gap-2">
-            {options.bits.map((b) => (
+            {bits.map((b) => (
               <label
                 key={b.id}
                 className={cn(

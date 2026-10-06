@@ -96,10 +96,13 @@ export const venues = sqliteTable("venues", {
   createdAt: createdAt(),
 });
 
+/** "rejected" = odrzucony — nie liczy się do materiału i nie ma go do wyboru w logu. */
+export const BIT_STATUSES = ["tested", "testing", "vomit", "rejected"] as const;
+
 export const bits = sqliteTable("bits", {
   id: id(),
   name: text("name").notNull(),
-  status: text("status", { enum: ["tested", "testing", "vomit"] }).notNull().default("testing"),
+  status: text("status", { enum: BIT_STATUSES }).notNull().default("testing"),
   lengthMin: integer("length_min"),
   notes: text("notes"),
   createdAt: createdAt(),
