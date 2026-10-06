@@ -343,3 +343,46 @@ export async function listCalendarGigs() {
 
 /** Rytm + najgorętsze okazje — z pamięcią podręczną wydarzeń (logika w planning.ts). */
 export const getRhythm = () => getPlanning(loadUpcomingEventsCached);
+
+/** Statystyki: skuteczność pisania (wyniki rozmów, kanały) i jak mi idzie (oceny wg kontekstu, sceny, miesiąca). */
+export async function getStats() {
+  const [outcomes, channels, byContext, byVenue, byMonth] = await Promise.all([
+    db
+      .select({ outcome: gigs.outcome, n: sql<number>`count(*)` })
+      .from(gigs)
+      .where(sql`${gigs.outcome} is not null`)
+      .groupBy(gigs.outcome),
+    // Wiadomości w sprawie grań: ile wysłanych na kanale i na ile przyszła odpowiedź.
+    db
+      .select({
+        channel: interactions.channel,
+        sent: sql<number>`count(*)`,
+        replied: sql<number>`sum(case when ${interactions.replied} = 1 then 1 else 0 end)`,
+      })
+      .from(interactions)
+      .where(sql`${interactions.gigId} is not null`)
+      .groupBy(interactions.channel)
+      .orderBy(desc(sql`count(*)`)),
+    db
+      .select({ context: gigs.context, avg: sql<number>`avg(${gigLogs.rating})`, n: sql<number>`count(*)` })
+      .from(gigLogs)
+      .innerJoin(gigs, eq(gigs.id, gigLogs.gigId))
+      .groupBy(gigs.context),
+    db
+      .select({ id: venues.id, name: venues.name, avg: sql<number>`avg(${gigLogs.rating})`, n: sql<number>`count(*)` })
+      .from(gigLogs)
+      .innerJoin(gigs, eq(gigs.id, gigLogs.gigId))
+      .innerJoin(venues, eq(venues.id, gigs.venueId))
+      .groupBy(venues.id)
+      .having(sql`count(*) >= 2`)
+      .orderBy(desc(sql`avg(${gigLogs.rating})`)),
+    db
+      .select({ month: sql<string>`substr(${gigs.startsAt}, 1, 7)`, avg: sql<number>`avg(${gigLogs.rating})`, n: sql<number>`count(*)` })
+      .from(gigLogs)
+      .innerJoin(gigs, eq(gigs.id, gigLogs.gigId))
+      .groupBy(sql`substr(${gigs.startsAt}, 1, 7)`)
+      .orderBy(desc(sql`substr(${gigs.startsAt}, 1, 7)`))
+      .limit(6),
+  ]);
+  return { outcomes, channels, byContext, byVenue, byMonth: byMonth.reverse() };
+}

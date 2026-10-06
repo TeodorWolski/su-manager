@@ -1,4 +1,4 @@
-import { BookOpen, Building2, CalendarDays, MapPin, MessageSquareQuote, Target } from "lucide-react";
+import { BarChart3, BookOpen, Building2, CalendarDays, MapPin, MessageSquareQuote, Target } from "lucide-react";
 import { PageHeader, Row, Section } from "@/components/ios";
 import { ThemeSwitch } from "@/components/theme";
 
@@ -12,6 +12,7 @@ export default function MorePage() {
       <PageHeader title="Więcej" />
       <Section>
         <Row href="/goals" leading={<Icon className="bg-rose-500"><Target className="size-4.5" /></Icon>} title="Cele" />
+        <Row href="/stats" leading={<Icon className="bg-emerald-600"><BarChart3 className="size-4.5" /></Icon>} title="Statystyki" />
         <Row href="/bits" leading={<Icon className="bg-violet-500"><BookOpen className="size-4.5" /></Icon>} title="Materiał" />
         <Row href="/thoughts" leading={<Icon className="bg-primary"><MessageSquareQuote className="size-4.5" /></Icon>} title="Myśli po graniach" />
         <Row href="/venues" leading={<Icon className="bg-sky-500"><Building2 className="size-4.5" /></Icon>} title="Sceny" />
