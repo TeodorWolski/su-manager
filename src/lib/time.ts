@@ -57,3 +57,56 @@ export function fmtTravel(minutes: number | null | undefined) {
   const m = minutes % 60;
   return h ? `${h} h${m ? ` ${m} min` : ""}` : `${m} min`;
 }
+
+const MONTHS = ["sty", "lut", "mar", "kwi", "maj", "cze", "lip", "sie", "wrz", "paz", "lis", "gru"];
+
+/**
+ * Data wpisana w wyszukiwarce: „14.10”, „14.10.2026”, „2026-10-14”, „14 października”, „14 paź”,
+ * „dziś”, „jutro”. Bez roku — najbliższy taki dzień od dziś. Zwraca datę i resztę frazy.
+ */
+export function parseDateQuery(query: string, today: string): { date: string | null; rest: string } {
+  const q = query
+    .toLowerCase()
+    .replace(/ł/g, "l")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "");
+  const iso = (y: number, m: number, d: number) =>
+    `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+  const valid = (y: number, m: number, d: number) => {
+    const t = new Date(Date.UTC(y, m - 1, d));
+    return m >= 1 && m <= 12 && t.getUTCMonth() === m - 1 && t.getUTCDate() === d;
+  };
+  /** Bez roku: ten rok, a jeśli dzień już minął — przyszły. */
+  const nearest = (m: number, d: number, y?: number) => {
+    if (y) return y < 100 ? 2000 + y : y;
+    const thisYear = Number(today.slice(0, 4));
+    return iso(thisYear, m, d) < today ? thisYear + 1 : thisYear;
+  };
+  const patterns: [RegExp, (m: RegExpMatchArray) => string | null][] = [
+    [/\b(\d{4})-(\d{2})-(\d{2})\b/, (m) => (valid(+m[1], +m[2], +m[3]) ? iso(+m[1], +m[2], +m[3]) : null)],
+    [
+      /\b(\d{1,2})[./](\d{1,2})(?:[./](\d{2}|\d{4}))?\b/,
+      (m) => {
+        const y = nearest(+m[2], +m[1], m[3] ? +m[3] : undefined);
+        return valid(y, +m[2], +m[1]) ? iso(y, +m[2], +m[1]) : null;
+      },
+    ],
+    [
+      /\b(\d{1,2})\s+([a-z]{3})[a-z]*\b/,
+      (m) => {
+        const month = MONTHS.indexOf(m[2]) + 1;
+        if (!month) return null;
+        const y = nearest(month, +m[1]);
+        return valid(y, month, +m[1]) ? iso(y, month, +m[1]) : null;
+      },
+    ],
+    [/\b(dzis|dzisiaj)\b/, () => today],
+    [/\bjutro\b/, () => new Date(Date.parse(today) + 864e5).toISOString().slice(0, 10)],
+  ];
+  for (const [re, toDate] of patterns) {
+    const m = q.match(re);
+    const date = m && toDate(m);
+    if (m && date) return { date, rest: q.replace(m[0], " ").replace(/\s+/g, " ").trim() };
+  }
+  return { date: null, rest: query.trim() };
+}

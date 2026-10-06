@@ -1,4 +1,4 @@
-import { ChevronDown, ExternalLink } from "lucide-react";
+import { ChevronDown, ExternalLink, Search, X } from "lucide-react";
 import Link from "next/link";
 import { PendingButton } from "@/components/form";
 import { eventToGig, hidePerformer, messageFromEvent, setCityTravel, snoozePerformer, unsnoozeContact } from "@/app/actions";
@@ -12,6 +12,7 @@ import {
   groupByPerformer,
   MAX_TRAVEL_MIN,
   NEW_FOR_DAYS,
+  searchOpportunities,
   type Opportunity,
   type OpportunityGroup,
 } from "@/lib/opportunities";
@@ -132,6 +133,7 @@ function GroupCard({ g }: { g: OpportunityGroup }) {
             <Pill tone={AVAILABILITY_TONE[o.event.availability]}>{AVAILABILITY_LABEL[o.event.availability]}</Pill>
           )}
           {g.isNew && <Pill tone="info">nowe</Pill>}
+          {o.note && <Pill tone="muted">{o.note}</Pill>}
           <ExternalLink className="text-muted-foreground/60 mt-1 size-3.5 shrink-0" />
         </div>
         <div className="text-muted-foreground mt-0.5 text-[13px]">{where(o)}</div>
@@ -270,8 +272,54 @@ function UnknownCities({ items }: { items: Opportunity[] }) {
   );
 }
 
+/** Szukaj komika (albo programu, miejsca) we wszystkich nadchodzących wydarzeniach. */
+function SearchBox({ q }: { q: string }) {
+  return (
+    <form action="/events" className="bg-muted mb-3 flex h-10 items-center gap-2 rounded-xl px-3">
+      <Search className="text-muted-foreground size-4 shrink-0" />
+      <input
+        name="q"
+        type="search"
+        defaultValue={q}
+        placeholder="Komik, miasto albo data, np. 14.10"
+        className="placeholder:text-muted-foreground min-w-0 flex-1 bg-transparent text-[16px] outline-none"
+      />
+      {q && (
+        <Link href="/events" aria-label="Wyczyść" className="text-muted-foreground -mr-1 p-1">
+          <X className="size-4" />
+        </Link>
+      )}
+    </form>
+  );
+}
+
+async function SearchResults({ q }: { q: string }) {
+  const found = (await searchOpportunities(q, loadUpcomingEventsCached)).sort((a, b) =>
+    a.event.startsAt.localeCompare(b.event.startsAt),
+  );
+  // Każdy termin osobno — szukam jego grań, więc nie chowam ich pod „Inne terminy”.
+  const groups: OpportunityGroup[] = found.map((o) => ({
+    performer: o.performer,
+    primary: o,
+    others: [],
+    matches: o.matches,
+    isNew: o.isNew,
+  }));
+  return (
+    <>
+      <PageHeader title="Okazje" subtitle={`„${q}” · ${plural(found.length, "termin", "terminy", "terminów")}`} />
+      <SearchBox q={q} />
+      <Section footer="Szukam po komiku, programie, scenie, mieście i dacie („14.10”, „14 paź”, „jutro”) we wszystkich nadchodzących wydarzeniach — także poza zasięgiem i u pomijanych; szara etykieta mówi, czemu normalnie ich nie widzisz.">
+        {groups.length ? groups.map((g) => <GroupCard key={g.primary.event.id} g={g} />) : <Empty>Nic nie znalazłem.</Empty>}
+      </Section>
+    </>
+  );
+}
+
 export default async function EventsPage({ searchParams }: PageProps<"/events">) {
   const sp = await searchParams;
+  const q = typeof sp.q === "string" ? sp.q.trim() : "";
+  if (q) return <SearchResults q={q} />;
   const tab: TabKey = typeof sp.tab === "string" && sp.tab in TABS ? (sp.tab as TabKey) : "friends";
   const month = isMonth(sp.m) ? sp.m : null;
   // Wybrany miesiąc = planuję go w całości, więc pokazuję wszystkie terminy, nie tylko nowe.
@@ -318,6 +366,8 @@ export default async function EventsPage({ searchParams }: PageProps<"/events">)
         title="Okazje"
         subtitle={`${plural(newCount, "komik", "komików", "komików")} z nowymi terminami w ostatnich ${NEW_FOR_DAYS} dniach`}
       />
+
+      <SearchBox q="" />
 
       <div className="bg-muted mb-3 grid grid-cols-4 gap-1 rounded-xl p-1">
         {(Object.keys(TABS) as TabKey[]).map((t) => (

@@ -8,7 +8,7 @@ import { normalize } from "./text";
  * - wariant imię+nazwisko musi trafić wszystkimi tokenami; aliasy (np. „Viking”) mogą być jednym słowem.
  */
 
-const tokens = (s: string) => normalize(s).split(/[^a-z0-9]+/).filter(Boolean);
+export const tokens = (s: string) => normalize(s).split(/[^a-z0-9]+/).filter(Boolean);
 
 function levenshtein(a: string, b: string) {
   if (Math.abs(a.length - b.length) > 1) return 2;
@@ -39,6 +39,16 @@ export type Matchable = { id: number; name: string; aliases: string | null };
 export function variants(c: Matchable): string[][] {
   const all = [c.name, ...(c.aliases?.split(",") ?? [])].map(tokens).filter((v) => v.length);
   return all.filter((v) => v.length > 1 || v[0].length >= 4);
+}
+
+/**
+ * Wyszukiwarka: każde słowo frazy (≥2 litery) trafia w któreś słowo tekstu — w obie strony,
+ * bo odmieniona może być i fraza („Modzelewskiego”), i tekst („z Modzelewskim”).
+ */
+export function matchesQuery(query: string, text: string) {
+  const want = tokens(query).filter((w) => w.length >= 2);
+  const have = tokens(text);
+  return want.length > 0 && want.every((w) => have.some((h) => tokenMatches(w, h) || tokenMatches(h, w)));
 }
 
 export function matchContacts<T extends Matchable>(text: string, contacts: T[]): T[] {

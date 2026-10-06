@@ -72,6 +72,7 @@ Ocena grania **nie jest** oceną bitu, bo zależy od publiki, line-upu itd. Bit 
 - **Źródło:** scraper bileterii (`src/scraper/sources/*`, cron GitHub Actions codziennie o 10:30 czasu polskiego, razem z mailem) zbiera wydarzenia. Klasyfikacja jest w `src/lib/opportunities.ts`.
 - **Zakładki:** Znajomi (komicy z CRM), W zasięgu (≤3 h dojazdu albo nocleg), Open miki, Uzupełnij (miasta bez czasu dojazdu).
 - **Dostępność biletów** (`events.availability`): z kupbilecik etykieta „ostatnie bilety” / „sold out” z kafelka listy, odświeżana przy każdym przebiegu. Liczby sprzedanych biletów serwis nie podaje. Evently nie daje tej informacji (`undefined` = nie nadpisuj).
+- **Wyszukiwarka** (`?q=`, `searchOpportunities`): komik, program, scena, miasto i/lub data („14.10”, „14 paź”, „jutro”; `parseDateQuery` w `time.ts`). Szuka we wszystkich nadchodzących wydarzeniach, także odfiltrowanych; powód odfiltrowania jest w szarej etykiecie (`Opportunity.note`). Dopasowanie toleruje odmianę w obie strony („Modzelewskiego”) i obejmuje aliasy z CRM. Każdy termin to osobna karta.
 - **Grupowanie:** jedna karta na komika; najbliższy termin główny, reszta jako „Inne terminy”.
 - **Wyciszanie komika:**
   - ręcznie,

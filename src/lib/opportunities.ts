@@ -4,10 +4,10 @@
  */
 import { and, eq, gte, sql } from "drizzle-orm";
 import { cities, contacts, db, events, gigs, hiddenTitles, venues, type City, type Contact, type Event } from "@/db";
-import { matchContacts } from "./match";
+import { matchContacts, matchesQuery } from "./match";
 import { isWantedLanguage, performerKey, performerName } from "./performer";
 import { normalize } from "./text";
-import { nowLocal } from "./time";
+import { nowLocal, parseDateQuery } from "./time";
 
 /** Maks. czas dojazdu w jedną stronę; miasta z noclegiem wchodzą zawsze. */
 export const MAX_TRAVEL_MIN = 180;
@@ -42,6 +42,8 @@ export type Opportunity = {
   /** Kto występuje: kontakt z CRM albo nazwa wyciągnięta z tytułu. Klucz grupuje terminy jednego komika. */
   performer: { key: string; name: string; contactId: number | null };
   tab: Tab;
+  /** Tylko w wyszukiwarce: czemu wydarzenie normalnie nie trafia do Okazji (np. „poza zasięgiem”). */
+  note: string | null;
 };
 
 /** Wszystkie terminy jednego komika w danej zakładce: najbliższy w zasięgu + reszta jako alternatywy. */
@@ -151,14 +153,28 @@ async function loadContext() {
 
 type Ctx = Awaited<ReturnType<typeof loadContext>>;
 
-function classify(e: EventRow, ctx: Ctx, newSince: string): Opportunity | null {
-  if (e.dismissed || ctx.hidden.has(normalize(e.title))) return null;
-  if (!isWantedLanguage(`${e.title} ${e.performers ?? ""}`)) return null;
-  if (ctx.blacklist.has(`${normalize(e.venueName ?? "")}|${normalize(e.cityName ?? "")}`)) return null;
+/**
+ * `force` (wyszukiwarka): zamiast odrzucać wydarzenie, zapisz powód w `note` i pokaż je mimo to.
+ */
+function classify(e: EventRow, ctx: Ctx, newSince: string, force = false): Opportunity | null {
+  let note: string | null = null;
+  const drop = (reason: string) => {
+    note ??= reason;
+    return !force;
+  };
+  if (e.dismissed && drop("ukryte")) return null;
+  if (ctx.hidden.has(normalize(e.title)) && drop("program ukryty")) return null;
+  if (!isWantedLanguage(`${e.title} ${e.performers ?? ""}`) && drop("inny język")) return null;
+  if (ctx.blacklist.has(`${normalize(e.venueName ?? "")}|${normalize(e.cityName ?? "")}`) && drop("scena na czarnej liście")) {
+    return null;
+  }
 
   const all = matchContacts(`${e.title} ${e.performers ?? ""}`, ctx.people);
-  const matches = all.filter((m) => !m.ignoreInReport);
-  if (all.length && !matches.length) return null; // sami „pomijani” (nie interesuje / nie robi open miców)
+  let matches = all.filter((m) => !m.ignoreInReport);
+  if (all.length && !matches.length) {
+    if (drop("komik pomijany")) return null; // sami „pomijani” (nie interesuje / nie robi open miców)
+    matches = all;
+  }
 
   const city = e.cityName ? (ctx.citiesByName.get(normalize(e.cityName)) ?? null) : null;
   const known = !!city && city.travelMinutes != null;
@@ -170,7 +186,10 @@ function classify(e: EventRow, ctx: Ctx, newSince: string): Opportunity | null {
   else if (!known) tab = "unknownCity";
   else if (!inRange) tab = null;
   else tab = openMic ? "openMic" : "inRange";
-  if (!tab) return null;
+  if (!tab) {
+    if (drop("poza zasięgiem")) return null;
+    tab = openMic ? "openMic" : "inRange";
+  }
 
   const day = e.startsAt.slice(0, 10);
   const myGig = ctx.myGigs.find(
@@ -191,6 +210,7 @@ function classify(e: EventRow, ctx: Ctx, newSince: string): Opportunity | null {
       ? { key: `c${lead.id}`, name: lead.name, contactId: lead.id }
       : { key: performerKey(e.title), name: performerName(e.title), contactId: null },
     tab,
+    note,
   };
 }
 
@@ -248,6 +268,35 @@ export async function getOpportunities(
   return rows
     .filter((e) => !onlyIds || onlyIds.has(e.id))
     .map((e) => classify(e, ctx, newSince))
+    .filter((o): o is Opportunity => o !== null);
+}
+
+/**
+ * Wyszukiwarka: wszystkie nadchodzące wydarzenia pasujące do frazy (tytuł, występujący, a jeśli fraza
+ * to kontakt z CRM — także jego aliasy), łącznie z tymi, które Okazje normalnie odfiltrowują.
+ */
+export async function searchOpportunities(
+  query: string,
+  loadEvents: (today: string) => Promise<EventRow[]> = loadUpcomingEvents,
+) {
+  const today = nowLocal().slice(0, 10);
+  const [ctx, rows] = await Promise.all([loadContext(), loadEvents(today)]);
+  // „Modzelewski 14.10” = komik tego dnia; sama data = wszystko tego dnia.
+  const { date, rest } = parseDateQuery(query, today);
+  const q = normalize(rest).trim();
+  if (!date && q.length < 2) return [];
+  // Kontakty z CRM pasujące do frazy — ich aliasy też szukamy (np. pseudonim sceniczny).
+  const people = q ? ctx.people.filter((p) => matchesQuery(rest, `${p.name} ${p.aliases ?? ""}`)) : [];
+  const newSince = new Date(Date.now() - NEW_FOR_DAYS * 864e5).toISOString().replace("T", " ").slice(0, 19);
+  return rows
+    .filter((e) => {
+      if (date && e.startsAt.slice(0, 10) !== date) return false;
+      if (!q) return true;
+      const who = `${e.title} ${e.performers ?? ""}`;
+      const text = `${who} ${e.venueName ?? ""} ${e.cityName ?? ""}`;
+      return normalize(text).includes(q) || matchesQuery(rest, text) || matchContacts(who, people).length > 0;
+    })
+    .map((e) => classify(e, ctx, newSince, true))
     .filter((o): o is Opportunity => o !== null);
 }
 
