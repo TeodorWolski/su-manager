@@ -129,8 +129,17 @@ export async function logGigMessage(gigId: number, fd: FormData) {
   refresh();
 }
 
-/** „Odpisał” — ostatnia wiadomość w sprawie grania dostaje odpowiedź, granie znika z „Do ponowienia”. */
-export async function markGigReplied(gigId: number) {
+/** Relacje, które odpowiedź komika może nadpisać (bez kasowania historii wspólnych grań). */
+const SOFT_RELATIONS = ["none", "want_to_play", "no_reply", "agreed", "declined"];
+
+/**
+ * Odpowiedź w sprawie grania, jednym tapem:
+ * - „yes” = zgoda → granie potwierdzone, relacja „zgoda na granie”,
+ * - „no” = odmowa → granie odrzucone, relacja „odmowa”,
+ * - „wait” = odpisał, ale jeszcze nic pewnego → status „czekam”.
+ * W każdym wypadku ostatnia wiadomość dostaje odpowiedź i granie znika z „Do ponowienia”.
+ */
+export async function replyToGig(gigId: number, outcome: "yes" | "no" | "wait") {
   const [last] = await db
     .select({ id: interactions.id })
     .from(interactions)
@@ -138,6 +147,20 @@ export async function markGigReplied(gigId: number) {
     .orderBy(desc(interactions.date), desc(interactions.id))
     .limit(1);
   if (last) await db.update(interactions).set({ replied: true }).where(eq(interactions.id, last.id));
+
+  const status = outcome === "yes" ? "confirmed" : outcome === "no" ? "rejected" : "waiting";
+  const [gig] = await db.select({ headlinerId: gigs.headlinerId }).from(gigs).where(eq(gigs.id, gigId));
+  await db.update(gigs).set({ status, statusChangedAt: nowLocal() }).where(eq(gigs.id, gigId));
+
+  if (gig?.headlinerId && outcome !== "wait") {
+    const [c] = await db.select({ relation: contacts.relation }).from(contacts).where(eq(contacts.id, gig.headlinerId));
+    if (c && SOFT_RELATIONS.includes(c.relation)) {
+      await db
+        .update(contacts)
+        .set({ relation: outcome === "yes" ? "agreed" : "declined" })
+        .where(eq(contacts.id, gig.headlinerId));
+    }
+  }
   refresh();
 }
 

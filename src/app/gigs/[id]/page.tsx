@@ -1,7 +1,7 @@
 import { Check, ExternalLink } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { deleteGig, deleteGigMessage, logGigMessage, markGigReplied, setGigStatus } from "@/app/actions";
+import { deleteGig, deleteGigMessage, logGigMessage, replyToGig, setGigStatus } from "@/app/actions";
 import { ConfirmButton, PendingButton } from "@/components/form";
 import { PageHeader, Pill, Row, Section, Stat } from "@/components/ios";
 import { MessageComposer } from "@/components/message-composer";
@@ -98,7 +98,7 @@ export default async function GigPage({ params }: PageProps<"/gigs/[id]">) {
         <Section
           title="Wiadomości"
           footer={
-            lastMessage && !lastMessage.replied
+            lastMessage && (!lastMessage.replied || gig.status === "waiting")
               ? timing.due
                 ? `Cisza od ${quiet} dni, a granie już niedługo — ${next ? `ponów na: ${next}` : "pisałeś już wszędzie"}.`
                 : `Napisane ${quiet === 0 ? "dziś" : `${quiet} dni temu`} — przypomnę ${fmtDate(timing.remindOn)}, ok. ${FOLLOW_UP_BEFORE_DAYS} dni przed graniem.`
@@ -126,10 +126,27 @@ export default async function GigPage({ params }: PageProps<"/gigs/[id]">) {
               next={lastMessage ? next : "Instagram"}
             />
           </div>
-          {lastMessage && !lastMessage.replied && (
-            <form action={markGigReplied.bind(null, gig.id)} className="border-t">
-              <PendingButton className="text-primary h-11 w-full text-[15px]">Odpisał</PendingButton>
-            </form>
+          {lastMessage && (!lastMessage.replied || gig.status === "waiting") && (
+            <div className="border-t">
+              <div className="text-muted-foreground px-4 pt-2.5 text-[13px]">Odpisał?</div>
+              <div className={cn("grid gap-1.5 p-2", gig.status === "waiting" ? "grid-cols-2" : "grid-cols-3")}>
+                {(
+                  [
+                    ["yes", "Zgoda", "bg-st-ok text-white"],
+                    ["no", "Odmowa", "bg-st-rej/14 text-st-rej"],
+                    ["wait", "Jeszcze nie wie", "bg-secondary text-secondary-foreground"],
+                  ] as const
+                )
+                  .filter(([outcome]) => !(outcome === "wait" && gig.status === "waiting"))
+                  .map(([outcome, label, cls]) => (
+                  <form key={outcome} action={replyToGig.bind(null, gig.id, outcome)}>
+                    <PendingButton className={cn("h-10 w-full rounded-lg text-[14px] font-medium active:scale-95", cls)}>
+                      {label}
+                    </PendingButton>
+                  </form>
+                ))}
+              </div>
+            </div>
           )}
         </Section>
       )}

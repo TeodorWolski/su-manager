@@ -5,7 +5,7 @@ import { eventToGig, hidePerformer, messageFromEvent, setCityTravel, snoozePerfo
 import { Empty, PageHeader, Pill, Section } from "@/components/ios";
 import { MessageComposer } from "@/components/message-composer";
 import { isMonth, MonthChips, monthCounts } from "@/components/month-chips";
-import { AVAILABILITY_LABEL, AVAILABILITY_TONE, RELATION_LABEL, RELATION_TONE } from "@/lib/labels";
+import { AVAILABILITY_LABEL, AVAILABILITY_TONE, CHANNEL_SHORT, RELATION_LABEL, RELATION_TONE } from "@/lib/labels";
 import {
   COOLDOWN_DAYS,
   getOpportunities,
@@ -151,6 +151,13 @@ function GroupCard({ g }: { g: OpportunityGroup }) {
               {m.relation !== "none" && <Pill tone={RELATION_TONE[m.relation]}>{RELATION_LABEL[m.relation]}</Pill>}
               {m.lastPlayedTogether && (
                 <span className="text-muted-foreground whitespace-nowrap">wspólny wieczór {fmtDate(m.lastPlayedTogether)}</span>
+              )}
+              {m.lastMessageAt && (
+                <span className="text-muted-foreground whitespace-nowrap">
+                  pisałeś {fmtDate(m.lastMessageAt)}
+                  {m.lastMessageChannel && ` (${CHANNEL_SHORT[m.lastMessageChannel] ?? m.lastMessageChannel})`}
+                  {m.lastMessageReplied ? " · odpisał" : " · bez odpowiedzi"}
+                </span>
               )}
             </Link>
           ))}

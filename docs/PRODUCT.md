@@ -66,7 +66,7 @@ Ocena grania **nie jest** oceną bitu, bo zależy od publiki, line-upu itd. Bit 
 - **Karta grania, sekcja „Wiadomości”:**
   - gotowy tekst do skopiowania,
   - „Wysłałem: IG / FB / Fanpage” zapisuje `interactions` z `gigId`; pierwsza wiadomość przestawia status na `contacted`,
-  - „Odpisał” zdejmuje granie z ponawiania.
+  - „Odpisał?” → **Zgoda** (status potwierdzone, relacja „zgoda”), **Odmowa** (odrzucone, „odmowa”), **Jeszcze nie wie** (status „czekam”; przypomnienie przed graniem dalej działa). Relację nadpisuje tylko „miękką” (bez historii wspólnych grań).
 - **Bramka oceny** (`components/review-gate.tsx`): 90 min po starcie potwierdzonego grania, ale nie przed 20:00, cała apka jest zasłonięta formularzem logu. Ucieczka: „nie zagrałem” (status `cancelled`). Grania importowane wstecz mają `skipReview`.
 - **Log:**
   - ocena występu, „myśli na gorąco” (najważniejsze pole), ocena miejsca,
@@ -75,11 +75,13 @@ Ocena grania **nie jest** oceną bitu, bo zależy od publiki, line-upu itd. Bit 
 - **Nowe granie:** w polach komików nie ma pomijanych z powodu `not_interested` / `no_openers`.
 
 ### Okazje (`/events`)
+- **Poranny mail** (10:30, `src/scraper/email.ts`): „Do ponowienia”, „Najgorętsze okazje” z gotowym tekstem i nowe terminy z bileterii. Wysyłany, gdy którakolwiek sekcja nie jest pusta.
 - **Źródło:** scraper bileterii (`src/scraper/sources/*`, cron GitHub Actions codziennie o 10:30 czasu polskiego, razem z mailem) zbiera wydarzenia. Klasyfikacja jest w `src/lib/opportunities.ts`.
 - **Zakładki:** Znajomi (komicy z CRM), W zasięgu (≤3 h dojazdu albo nocleg), Open miki, Uzupełnij (miasta bez czasu dojazdu).
 - **Dostępność biletów** (`events.availability`): z kupbilecik etykieta „ostatnie bilety” / „sold out” z kafelka listy, odświeżana przy każdym przebiegu. Liczby sprzedanych biletów serwis nie podaje. Evently nie daje tej informacji (`undefined` = nie nadpisuj).
 - **Wyszukiwarka** (`?q=`, `searchOpportunities`): komik, program, scena, miasto i/lub data („14.10”, „14 paź”, „jutro”; `parseDateQuery` w `time.ts`). Szuka we wszystkich nadchodzących wydarzeniach, także odfiltrowanych; powód odfiltrowania jest w szarej etykiecie (`Opportunity.note`). Dopasowanie toleruje odmianę w obie strony („Modzelewskiego”) i obejmuje aliasy z CRM. Każdy termin to osobna karta.
 - **„Jestem w…”** (`?near=&d=&r=&span=`, `nearOpportunities`): miasto i data, a w wyniku wydarzenia w promieniu 30/60/100 km (w linii prostej), opcjonalnie ±1 dzień, najbliższe najpierw. Zasięg z Warszawy jest tu ignorowany. Współrzędne są w `src/data/places-pl.json` (GeoNames, generator `scripts/build-places.ts`). Miasta spoza pliku nie mają odległości i są pomijane.
+- **Historia przy komiku:** na karcie widać „pisałeś 12.09 (IG) · bez odpowiedzi / odpisał” z ostatniej interakcji w CRM, żeby nie pytać za często.
 - **Grupowanie:** jedna karta na komika; najbliższy termin główny, reszta jako „Inne terminy”.
 - **Wyciszanie komika:**
   - ręcznie,
@@ -113,7 +115,7 @@ Ocena grania **nie jest** oceną bitu, bo zależy od publiki, line-upu itd. Bit 
 
 - **Daty grań** to lokalny czas Warszawy jako string bez strefy: `"2026-10-14T20:00"` albo sama data `"2026-10-14"` (import, brak godziny). „Teraz” to `nowLocal()` z `src/lib/time.ts`. Porównania są stringowe; `effectiveStart()` dokleja 20:00 do samej daty. `createdAt` jest w UTC (`datetime('now')`).
 - **Mutacje to server actions** w `src/app/actions.ts`. Po akcji na tej samej stronie: `refresh()`. Z przejściem: `done(path)` (redirect). Akcje na wydarzeniach unieważniają `EVENTS_TAG`.
-- **Odczyty** są w `src/lib/queries.ts` (`server-only`). Logika czysta (rytm, ponawianie, szablony) siedzi w osobnych modułach `src/lib/*`, bez bazy, żeby dało się ją testować.
+- **Odczyty** są w `src/lib/queries.ts` (`server-only`). Wyjątek: `src/lib/planning.ts` (do ponowienia, rytm, najgorętsze) jest bez `server-only` i bez cache Next, bo używa go też skrypt maila. Logika czysta (rytm, ponawianie, szablony) siedzi w osobnych modułach `src/lib/*`, bez bazy, żeby dało się ją testować.
 - **Etykiety, tony i listy kanałów** są w `src/lib/labels.ts`. Enumy statusów są w `src/db/schema.ts` (`*_STATUSES`). Enumy drizzle na kolumnach `text` nie tworzą CHECK w SQLite, więc nowa wartość nie wymaga migracji.
 - **Progi i stałe** są nazwane i opisane przy definicji (`FOLLOW_UP_BEFORE_DAYS`, `WEEK_MIN/MAX`, `STREAK_WARN`, `COOLDOWN_DAYS`, `MAX_TRAVEL_MIN`, `REVIEW_DELAY_MIN`…).
 - **UI:** komponenty iOS-owe z `src/components/ios.tsx` (`Section`, `Row`, `Pill`, `Stat`) i `form.tsx` (`FieldRow`, `PendingButton`). Kolory statusów to tokeny `--st-*` w `globals.css`, akcent limonka `#E4F323`. Wspierany jest tryb jasny i ciemny.

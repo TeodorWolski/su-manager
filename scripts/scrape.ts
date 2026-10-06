@@ -2,7 +2,8 @@
  * Codzienny przebieg scrapera (GitHub Actions, patrz .github/workflows/scrape.yml).
  * 1. zbiera wydarzenia ze wszystkich serwisów (błąd jednego nie blokuje reszty),
  * 2. zapisuje nowe / odświeża znane (deduplikacja po tytuł+data+miejsce),
- * 3. jeśli wśród nowych są okazje — wysyła mail. Pierwszy przebieg tylko zasila bazę.
+ * 3. wysyła poranny mail: do ponowienia + najgorętsze okazje + nowe okazje (jeśli cokolwiek z tego jest).
+ *    Pierwszy przebieg tylko zasila bazę.
  *
  * Lokalnie: pnpm scrape   (bez RESEND_API_KEY mail jest tylko logowany)
  */
@@ -10,6 +11,7 @@ import "dotenv/config";
 import { eq, inArray, sql } from "drizzle-orm";
 import { db, events } from "@/db";
 import { dedupeKey, getOpportunities } from "@/lib/opportunities";
+import { getFollowUps, getPlanning } from "@/lib/planning";
 import { sendReport } from "@/scraper/email";
 import { fetchHtml } from "@/scraper/http";
 import { SOURCES } from "@/scraper/sources";
@@ -79,12 +81,11 @@ async function main() {
 
   if (firstRun) {
     log("pierwszy przebieg — tylko zasilam bazę, bez maila");
-  } else if (newIds.size) {
-    const fresh = (await getOpportunities(newIds)).filter((o) => !o.myGigId && o.tab !== "muted");
-    if (fresh.length) await sendReport(fresh, log);
-    else log("nowe wydarzenia, ale żadne nie jest okazją — bez maila");
   } else {
-    log("brak nowych wydarzeń — bez maila");
+    const fresh = newIds.size ? (await getOpportunities(newIds)).filter((o) => !o.myGigId && o.tab !== "muted") : [];
+    const [followUps, { hot }] = await Promise.all([getFollowUps(), getPlanning()]);
+    log(`mail: ${fresh.length} nowych okazji, ${followUps.length} do ponowienia, ${hot.length} gorących`);
+    await sendReport({ fresh, followUps, hot }, log);
   }
 
   // Padnięty parser = czerwony build w Actions, żeby GitHub dał znać mailem.

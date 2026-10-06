@@ -1,6 +1,6 @@
 import { CalendarPlus, ChevronRight, Flame, History, Mic, Scale } from "lucide-react";
 import Link from "next/link";
-import type { Rhythm } from "@/lib/queries";
+import type { Rhythm } from "@/lib/planning";
 import { fmtDay, fmtRange, WEEK_MAX, WEEK_MIN, type Insight, type Week } from "@/lib/rhythm";
 import { plural } from "@/lib/text";
 import { cn } from "@/lib/utils";

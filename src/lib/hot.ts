@@ -99,16 +99,16 @@ export function hotOpportunities(gigs: RhythmGig[], candidates: HotCandidate[], 
     scored.push({ ...c, score, reasons });
   }
 
-  // Jeden termin na komika i jeden na dzień — żeby lista była różnorodna.
-  const seenPerformer = new Set<string>();
-  const seenDay = new Set<string>();
+  // Jeden termin na komika, jeden na dzień i jeden danego typu na tydzień — to propozycje
+  // do wyboru, więc trzy openery w jednym tygodniu przeczyłyby balansowi.
+  const seen = new Set<string>();
   return scored
     .sort((a, b) => b.score - a.score)
     .filter((h) => {
       const d = day(h.startsAt);
-      if (seenPerformer.has(h.performer.key) || seenDay.has(d)) return false;
-      seenPerformer.add(h.performer.key);
-      seenDay.add(d);
+      const keys = [`p:${h.performer.key}`, `d:${d}`, `w:${weekStart(d)}:${h.isOpenMic}`];
+      if (keys.some((k) => seen.has(k))) return false;
+      keys.forEach((k) => seen.add(k));
       return true;
     })
     .slice(0, HOT_LIMIT);

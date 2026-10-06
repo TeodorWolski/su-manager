@@ -21,6 +21,10 @@ export const ACTIVE_GIG: readonly string[] = ["interested", "contacted", "waitin
 
 export type MatchedContact = Pick<Contact, "id" | "name" | "relation" | "ignoreInReport" | "snoozeUntil"> & {
   lastPlayedTogether: string | null;
+  /** Ostatnia wiadomość do niego (CRM): data, kanał, czy odpisał — żeby nie pytać za często. */
+  lastMessageAt: string | null;
+  lastMessageChannel: string | null;
+  lastMessageReplied: boolean | null;
   /** Do kiedy wyciszony w Okazjach (data), null = widoczny. */
   mutedUntil: string | null;
   muteReason: MuteReason | null;
@@ -121,6 +125,9 @@ async function loadContext() {
             and (g.headliner_id = contacts.id
               or exists (select 1 from gig_contacts gc where gc.gig_id = g.id and gc.contact_id = contacts.id)))`,
         nextGig: sql<string | null>`(${nextGigSql("g.starts_at")})`,
+        lastMessageAt: sql<string | null>`(select max(i.date) from interactions i where i.contact_id = contacts.id)`,
+        lastMessageChannel: sql<string | null>`(select i.channel from interactions i where i.contact_id = contacts.id order by i.date desc, i.id desc limit 1)`,
+        lastMessageReplied: sql<boolean | null>`(select i.replied from interactions i where i.contact_id = contacts.id order by i.date desc, i.id desc limit 1)`,
         nextGigCreatedAt: sql<string | null>`(${nextGigSql("g.created_at")})`,
       })
       .from(contacts),
