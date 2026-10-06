@@ -4,7 +4,7 @@ import { GigRow } from "@/components/gig-row";
 import { GigGoalCard, MaterialTile, RatingTile } from "@/components/goals";
 import { Empty, PageHeader, Pill, Rating, Row, Section } from "@/components/ios";
 import { Button } from "@/components/ui/button";
-import { FOLLOW_UP_AFTER_DAYS } from "@/lib/follow-up";
+import { FOLLOW_UP_BEFORE_DAYS } from "@/lib/follow-up";
 import { CHANNEL_SHORT } from "@/lib/labels";
 import { HotOpportunities } from "@/components/hot";
 import { RhythmCard } from "@/components/rhythm";
@@ -53,7 +53,7 @@ export default async function Home() {
       {followUps.length > 0 && (
         <Section
           title="Do ponowienia"
-          footer={`Cisza od ${FOLLOW_UP_AFTER_DAYS}+ dni. Napisz jeszcze raz — najlepiej innym kanałem — albo zmień status.`}
+          footer={`Do grania ${FOLLOW_UP_BEFORE_DAYS} dni lub mniej, a odpowiedzi brak. Napisz jeszcze raz — najlepiej innym kanałem — albo zmień status.`}
         >
           {followUps.map((g) => (
             <Row
@@ -63,6 +63,7 @@ export default async function Home() {
               subtitle={[
                 fmtDate(g.startsAt),
                 g.headlinerName,
+                g.daysLeft <= 1 ? "już jutro" : `za ${g.daysLeft} dni`,
                 `cisza ${g.quietDays} dni`,
                 g.used.length > 0 && `pisałeś: ${g.used.map((c) => CHANNEL_SHORT[c] ?? c).join(", ")}`,
               ]

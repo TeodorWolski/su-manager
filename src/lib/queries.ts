@@ -15,7 +15,7 @@ import {
   type GigStatus,
 } from "@/db";
 import { loadUpcomingEventsCached } from "./events-cache";
-import { daysSince, FOLLOW_UP_AFTER_DAYS, lastActivity, nextChannel } from "./follow-up";
+import { daysSince, followUpTiming, lastActivity, nextChannel } from "./follow-up";
 import { getOpportunities } from "./opportunities";
 import { hotOpportunities, type HotCandidate } from "./hot";
 import { getInsights, type RhythmOpportunity } from "./rhythm";
@@ -274,8 +274,8 @@ export async function listThoughts(query?: string) {
 }
 
 /**
- * Grania „napisałem” / „czekam”, w których od FOLLOW_UP_AFTER_DAYS dni nic się nie dzieje,
- * a ostatnia wiadomość nie dostała odpowiedzi. Z podpowiedzią kolejnego kanału.
+ * Grania „napisałem” / „czekam” bez odpowiedzi, do których zostało ~1,5 tygodnia
+ * (FOLLOW_UP_BEFORE_DAYS) i od ostatniej wiadomości minęło min. FOLLOW_UP_MIN_QUIET_DAYS. Z podpowiedzią kolejnego kanału.
  */
 export async function getFollowUps() {
   const today = nowLocal().slice(0, 10);
@@ -299,9 +299,16 @@ export async function getFollowUps() {
     .map((g) => {
       const used = g.channels?.split(",") ?? [];
       const since = lastActivity(g);
-      return { ...g, used, quietDays: daysSince(since, today), next: nextChannel(used) };
+      return {
+        ...g,
+        used,
+        quietDays: daysSince(since, today),
+        daysLeft: daysSince(today, g.startsAt),
+        next: nextChannel(used),
+        due: followUpTiming(g.startsAt, since, today).due,
+      };
     })
-    .filter((g) => g.quietDays >= FOLLOW_UP_AFTER_DAYS);
+    .filter((g) => g.due);
 }
 
 export type FollowUp = Awaited<ReturnType<typeof getFollowUps>>[number];

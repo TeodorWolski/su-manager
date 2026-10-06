@@ -56,7 +56,7 @@ Ocena grania **nie jest** oceną bitu, bo zależy od publiki, line-upu itd. Bit 
   - punkty: znajomy, ostatnie bilety / sold out, luźny tydzień, typ, którego w tygodniu brakuje (balans), bliskość, nowość,
   - jeden termin na komika i jeden na dzień, maks. 4, z gotowym „Napisz”.
 - **Do ponowienia** (`src/lib/follow-up.ts`):
-  - kiedy: granie „napisałem/czekam”, 3+ dni ciszy, ostatnia wiadomość bez odpowiedzi,
+  - kiedy: granie „napisałem/czekam” bez odpowiedzi, ok. 1,5 tygodnia (10 dni) przed graniem i min. 2 dni po ostatniej wiadomości,
   - pokazuje, gdzie już pisałem, i podpowiada kolejny kanał: Instagram → FB prywatny → FB fanpage,
   - ponowienie zwykle idzie innym komunikatorem niż pierwsza wiadomość.
 - Nadchodzące, W toku (pipeline) i ostatnie „myśli” z logów.
@@ -115,7 +115,7 @@ Ocena grania **nie jest** oceną bitu, bo zależy od publiki, line-upu itd. Bit 
 - **Mutacje to server actions** w `src/app/actions.ts`. Po akcji na tej samej stronie: `refresh()`. Z przejściem: `done(path)` (redirect). Akcje na wydarzeniach unieważniają `EVENTS_TAG`.
 - **Odczyty** są w `src/lib/queries.ts` (`server-only`). Logika czysta (rytm, ponawianie, szablony) siedzi w osobnych modułach `src/lib/*`, bez bazy, żeby dało się ją testować.
 - **Etykiety, tony i listy kanałów** są w `src/lib/labels.ts`. Enumy statusów są w `src/db/schema.ts` (`*_STATUSES`). Enumy drizzle na kolumnach `text` nie tworzą CHECK w SQLite, więc nowa wartość nie wymaga migracji.
-- **Progi i stałe** są nazwane i opisane przy definicji (`FOLLOW_UP_AFTER_DAYS`, `WEEK_MIN/MAX`, `STREAK_WARN`, `COOLDOWN_DAYS`, `MAX_TRAVEL_MIN`, `REVIEW_DELAY_MIN`…).
+- **Progi i stałe** są nazwane i opisane przy definicji (`FOLLOW_UP_BEFORE_DAYS`, `WEEK_MIN/MAX`, `STREAK_WARN`, `COOLDOWN_DAYS`, `MAX_TRAVEL_MIN`, `REVIEW_DELAY_MIN`…).
 - **UI:** komponenty iOS-owe z `src/components/ios.tsx` (`Section`, `Row`, `Pill`, `Stat`) i `form.tsx` (`FieldRow`, `PendingButton`). Kolory statusów to tokeny `--st-*` w `globals.css`, akcent limonka `#E4F323`. Wspierany jest tryb jasny i ciemny.
 - **Next.js 16** z breaking changes: przed pisaniem kodu czytaj `node_modules/next/dist/docs/` (patrz `AGENTS.md`).
 

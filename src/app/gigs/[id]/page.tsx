@@ -6,7 +6,7 @@ import { ConfirmButton, PendingButton } from "@/components/form";
 import { PageHeader, Pill, Row, Section, Stat } from "@/components/ios";
 import { MessageComposer } from "@/components/message-composer";
 import { Button } from "@/components/ui/button";
-import { daysSince, FOLLOW_UP_AFTER_DAYS, lastActivity, nextChannel } from "@/lib/follow-up";
+import { daysSince, FOLLOW_UP_BEFORE_DAYS, followUpTiming, lastActivity, nextChannel } from "@/lib/follow-up";
 import { GIG_CONTEXT_LABEL, GIG_PIPELINE, GIG_STATUS_LABEL, GIG_STATUS_TONE, REACTION_EMOJI } from "@/lib/labels";
 import { pitchMessage } from "@/lib/messages";
 import { getGig, type GigStatus } from "@/lib/queries";
@@ -31,10 +31,9 @@ export default async function GigPage({ params }: PageProps<"/gigs/[id]">) {
   const asking = !log && (["interested", "contacted", "waiting"] as GigStatus[]).includes(gig.status);
   const used = [...new Set(data.messages.map((m) => m.channel))];
   const lastMessage = data.messages.at(-1);
-  const quiet = daysSince(
-    lastActivity({ statusChangedAt: gig.statusChangedAt, createdAt: gig.createdAt, lastMessageAt: lastMessage?.date ?? null }),
-    nowLocal(),
-  );
+  const since = lastActivity({ statusChangedAt: gig.statusChangedAt, createdAt: gig.createdAt, lastMessageAt: lastMessage?.date ?? null });
+  const quiet = daysSince(since, nowLocal());
+  const timing = followUpTiming(gig.startsAt, since, nowLocal().slice(0, 10));
   const next = nextChannel(used);
 
   return (
@@ -100,9 +99,9 @@ export default async function GigPage({ params }: PageProps<"/gigs/[id]">) {
           title="Wiadomości"
           footer={
             lastMessage && !lastMessage.replied
-              ? quiet >= FOLLOW_UP_AFTER_DAYS
-                ? `Cisza od ${quiet} dni — ${next ? `ponów na: ${next}` : "pisałeś już wszędzie"}.`
-                : `Napisane ${quiet === 0 ? "dziś" : `${quiet} dni temu`} — przypomnę po ${FOLLOW_UP_AFTER_DAYS} dniach ciszy.`
+              ? timing.due
+                ? `Cisza od ${quiet} dni, a granie już niedługo — ${next ? `ponów na: ${next}` : "pisałeś już wszędzie"}.`
+                : `Napisane ${quiet === 0 ? "dziś" : `${quiet} dni temu`} — przypomnę ${fmtDate(timing.remindOn)}, ok. ${FOLLOW_UP_BEFORE_DAYS} dni przed graniem.`
               : undefined
           }
         >
