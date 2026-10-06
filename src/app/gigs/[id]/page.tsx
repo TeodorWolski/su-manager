@@ -7,11 +7,28 @@ import { PageHeader, Pill, Row, Section, Stat } from "@/components/ios";
 import { MessageComposer } from "@/components/message-composer";
 import { Button } from "@/components/ui/button";
 import { daysSince, FOLLOW_UP_BEFORE_DAYS, followUpTiming, lastActivity, nextChannel } from "@/lib/follow-up";
-import { GIG_CONTEXT_LABEL, GIG_PIPELINE, GIG_STATUS_LABEL, GIG_STATUS_TONE, REACTION_EMOJI } from "@/lib/labels";
+import {
+  GIG_CONTEXT_LABEL,
+  GIG_OUTCOME_LABEL,
+  GIG_PIPELINE,
+  GIG_STATUS_LABEL,
+  GIG_STATUS_TONE,
+  REACTION_EMOJI,
+} from "@/lib/labels";
+import type { GigOutcome } from "@/db/schema";
 import { pitchMessage } from "@/lib/messages";
 import { getGig, type GigStatus } from "@/lib/queries";
 import { effectiveStart, fmtDate, fmtDateTime, nowLocal } from "@/lib/time";
 import { cn } from "@/lib/utils";
+
+/** Zakończenia rozmowy o granie — kolejność = jak często się zdarzają. */
+const OUTCOME_BUTTONS: [GigOutcome, string][] = [
+  ["agreed", "bg-st-ok text-white col-span-2"],
+  ["declined", "bg-st-rej/14 text-st-rej"],
+  ["ghosted", "bg-secondary text-secondary-foreground"],
+  ["slot_taken", "bg-secondary text-secondary-foreground"],
+  ["no_openers", "bg-secondary text-secondary-foreground"],
+];
 
 /** Aktywny krok w kolorze swojego statusu (szary → niebieski → ochra → zieleń). */
 const STEP_ACTIVE: Partial<Record<GigStatus, string>> = {
@@ -44,6 +61,7 @@ export default async function GigPage({ params }: PageProps<"/gigs/[id]">) {
           <span className="flex flex-wrap items-center gap-2">
             {fmtDateTime(gig.startsAt)}
             <Pill tone={GIG_STATUS_TONE[gig.status]}>{GIG_STATUS_LABEL[gig.status]}</Pill>
+            {gig.outcome && gig.outcome !== "agreed" && <Pill tone="muted">{GIG_OUTCOME_LABEL[gig.outcome]}</Pill>}
           </span>
         }
         back={{ href: "/gigs", label: "Grania" }}
@@ -128,23 +146,24 @@ export default async function GigPage({ params }: PageProps<"/gigs/[id]">) {
           </div>
           {lastMessage && (!lastMessage.replied || gig.status === "waiting") && (
             <div className="border-t">
-              <div className="text-muted-foreground px-4 pt-2.5 text-[13px]">Odpisał?</div>
-              <div className={cn("grid gap-1.5 p-2", gig.status === "waiting" ? "grid-cols-2" : "grid-cols-3")}>
-                {(
-                  [
-                    ["yes", "Zgoda", "bg-st-ok text-white"],
-                    ["no", "Odmowa", "bg-st-rej/14 text-st-rej"],
-                    ["wait", "Jeszcze nie wie", "bg-secondary text-secondary-foreground"],
-                  ] as const
-                )
-                  .filter(([outcome]) => !(outcome === "wait" && gig.status === "waiting"))
-                  .map(([outcome, label, cls]) => (
-                  <form key={outcome} action={replyToGig.bind(null, gig.id, outcome)}>
-                    <PendingButton className={cn("h-10 w-full rounded-lg text-[14px] font-medium active:scale-95", cls)}>
-                      {label}
+              <div className="text-muted-foreground px-4 pt-2.5 text-[13px]">Jak się skończyło?</div>
+              <div className="grid grid-cols-2 gap-1.5 p-2">
+                {OUTCOME_BUTTONS.filter(([o]) => o !== "no_openers" || (gig.headlinerId && gig.context !== "open_mic")).map(
+                  ([outcome, cls]) => (
+                    <form key={outcome} action={replyToGig.bind(null, gig.id, outcome)}>
+                      <PendingButton className={cn("h-10 w-full rounded-lg text-[14px] font-medium active:scale-95", cls)}>
+                        {GIG_OUTCOME_LABEL[outcome]}
+                      </PendingButton>
+                    </form>
+                  ),
+                )}
+                {gig.status !== "waiting" && (
+                  <form action={replyToGig.bind(null, gig.id, "wait")}>
+                    <PendingButton className="text-muted-foreground h-10 w-full rounded-lg text-[14px] active:scale-95">
+                      Odpisał, jeszcze nie wie
                     </PendingButton>
                   </form>
-                ))}
+                )}
               </div>
             </div>
           )}

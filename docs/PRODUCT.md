@@ -66,7 +66,15 @@ Ocena grania **nie jest** oceną bitu, bo zależy od publiki, line-upu itd. Bit 
 - **Karta grania, sekcja „Wiadomości”:**
   - gotowy tekst do skopiowania,
   - „Wysłałem: IG / FB / Fanpage” zapisuje `interactions` z `gigId`; pierwsza wiadomość przestawia status na `contacted`,
-  - „Odpisał?” → **Zgoda** (status potwierdzone, relacja „zgoda”), **Odmowa** (odrzucone, „odmowa”), **Jeszcze nie wie** (status „czekam”; przypomnienie przed graniem dalej działa). Relację nadpisuje tylko „miękką” (bez historii wspólnych grań).
+  - „Jak się skończyło?” (wynik w `gigs.outcome`, `GIG_OUTCOMES`):
+    - **Zgodził się:** potwierdzone, relacja „zgoda”,
+    - **Odmówił:** odrzucone, relacja „odmowa”,
+    - **Zghostował:** odrzucone, wiadomość „bez odpowiedzi”, relacja „brak odpowiedzi”,
+    - **Ktoś zajął miejsce:** odrzucone, relacja bez zmian (inny termin może wyjść),
+    - **Nie robi open miców:** odrzucone, komik pomijany w Okazjach z tym powodem,
+    - **Odpisał, jeszcze nie wie:** status „czekam”, przypomnienie przed graniem dalej działa.
+    
+    Relację nadpisuje tylko „miękką” (bez historii wspólnych grań). Powrót do statusu z pipeline'u kasuje wynik.
 - **Bramka oceny** (`components/review-gate.tsx`): 90 min po starcie potwierdzonego grania, ale nie przed 20:00, cała apka jest zasłonięta formularzem logu. Ucieczka: „nie zagrałem” (status `cancelled`). Grania importowane wstecz mają `skipReview`.
 - **Log:**
   - ocena występu, „myśli na gorąco” (najważniejsze pole), ocena miejsca,

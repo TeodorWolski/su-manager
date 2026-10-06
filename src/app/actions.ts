@@ -26,6 +26,7 @@ import {
   interactions,
   VENUE_VERDICTS,
   venues,
+  type GigOutcome,
   type GigStatus,
   type VenueVerdict,
 } from "@/db";
@@ -97,7 +98,12 @@ export async function saveGig(fd: FormData) {
 }
 
 export async function setGigStatus(id: number, status: GigStatus) {
-  await db.update(gigs).set({ status, statusChangedAt: nowLocal() }).where(eq(gigs.id, id));
+  // Powrót do pipeline'u (np. jednak rozmawiamy dalej) kasuje wcześniejszy wynik rozmowy.
+  const reopened = (["interested", "contacted", "waiting"] as GigStatus[]).includes(status);
+  await db
+    .update(gigs)
+    .set({ status, statusChangedAt: nowLocal(), ...(reopened ? { outcome: null } : {}) })
+    .where(eq(gigs.id, id));
   refresh();
 }
 
@@ -133,33 +139,43 @@ export async function logGigMessage(gigId: number, fd: FormData) {
 const SOFT_RELATIONS = ["none", "want_to_play", "no_reply", "agreed", "declined"];
 
 /**
- * Odpowiedź w sprawie grania, jednym tapem:
- * - „yes” = zgoda → granie potwierdzone, relacja „zgoda na granie”,
- * - „no” = odmowa → granie odrzucone, relacja „odmowa”,
- * - „wait” = odpisał, ale jeszcze nic pewnego → status „czekam”.
- * W każdym wypadku ostatnia wiadomość dostaje odpowiedź i granie znika z „Do ponowienia”.
+ * Jak się skończyło pytanie o granie, jednym tapem:
+ * - agreed → granie potwierdzone, relacja „zgoda na granie”,
+ * - declined → odrzucone, relacja „odmowa”,
+ * - no_openers → odrzucone + komik pomijany w Okazjach z tym powodem,
+ * - slot_taken → odrzucone, relacja bez zmian (to nie odmowa — inny termin może wyjść),
+ * - ghosted → odrzucone, ostatnia wiadomość „bez odpowiedzi”, relacja „pisałem, brak odpowiedzi”,
+ * - wait (bez wyniku) → odpisał, ale jeszcze nie wie: status „czekam”, przypomnienie dalej działa.
  */
-export async function replyToGig(gigId: number, outcome: "yes" | "no" | "wait") {
+export async function replyToGig(gigId: number, outcome: GigOutcome | "wait") {
   const [last] = await db
     .select({ id: interactions.id })
     .from(interactions)
     .where(eq(interactions.gigId, gigId))
     .orderBy(desc(interactions.date), desc(interactions.id))
     .limit(1);
-  if (last) await db.update(interactions).set({ replied: true }).where(eq(interactions.id, last.id));
+  if (last) await db.update(interactions).set({ replied: outcome !== "ghosted" }).where(eq(interactions.id, last.id));
 
-  const status = outcome === "yes" ? "confirmed" : outcome === "no" ? "rejected" : "waiting";
   const [gig] = await db.select({ headlinerId: gigs.headlinerId }).from(gigs).where(eq(gigs.id, gigId));
-  await db.update(gigs).set({ status, statusChangedAt: nowLocal() }).where(eq(gigs.id, gigId));
+  await db
+    .update(gigs)
+    .set(
+      outcome === "wait"
+        ? { status: "waiting", statusChangedAt: nowLocal() }
+        : { status: outcome === "agreed" ? "confirmed" : "rejected", outcome, statusChangedAt: nowLocal() },
+    )
+    .where(eq(gigs.id, gigId));
 
-  if (gig?.headlinerId && outcome !== "wait") {
-    const [c] = await db.select({ relation: contacts.relation }).from(contacts).where(eq(contacts.id, gig.headlinerId));
-    if (c && SOFT_RELATIONS.includes(c.relation)) {
-      await db
-        .update(contacts)
-        .set({ relation: outcome === "yes" ? "agreed" : "declined" })
-        .where(eq(contacts.id, gig.headlinerId));
-    }
+  const contactId = gig?.headlinerId;
+  if (!contactId || outcome === "wait" || outcome === "slot_taken") return refresh();
+  if (outcome === "no_openers") {
+    await db.update(contacts).set({ ignoreInReport: true, ignoreReason: "no_openers" }).where(eq(contacts.id, contactId));
+    return refresh();
+  }
+  const relation = outcome === "agreed" ? "agreed" : outcome === "declined" ? "declined" : "no_reply";
+  const [c] = await db.select({ relation: contacts.relation }).from(contacts).where(eq(contacts.id, contactId));
+  if (c && SOFT_RELATIONS.includes(c.relation)) {
+    await db.update(contacts).set({ relation }).where(eq(contacts.id, contactId));
   }
   refresh();
 }

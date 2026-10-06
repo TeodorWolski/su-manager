@@ -123,6 +123,12 @@ export const GIG_STATUSES = [
   "cancelled",
 ] as const;
 
+/**
+ * Jak się skończyło pytanie o granie: zgoda, odmowa, nie robi open miców przed sobą,
+ * ktoś zajął miejsce, zghostował (brak odpowiedzi).
+ */
+export const GIG_OUTCOMES = ["agreed", "declined", "no_openers", "slot_taken", "ghosted"] as const;
+
 /** opener = darmowy slot przed headlinerem, support = płatny, headline = własny / co-headline. */
 export const GIG_CONTEXTS = ["open_mic", "opener", "support", "headline", "other"] as const;
 
@@ -136,6 +142,8 @@ export const gigs = sqliteTable("gigs", {
   status: text("status", { enum: GIG_STATUSES }).notNull().default("interested"),
   /** Lokalny czas ostatniej zmiany statusu — z niego (i z wiadomości) liczymy, kiedy ponowić. */
   statusChangedAt: text("status_changed_at"),
+  /** Wynik rozmowy o granie (patrz GIG_OUTCOMES); null = jeszcze w toku / nie pytałem. */
+  outcome: text("outcome", { enum: GIG_OUTCOMES }),
   context: text("context", { enum: GIG_CONTEXTS }),
   /** Przed kim gram (support) — kontakt z CRM. */
   headlinerId: integer("headliner_id").references(() => contacts.id, { onDelete: "set null" }),
@@ -249,5 +257,6 @@ export type GigLog = typeof gigLogs.$inferSelect;
 export type Event = typeof events.$inferSelect;
 export type GigStatus = (typeof GIG_STATUSES)[number];
 export type GigContext = (typeof GIG_CONTEXTS)[number];
+export type GigOutcome = (typeof GIG_OUTCOMES)[number];
 export type VenueVerdict = (typeof VENUE_VERDICTS)[number];
 export type IgnoreReason = (typeof IGNORE_REASONS)[number];
