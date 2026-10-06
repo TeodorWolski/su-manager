@@ -1,0 +1,43 @@
+name: Podsumowanie tygodnia
+
+on:
+  # W niedzielę o 19:00 czasu polskiego. Cron jest w UTC: latem (UTC+2) pasuje 17:00 UTC,
+  # zimą (UTC+1) 18:00 UTC. Krok „pora” przepuszcza tylko właściwy (jak w scrape.yml).
+  schedule:
+    - cron: "0 17 * * 0"
+    - cron: "0 18 * * 0"
+  workflow_dispatch: # ręczne uruchomienie z zakładki Actions
+
+jobs:
+  weekly:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Pora (19:00 w Warszawie)
+        id: time
+        run: |
+          offset=$(TZ=Europe/Warsaw date +%z)
+          want="0 18 * * 0"; [ "$offset" = "+0200" ] && want="0 17 * * 0"
+          if [ "${{ github.event_name }}" != "schedule" ] || [ "${{ github.event.schedule }}" = "$want" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Pomijam: ten cron nie odpowiada 19:00 przy przesunięciu $offset"
+          fi
+      - uses: actions/checkout@v4
+        if: steps.time.outputs.run
+      - uses: pnpm/action-setup@v4
+        if: steps.time.outputs.run
+      - uses: actions/setup-node@v4
+        if: steps.time.outputs.run
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+        if: steps.time.outputs.run
+      - run: pnpm weekly
+        if: steps.time.outputs.run
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DATABASE_AUTH_TOKEN: ${{ secrets.DATABASE_AUTH_TOKEN }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          REPORT_EMAIL: ${{ secrets.REPORT_EMAIL }}

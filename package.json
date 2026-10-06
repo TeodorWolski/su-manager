@@ -13,7 +13,8 @@
     "db:studio": "drizzle-kit studio",
     "typecheck": "tsc --noEmit",
     "scrape": "tsx scripts/scrape.ts",
-    "backup": "tsx scripts/backup.ts"
+    "backup": "tsx scripts/backup.ts",
+    "weekly": "tsx scripts/weekly.ts"
   },
   "dependencies": {
     "@libsql/client": "^0.18.0",

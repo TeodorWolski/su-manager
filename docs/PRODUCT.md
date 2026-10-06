@@ -80,12 +80,15 @@ Ocena grania **nie jest** oceną bitu, bo zależy od publiki, line-upu itd. Bit 
   - ocena występu, „myśli na gorąco” (najważniejsze pole), ocena miejsca,
   - frekwencja, minuty zagrane/dostępne, kontekst,
   - zagrane bity z reakcją 👍/😐/👎.
+- **Wszystkie** (`/gigs?view=all`): bez odrzuconych.
 - **Nowe granie:** w polach komików nie ma pomijanych z powodu `not_interested` / `no_openers`.
 
 ### Okazje (`/events`)
+- **Podsumowanie tygodnia** (niedziela 19:00, `src/lib/weekly.ts`, `scripts/weekly.ts`, `.github/workflows/weekly.yml`): zagrane grania z oceną, bity 👍/👎, wysłane wiadomości i wyniki rozmów, przyszły tydzień względem rytmu 2–3 i balansu, do 3 najgorętszych okazji.
 - **Poranny mail** (10:30, `src/scraper/email.ts`): „Do ponowienia”, „Najgorętsze okazje” z gotowym tekstem i nowe terminy z bileterii. Wysyłany, gdy którakolwiek sekcja nie jest pusta.
 - **Źródło:** scraper bileterii (`src/scraper/sources/*`, cron GitHub Actions codziennie o 10:30 czasu polskiego, razem z mailem) zbiera wydarzenia. Klasyfikacja jest w `src/lib/opportunities.ts`.
 - **Zakładki:** Znajomi (komicy z CRM), W zasięgu (≤3 h dojazdu albo nocleg), Open miki, Uzupełnij (miasta bez czasu dojazdu).
+- **Poranne godziny z kupbilecik:** godzina przed 12:00 to zwykle pomyłka organizatora (06:00 zamiast 18:00). Parser bierze wtedy „Start Wydarzenia” ze strony wydarzenia; bez niego przed 10:00 dodaje 12 h (`fixMorning`).
 - **Dostępność biletów** (`events.availability`): z kupbilecik etykieta „ostatnie bilety” / „sold out” z kafelka listy, odświeżana przy każdym przebiegu. Liczby sprzedanych biletów serwis nie podaje. Evently nie daje tej informacji (`undefined` = nie nadpisuj).
 - **Wyszukiwarka** (`?q=`, `searchOpportunities`): komik, program, scena, miasto i/lub data („14.10”, „14 paź”, „jutro”; `parseDateQuery` w `time.ts`). Szuka we wszystkich nadchodzących wydarzeniach, także odfiltrowanych; powód odfiltrowania jest w szarej etykiecie (`Opportunity.note`). Dopasowanie toleruje odmianę w obie strony („Modzelewskiego”) i obejmuje aliasy z CRM. Każdy termin to osobna karta.
 - **„Jestem w…”** (`?near=&d=&r=&span=`, `nearOpportunities`): miasto i data, a w wyniku wydarzenia w promieniu 30/60/100 km (w linii prostej), opcjonalnie ±1 dzień, najbliższe najpierw. Zasięg z Warszawy jest tu ignorowany. Współrzędne są w `src/data/places-pl.json` (GeoNames, generator `scripts/build-places.ts`). Miasta spoza pliku nie mają odległości i są pomijane.
@@ -93,6 +96,7 @@ Ocena grania **nie jest** oceną bitu, bo zależy od publiki, line-upu itd. Bit 
 - **Grupowanie:** jedna karta na komika; najbliższy termin główny, reszta jako „Inne terminy”.
 - **Wyciszanie komika:**
   - ręcznie,
+  - po wyniku rozmowy: „Odmówił” na 60 dni, „Zghostował” na 30 (`MUTE_AFTER_OUTCOME_DAYS`),
   - gdy mam z nim granie w toku,
   - 30 dni po wspólnym wieczorze (`COOLDOWN_DAYS`).
 - **Pomijanie komika:** z powodem `not_interested` / `no_openers` / `other`.
@@ -113,6 +117,7 @@ Ocena grania **nie jest** oceną bitu, bo zależy od publiki, line-upu itd. Bit 
 - **Materiał** (`/bits`):
   - statusy: `tested`, `testing`, `editing` („do redakcji”), `vomit`, `rejected` (odrzucony: nie liczy się do celu i nie ma go w logu),
   - sekcja „Do pracy”: do redakcji oraz w testach i niegrane od 21+ dni.
+- **Statystyki** (`/stats`): skuteczność pisania (wyniki rozmów, % odpowiedzi wg kanału) i moje oceny wg kontekstu, miesiąca i sceny.
 - **Cele** (`/goals`): grania na miesiąc i minuty materiału do terminu.
 - **Myśli po graniach:** przeszukiwalne notatki z logów.
 - **Sceny:** werdykt, ocena miejsca, czas dojazdu.

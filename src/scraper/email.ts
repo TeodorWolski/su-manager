@@ -118,13 +118,18 @@ export function renderReport({ fresh: items, followUps, hot }: Digest) {
   return { subject: `SU Manager: ${subject || "nowe miasta do uzupełnienia"}`, html, worthSending: !!subject };
 }
 
-/** Wysyłka przez Resend (bez SDK). Bez klucza — tylko log, żeby lokalnie dało się testować. */
+/** Poranny raport: składa treść i wysyła, jeśli jest co. */
 export async function sendReport(digest: Digest, log: (m: string) => void) {
   const { subject, html, worthSending } = renderReport(digest);
   if (!worthSending) {
     log("nic do ponowienia, brak gorących i nowych okazji — bez maila");
     return;
   }
+  await sendMail(subject, html, log);
+}
+
+/** Wysyłka przez Resend (bez SDK). Bez klucza — tylko log, żeby lokalnie dało się testować. */
+export async function sendMail(subject: string, html: string, log: (m: string) => void) {
   const key = process.env.RESEND_API_KEY;
   const to = process.env.REPORT_EMAIL;
   if (!key || !to) {
