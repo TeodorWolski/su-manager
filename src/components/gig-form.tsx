@@ -7,6 +7,8 @@ import { Chips } from "./chips";
 import { FieldRow, Select, SubmitButton, TextArea, TextInput } from "./form";
 import { Section } from "./ios";
 
+const HIDDEN_REASONS: readonly string[] = ["not_interested", "no_openers"];
+
 export function GigForm({
   gig,
   lineup = [],
@@ -16,6 +18,14 @@ export function GigForm({
   lineup?: number[];
   options: FormOptions;
 }) {
+  // Bez komików ukrytych z powodu „nie interesuje mnie” / „nie robi open miców przed sobą” —
+  // chyba że już są wybrani w edytowanym graniu.
+  const keep = new Set([gig?.headlinerId, ...lineup]);
+  const comedians = options.contacts
+    .filter((c) => c.role === "comedian")
+    .filter((c) => keep.has(c.id) || !(c.ignoreReason && HIDDEN_REASONS.includes(c.ignoreReason)))
+    .map((c) => ({ value: c.id, label: c.name }));
+
   return (
     <form action={saveGig}>
       {gig && <input type="hidden" name="id" value={gig.id} />}
@@ -71,7 +81,7 @@ export function GigForm({
           <Select
             name="headlinerId"
             defaultValue={gig?.headlinerId ?? ""}
-            options={options.contacts.filter((c) => c.role === "comedian").map((c) => ({ value: c.id, label: c.name }))}
+            options={comedians}
           />
         </FieldRow>
         <FieldRow label="Link">
@@ -84,7 +94,7 @@ export function GigForm({
         <Chips
           name="lineup"
           selected={lineup}
-          options={options.contacts.filter((c) => c.role === "comedian").map((c) => ({ value: c.id, label: c.name }))}
+          options={comedians}
           empty="Dodaj komików w zakładce Ludzie, żeby oznaczać, z kim grasz."
         />
       </div>

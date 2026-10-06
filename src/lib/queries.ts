@@ -214,7 +214,7 @@ export async function listBits() {
       avgRating: sql<number | null>`(select avg(l.rating) from gig_bits gb join gig_logs l on l.gig_id = gb.gig_id where gb.bit_id = bits.id)`,
     })
     .from(bits)
-    .orderBy(sql`case ${bits.status} when 'tested' then 0 when 'testing' then 1 else 2 end`, asc(bits.name));
+    .orderBy(sql`case ${bits.status} when 'tested' then 0 when 'testing' then 1 when 'rejected' then 3 else 2 end`, asc(bits.name));
 }
 
 export async function getBit(id: number) {
@@ -280,7 +280,10 @@ export async function getFormOptions() {
       .leftJoin(cities, eq(venues.cityId, cities.id))
       .orderBy(asc(venues.name)),
     db.select({ id: cities.id, name: cities.name }).from(cities).orderBy(asc(cities.name)),
-    db.select({ id: contacts.id, name: contacts.name, role: contacts.role }).from(contacts).orderBy(asc(contacts.name)),
+    db
+      .select({ id: contacts.id, name: contacts.name, role: contacts.role, ignoreReason: contacts.ignoreReason })
+      .from(contacts)
+      .orderBy(asc(contacts.name)),
     db
       .select({ id: bits.id, name: bits.name, status: bits.status, lengthMin: bits.lengthMin })
       .from(bits)
