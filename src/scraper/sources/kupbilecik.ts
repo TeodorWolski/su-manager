@@ -4,6 +4,14 @@ import type { ScrapedEvent, Source } from "../types";
 const BASE = "https://www.kupbilecik.pl";
 const MAX_PAGES = 120;
 
+/** Etykieta na kafelku: „ostatnie bilety” / „sold out”; brak = normalna dostępność. */
+function availability(text: string): "last" | "sold_out" | null {
+  const t = text.toLowerCase();
+  if (t.includes("sold out") || t.includes("wyprzedane")) return "sold_out";
+  if (t.includes("ostatnie bilety")) return "last";
+  return null;
+}
+
 /**
  * Lista /pl/standup jest renderowana po stronie serwera, a kafelek ma wszystko
  * (tytuł, datę, miasto, miejsce) — strony szczegółów nie są potrzebne.
@@ -43,6 +51,7 @@ export const kupbilecik: Source = {
           cityName: tile.find('a[href^="/pl/city/"]').first().text().trim() || null,
           venueName: tile.find('a[href^="/pl/place/"]').first().text().trim() || null,
           performers: null,
+          availability: availability(tile.find(".kb-fw-300.rounded-3").text()),
         });
       });
 

@@ -1,4 +1,4 @@
-import { RELATION_LABEL } from "@/lib/labels";
+import { AVAILABILITY_LABEL, RELATION_LABEL } from "@/lib/labels";
 import { groupByPerformer, type Opportunity, type OpportunityGroup } from "@/lib/opportunities";
 import { plural } from "@/lib/text";
 import { fmtDate, fmtDateTime, fmtTravel } from "@/lib/time";
@@ -15,6 +15,7 @@ function row(g: OpportunityGroup) {
   const where = [e.venueName, e.cityName].filter(Boolean).join(", ");
   const travel = o.city?.travelMinutes != null ? ` · ${fmtTravel(o.city.travelMinutes)}` : "";
   const more = g.others.length ? ` · +${plural(g.others.length, "termin", "terminy", "terminów")}` : "";
+  const tickets = e.availability ? ` · <b style="color:#b45309">${AVAILABILITY_LABEL[e.availability]}</b>` : "";
   const who = g.matches
     .map((m) => {
       const when = m.lastPlayedTogether ? `, wspólny wieczór ${fmtDate(m.lastPlayedTogether)}` : "";
@@ -23,7 +24,7 @@ function row(g: OpportunityGroup) {
     .join(", ");
   return `<tr><td style="padding:8px 0;border-bottom:1px solid #e5ece8">
     <a href="${esc(e.url)}" style="color:#13824a;font-weight:600;text-decoration:none">${esc(e.title)}</a><br>
-    <span style="color:#5b6b63;font-size:13px">${esc(fmtDateTime(e.startsAt))} · ${esc(where)}${travel}${more}</span>
+    <span style="color:#5b6b63;font-size:13px">${esc(fmtDateTime(e.startsAt))} · ${esc(where)}${travel}${more}${tickets}</span>
     ${who ? `<br><span style="font-size:13px">${who}</span>` : ""}
   </td></tr>`;
 }

@@ -50,6 +50,9 @@ async function main() {
       continue;
     }
     seenIds.push(prev.id);
+    if (s.availability !== undefined && s.availability !== prev.availability) {
+      await db.update(events).set({ availability: s.availability }).where(eq(events.id, prev.id));
+    }
     // Organizator poprawił tytuł/datę/miejsce — aktualizujemy rekord.
     if (prev.dedupeKey !== key || prev.url !== s.url) {
       try {

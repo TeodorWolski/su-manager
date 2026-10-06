@@ -9,6 +9,8 @@ export type ScrapedEvent = {
   cityName: string | null;
   venueName: string | null;
   performers: string | null;
+  /** Dostępność biletów; undefined = serwis tego nie podaje (nie nadpisujemy), null = normalna. */
+  availability?: "last" | "sold_out" | null;
 };
 
 export type SourceContext = {

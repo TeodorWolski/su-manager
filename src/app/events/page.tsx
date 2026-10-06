@@ -5,7 +5,7 @@ import { eventToGig, hidePerformer, messageFromEvent, setCityTravel, snoozePerfo
 import { Empty, PageHeader, Pill, Section } from "@/components/ios";
 import { MessageComposer } from "@/components/message-composer";
 import { isMonth, MonthChips, monthCounts } from "@/components/month-chips";
-import { RELATION_LABEL, RELATION_TONE } from "@/lib/labels";
+import { AVAILABILITY_LABEL, AVAILABILITY_TONE, RELATION_LABEL, RELATION_TONE } from "@/lib/labels";
 import {
   COOLDOWN_DAYS,
   getOpportunities,
@@ -128,6 +128,9 @@ function GroupCard({ g }: { g: OpportunityGroup }) {
       <a href={o.event.url} target="_blank" rel="noreferrer" className="group block">
         <div className="flex items-start gap-2">
           <span className="min-w-0 flex-1 text-[16px] leading-snug group-hover:underline">{o.event.title}</span>
+          {o.event.availability && (
+            <Pill tone={AVAILABILITY_TONE[o.event.availability]}>{AVAILABILITY_LABEL[o.event.availability]}</Pill>
+          )}
           {g.isNew && <Pill tone="info">nowe</Pill>}
           <ExternalLink className="text-muted-foreground/60 mt-1 size-3.5 shrink-0" />
         </div>
@@ -169,6 +172,12 @@ function GroupCard({ g }: { g: OpportunityGroup }) {
                   className="text-muted-foreground min-w-0 flex-1 text-[13px] hover:underline"
                 >
                   {where(x)}
+                  {x.event.availability && (
+                    <span className={x.event.availability === "sold_out" ? "text-st-rej" : "text-st-wai"}>
+                      {" "}
+                      · {AVAILABILITY_LABEL[x.event.availability]}
+                    </span>
+                  )}
                 </a>
                 <GigButton o={x} small />
               </div>

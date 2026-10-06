@@ -104,6 +104,10 @@ export const IGNORE_REASON_LABEL: Record<IgnoreReason, string> = {
   other: "Inny powód",
 };
 
+/** Dostępność biletów z bileterii — pełna sala to dobry moment, żeby prosić o slot. */
+export const AVAILABILITY_LABEL = { last: "ostatnie bilety", sold_out: "sold out" } as const;
+export const AVAILABILITY_TONE: Record<keyof typeof AVAILABILITY_LABEL, Tone> = { last: "warning", sold_out: "danger" };
+
 /** Kanały, którymi piszę do komików — w tej kolejności proponuję ponowienie na kolejnym. */
 export const MESSAGE_CHANNELS = ["Instagram", "FB prywatny", "FB fanpage"] as const;
 export const CHANNELS = [...MESSAGE_CHANNELS, "WhatsApp", "SMS", "Telefon", "Mail", "Na żywo"];

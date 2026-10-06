@@ -190,6 +190,8 @@ export const gigBits = sqliteTable(
   (t) => [primaryKey({ columns: [t.gigId, t.bitId] })],
 );
 
+export const TICKET_AVAILABILITY = ["last", "sold_out"] as const;
+
 /** Wydarzenia zebrane przez scraper z bileterii. */
 export const events = sqliteTable(
   "events",
@@ -210,6 +212,8 @@ export const events = sqliteTable(
     firstSeenAt: createdAt(),
     lastSeenAt: text("last_seen_at").notNull(),
     dismissed: integer("dismissed", { mode: "boolean" }).notNull().default(false),
+    /** Dostępność biletów wg bileterii: "last" = ostatnie bilety, "sold_out"; null = normalna / nieznana. */
+    availability: text("availability", { enum: TICKET_AVAILABILITY }),
     gigId: integer("gig_id").references(() => gigs.id, { onDelete: "set null" }),
   },
   (t) => [uniqueIndex("events_source_id").on(t.source, t.sourceId)],

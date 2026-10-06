@@ -199,7 +199,17 @@ export const EVENTS_TAG = "events";
 
 export type EventRow = Pick<
   Event,
-  "id" | "url" | "title" | "startsAt" | "cityName" | "venueName" | "performers" | "firstSeenAt" | "dismissed" | "gigId"
+  | "id"
+  | "url"
+  | "title"
+  | "startsAt"
+  | "cityName"
+  | "venueName"
+  | "performers"
+  | "firstSeenAt"
+  | "dismissed"
+  | "gigId"
+  | "availability"
 >;
 
 /** Nadchodzące, nieukryte wydarzenia — tylko kolumny potrzebne w raporcie (mniej danych z bazy). */
@@ -216,6 +226,7 @@ export function loadUpcomingEvents(today: string): Promise<EventRow[]> {
       firstSeenAt: events.firstSeenAt,
       dismissed: events.dismissed,
       gigId: events.gigId,
+      availability: events.availability,
     })
     .from(events)
     .where(and(gte(events.startsAt, today), eq(events.dismissed, false)))
