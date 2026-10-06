@@ -6,6 +6,7 @@ import { Empty, PageHeader, Pill, Rating, Row, Section } from "@/components/ios"
 import { Button } from "@/components/ui/button";
 import { FOLLOW_UP_AFTER_DAYS } from "@/lib/follow-up";
 import { CHANNEL_SHORT } from "@/lib/labels";
+import { HotOpportunities } from "@/components/hot";
 import { RhythmCard } from "@/components/rhythm";
 import { getDashboard, getRhythm } from "@/lib/queries";
 import { getGoals } from "@/lib/goals";
@@ -42,6 +43,8 @@ export default async function Home() {
       </div>
 
       <RhythmCard rhythm={rhythm} />
+
+      <HotOpportunities items={rhythm.hot} />
 
       <Section title="Nadchodzące">
         {upcoming.length ? upcoming.map((g) => <GigRow key={g.id} gig={g} showStatus />) : <Empty>Brak potwierdzonych grań.</Empty>}

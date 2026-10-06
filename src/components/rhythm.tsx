@@ -1,4 +1,4 @@
-import { CalendarPlus, ChevronRight, Flame, History, Scale } from "lucide-react";
+import { CalendarPlus, ChevronRight, Flame, History, Mic, Scale } from "lucide-react";
 import Link from "next/link";
 import type { Rhythm } from "@/lib/queries";
 import { fmtDay, fmtRange, WEEK_MAX, WEEK_MIN, type Insight, type Week } from "@/lib/rhythm";
@@ -52,6 +52,14 @@ function InsightLine({ i }: { i: Insight }) {
         <Line icon={Scale} tone="text-st-wai">
           {i.label}: <b className="font-semibold">{gigsWord(i.week.confirmed)}</b> — więcej niż {WEEK_MIN}–{WEEK_MAX}. Część mogłaby
           trafić na luźniejszy tydzień.
+        </Line>
+      );
+    case "balance":
+      return (
+        <Line icon={Mic} tone="text-st-wai">
+          {i.label}: <b className="font-semibold">{i.week.openers} przed komikami</b>
+          {i.week.openMics ? `, ${i.week.openMics} open mic` : ", żadnego open mica"}. Może jedno zamienić na open mic? Najlepiej pół na
+          pół, 2+1 w którąś stronę też jest OK.
         </Line>
       );
     case "add": {

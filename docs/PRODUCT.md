@@ -49,6 +49,12 @@ Ocena grania **nie jest** oceną bitu, bo zależy od publiki, line-upu itd. Bit 
   - cel to 2–3 grania tygodniowo, równomiernie,
   - słupki: 4 tygodnie wstecz, bieżący i 3 naprzód,
   - podpowiedzi: luźny tydzień („może dodać jedno?” + 2 okazje z wolnych dni), seria ≥4 dni z rzędu, tydzień powyżej 3, refleksja o serii z ostatnich tygodni.
+- **Balans** (w Rytmie): pół na pół grania przed komikiem (opener/support) i open miki; 2+1 w którąś stronę jest OK, ale 3+ przed komikami w tygodniu daje ostrzeżenie (`MAX_OPENERS_PER_WEEK`).
+- **Najgorętsze okazje** (`src/lib/hot.ts`, `components/hot.tsx`):
+  - wydarzenia za 7–21 dni, żeby zdążyć zaklepać miejsce; najlepiej ok. 14 dni przed,
+  - odpadają: dni z graniem, tygodnie z 3+ graniami, trzecie granie przed komikiem w tygodniu, terminy robiące serię ≥4 dni,
+  - punkty: znajomy, ostatnie bilety / sold out, luźny tydzień, typ, którego w tygodniu brakuje (balans), bliskość, nowość,
+  - jeden termin na komika i jeden na dzień, maks. 4, z gotowym „Napisz”.
 - **Do ponowienia** (`src/lib/follow-up.ts`):
   - kiedy: granie „napisałem/czekam”, 3+ dni ciszy, ostatnia wiadomość bez odpowiedzi,
   - pokazuje, gdzie już pisałem, i podpowiada kolejny kanał: Instagram → FB prywatny → FB fanpage,

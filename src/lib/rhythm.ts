@@ -7,13 +7,22 @@ import { pl } from "date-fns/locale";
  */
 export const WEEK_MIN = 2;
 export const WEEK_MAX = 3;
+/**
+ * Balans w tygodniu: grania przed komikiem (opener/support) i open miki pół na pół.
+ * 2+1 w którąkolwiek stronę jest OK; 3 przed komikami w jednym tygodniu już nie.
+ */
+export const MAX_OPENERS_PER_WEEK = 2;
 /** Od tylu grań dzień po dniu ostrzegam o serii. */
 export const STREAK_WARN = 4;
 /** Ile tygodni wstecz i do przodu pokazuje pasek rytmu (plus bieżący). */
 const WEEKS_BACK = 4;
 const WEEKS_AHEAD = 3;
 
-export type RhythmGig = { id: number; title: string; startsAt: string; status: string };
+export type RhythmGig = { id: number; title: string; startsAt: string; status: string; context: string | null };
+
+/** Typ grania do balansu: przed komikiem albo open mic (headline / inne się nie liczą). */
+export const gigKind = (context: string | null): "opener" | "openMic" | null =>
+  context === "opener" || context === "support" ? "opener" : context === "open_mic" ? "openMic" : null;
 export type RhythmOpportunity = { eventId: number; title: string; startsAt: string; cityName: string | null; href: string };
 
 export type Week = {
@@ -23,20 +32,24 @@ export type Week = {
   confirmed: number;
   /** O które się staram (zainteresowany / napisałem / czekam). */
   pending: number;
+  /** Z potwierdzonych i w toku: ile przed komikiem, ile open miców. */
+  openers: number;
+  openMics: number;
   when: "past" | "current" | "future";
 };
 
 export type Insight =
   | { kind: "add"; week: Week; label: string; suggestions: RhythmOpportunity[] }
   | { kind: "busy"; week: Week; label: string }
+  | { kind: "balance"; week: Week; label: string }
   | { kind: "streak"; from: string; to: string; days: number; withPending: boolean }
   | { kind: "pastStreak"; from: string; to: string; days: number }
   | { kind: "uneven"; counts: number[] };
 
-const PENDING = ["interested", "contacted", "waiting"];
+export const PENDING = ["interested", "contacted", "waiting"];
 
 const day = (iso: string) => iso.slice(0, 10);
-const addDays = (date: string, n: number) => new Date(Date.parse(date) + n * 864e5).toISOString().slice(0, 10);
+export const addDays = (date: string, n: number) => new Date(Date.parse(date) + n * 864e5).toISOString().slice(0, 10);
 /** Poniedziałek tygodnia, w którym jest `date`. */
 export function weekStart(date: string) {
   const dow = (new Date(Date.parse(date)).getUTCDay() + 6) % 7; // pon = 0
@@ -48,6 +61,15 @@ export const fmtRange = (from: string, to: string) =>
   from.slice(5, 7) === to.slice(5, 7)
     ? `${format(parseISO(from), "d")}–${format(parseISO(to), "d MMM", { locale: pl })}`
     : `${format(parseISO(from), "d MMM", { locale: pl })} – ${format(parseISO(to), "d MMM", { locale: pl })}`;
+
+function balanceOf(gigs: RhythmGig[]) {
+  return {
+    openers: gigs.filter((g) => gigKind(g.context) === "opener").length,
+    openMics: gigs.filter((g) => gigKind(g.context) === "openMic").length,
+  };
+}
+
+const weekLabel = (w: Week) => (w.when === "current" ? "Ten tydzień" : `Tydzień ${fmtRange(w.start, w.end)}`);
 
 export function buildWeeks(gigs: RhythmGig[], today: string): Week[] {
   const current = weekStart(today);
@@ -61,6 +83,7 @@ export function buildWeeks(gigs: RhythmGig[], today: string): Week[] {
       end,
       confirmed: inWeek.filter((g) => g.status === "confirmed").length,
       pending: inWeek.filter((g) => PENDING.includes(g.status) && day(g.startsAt) >= today).length,
+      ...balanceOf(inWeek.filter((g) => g.status === "confirmed" || (PENDING.includes(g.status) && day(g.startsAt) >= today))),
       when: i < 0 ? "past" : i === 0 ? "current" : "future",
     });
   }
@@ -132,6 +155,9 @@ export function getInsights(gigs: RhythmGig[], opportunities: RhythmOpportunity[
     if (week.confirmed + week.pending < WEEK_MIN) {
       insights.push({ kind: "add", week, label, suggestions: suggestFor(week, gigs, opportunities, today) });
     }
+  }
+  for (const week of weeks.filter((w) => w.when !== "past" && w.openers > MAX_OPENERS_PER_WEEK)) {
+    insights.push({ kind: "balance", week, label: weekLabel(week) });
   }
   for (const week of weeks.filter((w) => w.when !== "past" && w.confirmed > WEEK_MAX)) {
     insights.push({

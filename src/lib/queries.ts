@@ -17,6 +17,7 @@ import {
 import { loadUpcomingEventsCached } from "./events-cache";
 import { daysSince, FOLLOW_UP_AFTER_DAYS, lastActivity, nextChannel } from "./follow-up";
 import { getOpportunities } from "./opportunities";
+import { hotOpportunities, type HotCandidate } from "./hot";
 import { getInsights, type RhythmOpportunity } from "./rhythm";
 import { DEFAULT_START_TIME, nowLocal } from "./time";
 import { normalize } from "./text";
@@ -375,13 +376,16 @@ export async function listCalendarGigs() {
     .orderBy(asc(gigs.startsAt));
 }
 
-/** Rytm grania na ekran Dziś: tygodnie wokół dzisiaj + podpowiedzi z Okazji na luźne tygodnie. */
+/**
+ * Rytm grania na ekran Dziś: tygodnie wokół dzisiaj + podpowiedzi z Okazji na luźne tygodnie
+ * + „najgorętsze okazje” z ~2-tygodniowym wyprzedzeniem.
+ */
 export async function getRhythm() {
   const today = nowLocal().slice(0, 10);
   const from = new Date(Date.parse(today) - 35 * 864e5).toISOString().slice(0, 10);
   const [rows, opportunities] = await Promise.all([
     db
-      .select({ id: gigs.id, title: gigs.title, startsAt: gigs.startsAt, status: gigs.status })
+      .select({ id: gigs.id, title: gigs.title, startsAt: gigs.startsAt, status: gigs.status, context: gigs.context })
       .from(gigs)
       .where(and(gte(gigs.startsAt, from), inArray(gigs.status, ["confirmed", "interested", "contacted", "waiting"]))),
     getOpportunities(undefined, loadUpcomingEventsCached),
@@ -398,7 +402,24 @@ export async function getRhythm() {
       cityName: o.event.cityName,
       href: `/events?${new URLSearchParams({ tab: o.tab, m: o.event.startsAt.slice(0, 7) })}`,
     }));
-  return getInsights(rows, ideas, today);
+  const candidates: HotCandidate[] = opportunities
+    .filter((o) => o.tab in order && !o.myGigId)
+    .map((o) => ({
+      eventId: o.event.id,
+      url: o.event.url,
+      title: o.event.title,
+      startsAt: o.event.startsAt,
+      cityName: o.event.cityName,
+      venueName: o.event.venueName,
+      isOpenMic: o.isOpenMic,
+      tab: o.tab,
+      availability: o.event.availability,
+      travelMinutes: o.city?.travelMinutes ?? null,
+      isNew: o.isNew,
+      performer: o.performer,
+      friend: o.tab === "friends" ? (o.matches[0]?.name ?? null) : null,
+    }));
+  return { ...getInsights(rows, ideas, today), hot: hotOpportunities(rows, candidates, today) };
 }
 
 export type Rhythm = Awaited<ReturnType<typeof getRhythm>>;
