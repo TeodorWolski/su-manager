@@ -1,4 +1,4 @@
-import { ChevronDown, ExternalLink, Search, X } from "lucide-react";
+import { ChevronDown, ExternalLink, MapPin, Search, X } from "lucide-react";
 import Link from "next/link";
 import { PendingButton } from "@/components/form";
 import { eventToGig, hidePerformer, messageFromEvent, setCityTravel, snoozePerformer, unsnoozeContact } from "@/app/actions";
@@ -11,6 +11,8 @@ import {
   getOpportunities,
   groupByPerformer,
   IGNORED_NOTE,
+  NEAR_RADII,
+  nearOpportunities,
   MAX_TRAVEL_MIN,
   NEW_FOR_DAYS,
   searchOpportunities,
@@ -135,6 +137,7 @@ function GroupCard({ g }: { g: OpportunityGroup }) {
           )}
           {g.isNew && <Pill tone="info">nowe</Pill>}
           {o.note && <Pill tone="muted">{o.note}</Pill>}
+          {o.distanceKm != null && <Pill tone="neutral">{o.distanceKm < 3 ? "na miejscu" : `~${o.distanceKm} km`}</Pill>}
           <ExternalLink className="text-muted-foreground/60 mt-1 size-3.5 shrink-0" />
         </div>
         <div className="text-muted-foreground mt-0.5 text-[13px]">{where(o)}</div>
@@ -294,6 +297,99 @@ function SearchBox({ q }: { q: string }) {
   );
 }
 
+/** „Jestem w [mieście] [dnia]” — co gra w okolicy, żeby dopisać się przy okazji wyjazdu. */
+function NearForm({ near = "", date, radius = 60, span = false, cities }: { near?: string; date: string; radius?: number; span?: boolean; cities: string[] }) {
+  const field = "bg-card h-10 rounded-lg px-3 text-[15px] outline-none";
+  return (
+    <details className="group/near mb-3" open={!!near}>
+      <summary className="text-primary flex cursor-pointer list-none items-center gap-1.5 px-1 text-[14px] [&::-webkit-details-marker]:hidden">
+        <MapPin className="size-4" /> Jestem w…
+        <ChevronDown className="size-3.5 transition-transform group-open/near:rotate-180" />
+      </summary>
+      <form action="/events" className="bg-muted mt-2 grid grid-cols-2 gap-2 rounded-xl p-2">
+        <input name="near" required defaultValue={near} list="near-cities" placeholder="Miasto, np. Kraków" className={cn(field, "col-span-2")} />
+        <datalist id="near-cities">
+          {cities.map((c) => (
+            <option key={c} value={c} />
+          ))}
+        </datalist>
+        <input name="d" type="date" required defaultValue={date} className={field} />
+        <select name="r" defaultValue={radius} className={field}>
+          {NEAR_RADII.map((r) => (
+            <option key={r} value={r}>
+              do {r} km
+            </option>
+          ))}
+        </select>
+        <label className="col-span-2 flex items-center gap-2 px-1 text-[14px]">
+          <input type="checkbox" name="span" value="1" defaultChecked={span} /> także dzień przed i po
+        </label>
+        <button type="submit" className="bg-primary text-primary-foreground col-span-2 h-10 rounded-lg text-[15px] font-medium active:scale-[0.98]">
+          Pokaż okolicę
+        </button>
+      </form>
+    </details>
+  );
+}
+
+async function NearResults({ near, date, radius, span }: { near: string; date: string; radius: number; span: boolean }) {
+  const [{ origin, items }, events] = await Promise.all([
+    nearOpportunities(near, date, { radiusKm: radius, spanDays: span ? 1 : 0 }, loadUpcomingEventsCached),
+    loadUpcomingEventsCached(nowLocal().slice(0, 10)),
+  ]);
+  const cities = [...new Set(events.map((e) => e.cityName).filter((c): c is string => !!c))].sort((a, b) => a.localeCompare(b, "pl"));
+  const card = (o: Opportunity): OpportunityGroup => ({ performer: o.performer, primary: o, others: [], matches: o.matches, isNew: o.isNew });
+  const groups = items.filter((o) => o.note !== IGNORED_NOTE).map(card);
+  const ignored = items.filter((o) => o.note === IGNORED_NOTE).map(card);
+  const radiusHref = (r: number) => `/events?${new URLSearchParams({ near, d: date, r: String(r), ...(span ? { span: "1" } : {}) })}`;
+  return (
+    <>
+      <PageHeader
+        title="Okazje"
+        back={{ href: "/events", label: "Okazje" }}
+        subtitle={`W pobliżu: ${near} · ${fmtDate(date)}${span ? " ±1 dzień" : ""} · ${plural(groups.length, "termin", "terminy", "terminów")}`}
+      />
+      <NearForm near={near} date={date} radius={radius} span={span} cities={cities} />
+      {origin ? (
+        <>
+          <div className="mb-3 flex gap-1.5">
+            {NEAR_RADII.map((r) => (
+              <Link
+                key={r}
+                href={radiusHref(r)}
+                className={cn(
+                  "rounded-full px-3 py-1.5 text-[13px] font-medium",
+                  r === radius ? "bg-foreground text-background" : "bg-muted text-muted-foreground",
+                )}
+              >
+                do {r} km
+              </Link>
+            ))}
+          </div>
+          <Section footer="Odległość w linii prostej od wpisanego miasta — drogą zwykle wychodzi ok. 1/3 więcej. Najbliższe najpierw.">
+            {groups.length ? (
+              groups.map((g) => <GroupCard key={g.primary.event.id} g={g} />)
+            ) : (
+              <Empty>Nic w tej okolicy tego dnia — spróbuj większego promienia albo ±1 dzień.</Empty>
+            )}
+          </Section>
+          {ignored.length > 0 && (
+            <Section title={`Pomijani komicy · ${ignored.length}`}>
+              {ignored.map((g) => (
+                <GroupCard key={g.primary.event.id} g={g} />
+              ))}
+            </Section>
+          )}
+        </>
+      ) : (
+        <Section>
+          <Empty>Nie znam miejscowości „{near}” — wpisz pełną polską nazwę, np. Kraków albo Bielsko-Biała.</Empty>
+        </Section>
+      )}
+    </>
+  );
+}
+
 async function SearchResults({ q }: { q: string }) {
   const found = (await searchOpportunities(q, loadUpcomingEventsCached)).sort((a, b) =>
     a.event.startsAt.localeCompare(b.event.startsAt),
@@ -338,6 +434,12 @@ export default async function EventsPage({ searchParams }: PageProps<"/events">)
   const sp = await searchParams;
   const q = typeof sp.q === "string" ? sp.q.trim() : "";
   if (q) return <SearchResults q={q} />;
+  const near = typeof sp.near === "string" ? sp.near.trim() : "";
+  if (near) {
+    const d = typeof sp.d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(sp.d) ? sp.d : nowLocal().slice(0, 10);
+    const r = NEAR_RADII.find((x) => String(x) === sp.r) ?? 60;
+    return <NearResults near={near} date={d} radius={r} span={sp.span === "1"} />;
+  }
   const tab: TabKey = typeof sp.tab === "string" && sp.tab in TABS ? (sp.tab as TabKey) : "friends";
   const month = isMonth(sp.m) ? sp.m : null;
   // Wybrany miesiąc = planuję go w całości, więc pokazuję wszystkie terminy, nie tylko nowe.
@@ -386,6 +488,7 @@ export default async function EventsPage({ searchParams }: PageProps<"/events">)
       />
 
       <SearchBox q="" />
+      <NearForm date={nowLocal().slice(0, 10)} cities={[...new Set(everything.map((o) => o.event.cityName).filter((c): c is string => !!c))].sort((a, b) => a.localeCompare(b, "pl"))} />
 
       <div className="bg-muted mb-3 grid grid-cols-4 gap-1 rounded-xl p-1">
         {(Object.keys(TABS) as TabKey[]).map((t) => (

@@ -32,6 +32,7 @@ Zmiana schematu: edytuj `src/db/schema.ts`, potem `pnpm db:generate && pnpm db:m
 
 - `pnpm scrape` — zbiera wydarzenia z bileterii, zapisuje nowe, wysyła mail z nowymi okazjami (Resend). Bez `RESEND_API_KEY` mail jest tylko logowany.
 - Parsery: `src/scraper/sources/*.ts`, jeden plik na serwis. Gdy strona zmieni HTML — poprawiasz tylko ten plik. Nowy serwis = nowy plik + wpis w `sources/index.ts`.
+- Współrzędne miejscowości do „Jestem w…” w Okazjach: `src/data/places-pl.json` z GeoNames (CC BY 4.0). Odświeżenie: pobierz `https://download.geonames.org/export/dump/PL.zip`, rozpakuj i uruchom `pnpm tsx scripts/build-places.ts PL.txt`.
 - Filtr i dopasowanie do CRM: `src/lib/opportunities.ts`, `src/lib/match.ts`.
 - Cron: `.github/workflows/scrape.yml` (codziennie o 10:30 czasu polskiego, niezależnie od czasu letniego/zimowego + ręcznie z zakładki Actions). Sekrety repo: `DATABASE_URL`, `DATABASE_AUTH_TOKEN`, `RESEND_API_KEY`, `REPORT_EMAIL`. Padnięty parser = czerwony build, GitHub wysyła o tym mail.
 

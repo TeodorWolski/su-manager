@@ -4,6 +4,7 @@
  */
 import { and, eq, gte, sql } from "drizzle-orm";
 import { cities, contacts, db, events, gigs, hiddenTitles, venues, type City, type Contact, type Event } from "@/db";
+import { coords, distanceKm } from "./geo";
 import { matchContacts, matchesQuery } from "./match";
 import { isWantedLanguage, performerKey, performerName } from "./performer";
 import { normalize } from "./text";
@@ -44,6 +45,8 @@ export type Opportunity = {
   tab: Tab;
   /** Tylko w wyszukiwarce: czemu wydarzenie normalnie nie trafia do Okazji (np. „poza zasięgiem”). */
   note: string | null;
+  /** Tylko w „Jestem w…”: odległość od miasta, w którym będę (km w linii prostej). */
+  distanceKm?: number;
 };
 
 /** Wszystkie terminy jednego komika w danej zakładce: najbliższy w zasięgu + reszta jako alternatywy. */
@@ -301,6 +304,43 @@ export async function searchOpportunities(
     })
     .map((e) => classify(e, ctx, newSince, true))
     .filter((o): o is Opportunity => o !== null);
+}
+
+/** Promienie do wyboru w „Jestem w…” (km w linii prostej). */
+export const NEAR_RADII = [30, 60, 100] as const;
+
+/**
+ * „Jestem w [mieście] [dnia]”: wydarzenia w promieniu `radiusKm` od tego miasta, tego dnia
+ * (albo ±`spanDays`), najbliższe najpierw. Zasięg z Warszawy nie ma tu znaczenia — i tak tam jestem.
+ * `origin` = null, gdy nie znam współrzędnych wpisanego miasta.
+ */
+export async function nearOpportunities(
+  cityName: string,
+  date: string,
+  { radiusKm = 60, spanDays = 0 }: { radiusKm?: number; spanDays?: number } = {},
+  loadEvents: (today: string) => Promise<EventRow[]> = loadUpcomingEvents,
+) {
+  const origin = coords(cityName);
+  if (!origin) return { origin: null, items: [] as Opportunity[] };
+  const today = nowLocal().slice(0, 10);
+  const [ctx, rows] = await Promise.all([loadContext(), loadEvents(today)]);
+  const shift = (n: number) => new Date(Date.parse(date) + n * 864e5).toISOString().slice(0, 10);
+  const [from, to] = [shift(-spanDays), shift(spanDays)];
+  const newSince = new Date(Date.now() - NEW_FOR_DAYS * 864e5).toISOString().replace("T", " ").slice(0, 19);
+  const items: Opportunity[] = [];
+  for (const e of rows) {
+    const day = e.startsAt.slice(0, 10);
+    if (day < from || day > to) continue;
+    const at = coords(e.cityName);
+    if (!at) continue;
+    const km = distanceKm(origin, at);
+    if (km > radiusKm) continue;
+    const o = classify(e, ctx, newSince, true);
+    if (!o) continue;
+    items.push({ ...o, note: o.note === "poza zasięgiem" ? null : o.note, distanceKm: Math.round(km) });
+  }
+  items.sort((a, b) => a.distanceKm! - b.distanceKm! || a.event.startsAt.localeCompare(b.event.startsAt));
+  return { origin, items };
 }
 
 /**
