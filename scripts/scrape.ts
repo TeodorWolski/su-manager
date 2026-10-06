@@ -8,8 +8,8 @@
  * Lokalnie: pnpm scrape   (bez RESEND_API_KEY mail jest tylko logowany)
  */
 import "dotenv/config";
-import { eq, inArray, sql } from "drizzle-orm";
-import { db, events } from "@/db";
+import { and, eq, inArray, sql } from "drizzle-orm";
+import { db, events, gigs } from "@/db";
 import { dedupeKey, getOpportunities } from "@/lib/opportunities";
 import { getFollowUps, getPlanning } from "@/lib/planning";
 import { sendReport } from "@/scraper/email";
@@ -64,6 +64,16 @@ async function main() {
           .where(eq(events.id, prev.id));
       } catch {
         log(`pomijam aktualizację ${s.source}:${s.sourceId} (duplikat z innego serwisu)`);
+      }
+      // Granie założone z tego wydarzenia dziedziczy poprawioną godzinę/datę —
+      // tylko jeśli nie zmieniałem jej ręcznie (wciąż ma starą wartość z wydarzenia).
+      if (prev.gigId && prev.startsAt !== s.startsAt) {
+        const moved = await db
+          .update(gigs)
+          .set({ startsAt: s.startsAt })
+          .where(and(eq(gigs.id, prev.gigId), eq(gigs.startsAt, prev.startsAt)))
+          .returning({ id: gigs.id });
+        if (moved.length) log(`granie #${prev.gigId}: ${prev.startsAt} → ${s.startsAt} (za bileterią)`);
       }
     }
   }
