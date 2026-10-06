@@ -69,7 +69,7 @@ Ocena grania **nie jest** oceną bitu, bo zależy od publiki, line-upu itd. Bit 
 - **Nowe granie:** w polach komików nie ma pomijanych z powodu `not_interested` / `no_openers`.
 
 ### Okazje (`/events`)
-- **Źródło:** scraper bileterii (`src/scraper/sources/*`, cron GitHub Actions codziennie rano) zbiera wydarzenia. Klasyfikacja jest w `src/lib/opportunities.ts`.
+- **Źródło:** scraper bileterii (`src/scraper/sources/*`, cron GitHub Actions codziennie o 10:30 czasu polskiego, razem z mailem) zbiera wydarzenia. Klasyfikacja jest w `src/lib/opportunities.ts`.
 - **Zakładki:** Znajomi (komicy z CRM), W zasięgu (≤3 h dojazdu albo nocleg), Open miki, Uzupełnij (miasta bez czasu dojazdu).
 - **Grupowanie:** jedna karta na komika; najbliższy termin główny, reszta jako „Inne terminy”.
 - **Wyciszanie komika:**

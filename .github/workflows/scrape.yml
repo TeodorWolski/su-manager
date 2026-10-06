@@ -1,8 +1,11 @@
 name: Scraper okazji
 
 on:
+  # Codziennie o 10:30 czasu polskiego. Cron jest w UTC, więc dwa wpisy: latem (UTC+2)
+  # pasuje 8:30 UTC, zimą (UTC+1) 9:30 UTC. Krok „pora” przepuszcza tylko właściwy.
   schedule:
-    - cron: "15 5 * * *" # codziennie ~7:15 czasu polskiego (latem), 6:15 zimą
+    - cron: "30 8 * * *"
+    - cron: "30 9 * * *"
   workflow_dispatch: # ręczne uruchomienie z zakładki Actions
 
 concurrency:
@@ -14,14 +17,29 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
+      - name: Pora (10:30 w Warszawie)
+        id: time
+        run: |
+          offset=$(TZ=Europe/Warsaw date +%z)
+          want="30 9 * * *"; [ "$offset" = "+0200" ] && want="30 8 * * *"
+          if [ "${{ github.event_name }}" != "schedule" ] || [ "${{ github.event.schedule }}" = "$want" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Pomijam: ten cron nie odpowiada 10:30 przy przesunięciu $offset"
+          fi
       - uses: actions/checkout@v4
+        if: steps.time.outputs.run
       - uses: pnpm/action-setup@v4
+        if: steps.time.outputs.run
       - uses: actions/setup-node@v4
+        if: steps.time.outputs.run
         with:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+        if: steps.time.outputs.run
       - run: pnpm scrape
+        if: steps.time.outputs.run
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DATABASE_AUTH_TOKEN: ${{ secrets.DATABASE_AUTH_TOKEN }}
