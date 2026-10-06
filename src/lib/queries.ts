@@ -217,7 +217,6 @@ export async function listBits() {
       status: bits.status,
       lengthMin: bits.lengthMin,
       timesPlayed: sql<number>`(select count(*) from gig_bits gb join gig_logs l on l.gig_id = gb.gig_id where gb.bit_id = bits.id)`,
-      avgRating: sql<number | null>`(select avg(l.rating) from gig_bits gb join gig_logs l on l.gig_id = gb.gig_id where gb.bit_id = bits.id)`,
       ups: sql<number>`(select count(*) from gig_bits gb where gb.bit_id = bits.id and gb.reaction = 1)`,
       downs: sql<number>`(select count(*) from gig_bits gb where gb.bit_id = bits.id and gb.reaction = -1)`,
       lastPlayed: sql<string | null>`(select max(g.starts_at) from gig_bits gb join gigs g on g.id = gb.gig_id where gb.bit_id = bits.id)`,

@@ -1,6 +1,6 @@
 import { Plus } from "lucide-react";
 import Link from "next/link";
-import { Empty, PageHeader, Pill, Rating, Row, Section } from "@/components/ios";
+import { Empty, PageHeader, Pill, Row, Section } from "@/components/ios";
 import { Button } from "@/components/ui/button";
 import { BIT_STATUS_LABEL, BIT_STATUS_TONE } from "@/lib/labels";
 import { daysSince } from "@/lib/follow-up";
@@ -28,10 +28,7 @@ function BitRow({ b, note }: { b: BitItem; note?: string }) {
           .join(" · ")
       }
       detail={
-        <span className="flex items-center gap-2">
-          <Rating value={b.avgRating} />
-          <Pill tone={BIT_STATUS_TONE[b.status]}>{BIT_STATUS_LABEL[b.status]}</Pill>
-        </span>
+        <Pill tone={BIT_STATUS_TONE[b.status]}>{BIT_STATUS_LABEL[b.status]}</Pill>
       }
     />
   );
@@ -76,7 +73,7 @@ export default async function BitsPage() {
         </Section>
       )}
       {(rest.length > 0 || items.length === 0) && (
-        <Section footer="Ocena bitu = średnia ocen grań, w których go zagrałeś. 👍/👎 — jak siadł sam bit (zaznaczasz w logu).">
+        <Section footer="👍/👎 — jak siadł sam bit. Zaznaczasz w logu po graniu.">
           {rest.length ? (
             rest.map((b) => <BitRow key={b.id} b={b} />)
           ) : (
