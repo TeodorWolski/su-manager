@@ -16,6 +16,8 @@ export const MAX_TRAVEL_MIN = 180;
 export const NEW_FOR_DAYS = 7;
 /** Po wspólnym wieczorze nie proponuj tego komika przez tyle dni (chyba że kontakt ma własne „wyciszony do”). */
 export const COOLDOWN_DAYS = 30;
+/** Po „Odmówił” / „Zghostował” komik znika z Okazji (i Najgorętszych) na tyle dni. */
+export const MUTE_AFTER_OUTCOME_DAYS = { declined: 60, ghosted: 30 } as const;
 /** Statusy grania, przy których nie piszę do komika o kolejny termin. */
 export const ACTIVE_GIG: readonly string[] = ["interested", "contacted", "waiting", "confirmed"];
 

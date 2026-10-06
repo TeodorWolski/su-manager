@@ -91,7 +91,8 @@ export async function listGigs(view: "upcoming" | "pipeline" | "past" | "all" = 
         .where(and(eq(gigs.status, "confirmed"), lt(startExpr, now)))
         .orderBy(desc(gigs.startsAt));
     case "all":
-      return q.orderBy(desc(gigs.startsAt));
+      // Bez odrzuconych — to historia moich grań, a nie odmów (te są przy kontaktach).
+      return q.where(ne(gigs.status, "rejected")).orderBy(desc(gigs.startsAt));
   }
 }
 

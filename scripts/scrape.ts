@@ -55,8 +55,8 @@ async function main() {
     if (s.availability !== undefined && s.availability !== prev.availability) {
       await db.update(events).set({ availability: s.availability }).where(eq(events.id, prev.id));
     }
-    // Organizator poprawił tytuł/datę/miejsce — aktualizujemy rekord.
-    if (prev.dedupeKey !== key || prev.url !== s.url) {
+    // Organizator poprawił tytuł/datę/godzinę/miejsce — aktualizujemy rekord.
+    if (prev.dedupeKey !== key || prev.url !== s.url || prev.startsAt !== s.startsAt) {
       try {
         await db
           .update(events)

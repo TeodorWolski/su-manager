@@ -4,7 +4,7 @@ import { desc, eq, sql } from "drizzle-orm";
 import { refresh, updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { matchContacts } from "@/lib/match";
-import { EVENTS_TAG, isOpenMic } from "@/lib/opportunities";
+import { EVENTS_TAG, isOpenMic, MUTE_AFTER_OUTCOME_DAYS } from "@/lib/opportunities";
 import { normalize } from "@/lib/text";
 import { nowLocal } from "@/lib/time";
 import {
@@ -173,9 +173,19 @@ export async function replyToGig(gigId: number, outcome: GigOutcome | "wait") {
     return refresh();
   }
   const relation = outcome === "agreed" ? "agreed" : outcome === "declined" ? "declined" : "no_reply";
-  const [c] = await db.select({ relation: contacts.relation }).from(contacts).where(eq(contacts.id, contactId));
+  const [c] = await db
+    .select({ relation: contacts.relation, snoozeUntil: contacts.snoozeUntil })
+    .from(contacts)
+    .where(eq(contacts.id, contactId));
   if (c && SOFT_RELATIONS.includes(c.relation)) {
     await db.update(contacts).set({ relation }).where(eq(contacts.id, contactId));
+  }
+  // Odmowa / ghosting — chwilę nie pytam znowu (nie skracam dłuższego wyciszenia).
+  if (c && (outcome === "declined" || outcome === "ghosted")) {
+    const until = isoDate(MUTE_AFTER_OUTCOME_DAYS[outcome]);
+    if (!c.snoozeUntil || c.snoozeUntil < until) {
+      await db.update(contacts).set({ snoozeUntil: until }).where(eq(contacts.id, contactId));
+    }
   }
   refresh();
 }

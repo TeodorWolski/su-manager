@@ -41,7 +41,7 @@ export default async function ContactPage({ params }: PageProps<"/contacts/[id]"
   const muted = mute?.until ?? null;
   const manualSnooze = contact.snoozeUntil != null;
   const muteNote = {
-    manual: "Wyciszony ręcznie.",
+    manual: "Wyciszony ręcznie albo po odmowie / ghostingu.",
     gig: `Macie granie w toku (${nextGig ? fmtDate(nextGig.startsAt) : ""}) — nie proponuję kolejnych terminów. Potem jeszcze ${COOLDOWN_DAYS} dni przerwy.`,
     played: `${COOLDOWN_DAYS} dni po wspólnym wieczorze (${lastPlayedTogether ? fmtDate(lastPlayedTogether) : ""}).`,
   };
