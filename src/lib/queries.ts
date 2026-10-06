@@ -14,7 +14,10 @@ import {
   venues,
   type GigStatus,
 } from "@/db";
+import { loadUpcomingEventsCached } from "./events-cache";
 import { daysSince, FOLLOW_UP_AFTER_DAYS, lastActivity, nextChannel } from "./follow-up";
+import { getOpportunities } from "./opportunities";
+import { getInsights, type RhythmOpportunity } from "./rhythm";
 import { DEFAULT_START_TIME, nowLocal } from "./time";
 import { normalize } from "./text";
 
@@ -371,3 +374,31 @@ export async function listCalendarGigs() {
     .where(eq(gigs.status, "confirmed"))
     .orderBy(asc(gigs.startsAt));
 }
+
+/** Rytm grania na ekran Dziś: tygodnie wokół dzisiaj + podpowiedzi z Okazji na luźne tygodnie. */
+export async function getRhythm() {
+  const today = nowLocal().slice(0, 10);
+  const from = new Date(Date.parse(today) - 35 * 864e5).toISOString().slice(0, 10);
+  const [rows, opportunities] = await Promise.all([
+    db
+      .select({ id: gigs.id, title: gigs.title, startsAt: gigs.startsAt, status: gigs.status })
+      .from(gigs)
+      .where(and(gte(gigs.startsAt, from), inArray(gigs.status, ["confirmed", "interested", "contacted", "waiting"]))),
+    getOpportunities(undefined, loadUpcomingEventsCached),
+  ]);
+  // Najpierw znajomi, potem open miki, potem reszta w zasięgu; bez wyciszonych i tych, gdzie już mam granie.
+  const order = { friends: 0, openMic: 1, inRange: 2 } as Record<string, number>;
+  const ideas: RhythmOpportunity[] = opportunities
+    .filter((o) => o.tab in order && !o.myGigId)
+    .sort((a, b) => order[a.tab] - order[b.tab] || a.event.startsAt.localeCompare(b.event.startsAt))
+    .map((o) => ({
+      eventId: o.event.id,
+      title: o.event.title,
+      startsAt: o.event.startsAt,
+      cityName: o.event.cityName,
+      href: `/events?${new URLSearchParams({ tab: o.tab, m: o.event.startsAt.slice(0, 7) })}`,
+    }));
+  return getInsights(rows, ideas, today);
+}
+
+export type Rhythm = Awaited<ReturnType<typeof getRhythm>>;
