@@ -2,14 +2,16 @@ import { Plus } from "lucide-react";
 import Link from "next/link";
 import { GigRow } from "@/components/gig-row";
 import { GigGoalCard, MaterialTile, RatingTile } from "@/components/goals";
-import { Empty, PageHeader, Rating, Row, Section } from "@/components/ios";
+import { Empty, PageHeader, Pill, Rating, Row, Section } from "@/components/ios";
 import { Button } from "@/components/ui/button";
+import { FOLLOW_UP_AFTER_DAYS } from "@/lib/follow-up";
+import { CHANNEL_SHORT } from "@/lib/labels";
 import { getDashboard } from "@/lib/queries";
 import { getGoals } from "@/lib/goals";
 import { fmtDate, fmtDateLong, nowLocal } from "@/lib/time";
 
 export default async function Home() {
-  const [{ upcoming, pipeline, month, recent }, goals] = await Promise.all([getDashboard(), getGoals()]);
+  const [{ upcoming, pipeline, followUps, month, recent }, goals] = await Promise.all([getDashboard(), getGoals()]);
   const today = nowLocal();
 
   return (
@@ -37,6 +39,30 @@ export default async function Home() {
       <Section title="Nadchodzące">
         {upcoming.length ? upcoming.map((g) => <GigRow key={g.id} gig={g} showStatus />) : <Empty>Brak potwierdzonych grań.</Empty>}
       </Section>
+
+      {followUps.length > 0 && (
+        <Section
+          title="Do ponowienia"
+          footer={`Cisza od ${FOLLOW_UP_AFTER_DAYS}+ dni. Napisz jeszcze raz — najlepiej innym kanałem — albo zmień status.`}
+        >
+          {followUps.map((g) => (
+            <Row
+              key={g.id}
+              href={`/gigs/${g.id}`}
+              title={g.title}
+              subtitle={[
+                fmtDate(g.startsAt),
+                g.headlinerName,
+                `cisza ${g.quietDays} dni`,
+                g.used.length > 0 && `pisałeś: ${g.used.map((c) => CHANNEL_SHORT[c] ?? c).join(", ")}`,
+              ]
+                .filter(Boolean)
+                .join(" · ")}
+              detail={g.next ? <Pill tone="info">→ {CHANNEL_SHORT[g.next] ?? g.next}</Pill> : <Pill tone="muted">wszędzie</Pill>}
+            />
+          ))}
+        </Section>
+      )}
 
       {pipeline.length > 0 && (
         <Section title="W toku" footer="Grania, o które się starasz — zmień status, gdy coś się ruszy.">

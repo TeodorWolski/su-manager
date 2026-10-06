@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { saveLog } from "@/app/actions";
 import type { GigContext } from "@/db/schema";
-import { GIG_CONTEXT_LABEL } from "@/lib/labels";
+import { GIG_CONTEXT_LABEL, REACTIONS } from "@/lib/labels";
 import type { FormOptions } from "@/lib/queries";
 import { cn } from "@/lib/utils";
 import { FieldRow, NumberInput, Select, SubmitButton, TextArea } from "./form";
@@ -62,6 +62,8 @@ export type LogDefaults = {
   context?: GigContext | null;
   headlinerId?: number | null;
   bitIds?: number[];
+  /** Zapisane reakcje na bity: bitId → 1 / 0 / -1. */
+  reactions?: Record<number, number | null>;
 };
 
 export function LogForm({
@@ -79,6 +81,7 @@ export function LogForm({
   const [venueRating, setVenueRating] = useState(defaults.venueRating ?? 0);
   const [context, setContext] = useState<GigContext | "">(defaults.context ?? "");
   const [picked, setPicked] = useState(new Set(defaults.bitIds ?? []));
+  const [reactions, setReactions] = useState<Record<number, number | null>>(defaults.reactions ?? {});
   // Odrzucone bity znikają z wyboru — chyba że były już zapisane w tym logu.
   const bits = options.bits.filter((b) => b.status !== "rejected" || defaults.bitIds?.includes(b.id));
 
@@ -204,6 +207,33 @@ export function LogForm({
                 {b.name}
               </label>
             ))}
+          </div>
+        )}
+        {picked.size > 0 && (
+          <div className="bg-card mt-3 overflow-hidden rounded-2xl">
+            {bits
+              .filter((b) => picked.has(b.id))
+              .map((b) => (
+                <div key={b.id} className="border-border/70 flex items-center gap-2 px-4 py-1.5 [&:not(:last-child)]:border-b">
+                  <span className="min-w-0 flex-1 truncate text-[15px]">{b.name}</span>
+                  <input type="hidden" name={`reaction-${b.id}`} value={reactions[b.id] ?? ""} />
+                  {REACTIONS.map((r) => (
+                    <button
+                      key={r.value}
+                      type="button"
+                      aria-label={r.label}
+                      aria-pressed={reactions[b.id] === r.value}
+                      onClick={() => setReactions((prev) => ({ ...prev, [b.id]: prev[b.id] === r.value ? null : r.value }))}
+                      className={cn(
+                        "flex size-9 items-center justify-center rounded-lg text-[18px] transition-all active:scale-90",
+                        reactions[b.id] === r.value ? "bg-primary/20 ring-primary/50 ring-1" : "opacity-40 grayscale",
+                      )}
+                    >
+                      {r.emoji}
+                    </button>
+                  ))}
+                </div>
+              ))}
           </div>
         )}
       </div>

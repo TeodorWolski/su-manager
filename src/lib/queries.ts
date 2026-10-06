@@ -14,6 +14,7 @@ import {
   venues,
   type GigStatus,
 } from "@/db";
+import { daysSince, FOLLOW_UP_AFTER_DAYS, lastActivity, nextChannel } from "./follow-up";
 import { DEFAULT_START_TIME, nowLocal } from "./time";
 import { normalize } from "./text";
 
@@ -109,12 +110,12 @@ export async function getPendingReviews() {
 
 export async function getGig(id: number) {
   // Równolegle — każde zapytanie to osobny round-trip do Turso.
-  const [[row], [gig], [log], playedBits, lineup] = await Promise.all([
+  const [[row], [gig], [log], playedBits, lineup, messages] = await Promise.all([
     gigListQuery().where(eq(gigs.id, id)),
     db.select().from(gigs).where(eq(gigs.id, id)),
     db.select().from(gigLogs).where(eq(gigLogs.gigId, id)),
     db
-      .select({ id: bits.id, name: bits.name })
+      .select({ id: bits.id, name: bits.name, reaction: gigBits.reaction })
       .from(gigBits)
       .innerJoin(bits, eq(gigBits.bitId, bits.id))
       .where(eq(gigBits.gigId, id)),
@@ -123,9 +124,14 @@ export async function getGig(id: number) {
       .from(gigContacts)
       .innerJoin(contacts, eq(gigContacts.contactId, contacts.id))
       .where(eq(gigContacts.gigId, id)),
+    db
+      .select()
+      .from(interactions)
+      .where(eq(interactions.gigId, id))
+      .orderBy(asc(interactions.date), asc(interactions.id)),
   ]);
   if (!row || !gig) return null;
-  return { ...row, gig, log: log ?? null, bits: playedBits, lineup };
+  return { ...row, gig, log: log ?? null, bits: playedBits, lineup, messages };
 }
 
 export async function listCities() {
@@ -212,15 +218,28 @@ export async function listBits() {
       lengthMin: bits.lengthMin,
       timesPlayed: sql<number>`(select count(*) from gig_bits gb join gig_logs l on l.gig_id = gb.gig_id where gb.bit_id = bits.id)`,
       avgRating: sql<number | null>`(select avg(l.rating) from gig_bits gb join gig_logs l on l.gig_id = gb.gig_id where gb.bit_id = bits.id)`,
+      ups: sql<number>`(select count(*) from gig_bits gb where gb.bit_id = bits.id and gb.reaction = 1)`,
+      downs: sql<number>`(select count(*) from gig_bits gb where gb.bit_id = bits.id and gb.reaction = -1)`,
+      lastPlayed: sql<string | null>`(select max(g.starts_at) from gig_bits gb join gigs g on g.id = gb.gig_id where gb.bit_id = bits.id)`,
+      createdAt: bits.createdAt,
     })
     .from(bits)
-    .orderBy(sql`case ${bits.status} when 'tested' then 0 when 'testing' then 1 when 'rejected' then 3 else 2 end`, asc(bits.name));
+    .orderBy(
+      sql`case ${bits.status} when 'tested' then 0 when 'testing' then 1 when 'editing' then 2 when 'vomit' then 3 else 4 end`,
+      asc(bits.name),
+    );
 }
 
 export async function getBit(id: number) {
   const [bit] = await db.select().from(bits).where(eq(bits.id, id));
   if (!bit) return null;
-  const bitGigs = await gigListQuery()
+  const bitGigs = await db
+    .select({ ...gigListSelect, reaction: gigBits.reaction })
+    .from(gigs)
+    .leftJoin(venues, eq(gigs.venueId, venues.id))
+    .leftJoin(cities, eq(gigs.cityId, cities.id))
+    .leftJoin(headliner, eq(gigs.headlinerId, headliner.id))
+    .leftJoin(gigLogs, eq(gigLogs.gigId, gigs.id))
     .innerJoin(gigBits, eq(gigBits.gigId, gigs.id))
     .where(eq(gigBits.bitId, id))
     .orderBy(desc(gigs.startsAt));
@@ -251,12 +270,46 @@ export async function listThoughts(query?: string) {
   });
 }
 
+/**
+ * Grania „napisałem” / „czekam”, w których od FOLLOW_UP_AFTER_DAYS dni nic się nie dzieje,
+ * a ostatnia wiadomość nie dostała odpowiedzi. Z podpowiedzią kolejnego kanału.
+ */
+export async function getFollowUps() {
+  const today = nowLocal().slice(0, 10);
+  const rows = await db
+    .select({
+      ...gigListSelect,
+      statusChangedAt: gigs.statusChangedAt,
+      lastMessageAt: sql<string | null>`(select max(i.date) from interactions i where i.gig_id = gigs.id)`,
+      channels: sql<string | null>`(select group_concat(distinct i.channel) from interactions i where i.gig_id = gigs.id)`,
+      lastReplied: sql<number | null>`(select i.replied from interactions i where i.gig_id = gigs.id order by i.date desc, i.id desc limit 1)`,
+    })
+    .from(gigs)
+    .leftJoin(venues, eq(gigs.venueId, venues.id))
+    .leftJoin(cities, eq(gigs.cityId, cities.id))
+    .leftJoin(headliner, eq(gigs.headlinerId, headliner.id))
+    .leftJoin(gigLogs, eq(gigLogs.gigId, gigs.id))
+    .where(and(inArray(gigs.status, ["contacted", "waiting"]), gte(gigs.startsAt, today)))
+    .orderBy(asc(gigs.startsAt));
+  return rows
+    .filter((g) => !g.lastReplied)
+    .map((g) => {
+      const used = g.channels?.split(",") ?? [];
+      const since = lastActivity(g);
+      return { ...g, used, quietDays: daysSince(since, today), next: nextChannel(used) };
+    })
+    .filter((g) => g.quietDays >= FOLLOW_UP_AFTER_DAYS);
+}
+
+export type FollowUp = Awaited<ReturnType<typeof getFollowUps>>[number];
+
 export async function getDashboard() {
   const now = nowLocal();
   const monthStart = `${now.slice(0, 7)}-01`;
-  const [upcoming, pipeline, [month], recent] = await Promise.all([
+  const [upcoming, allPipeline, followUps, [month], recent] = await Promise.all([
     listGigs("upcoming"),
     listGigs("pipeline"),
+    getFollowUps(),
     // Liczymy wszystkie zagrane w tym miesiącu (też bez logu); średnia — tylko z ocenionych.
     db
       .select({
@@ -268,7 +321,10 @@ export async function getDashboard() {
       .where(and(eq(gigs.status, "confirmed"), gte(gigs.startsAt, monthStart), lt(startExpr, now))),
     listThoughts().then((r) => r.slice(0, 3)),
   ]);
-  return { upcoming, pipeline, month, recent };
+  // Grania do ponowienia mają własną sekcję — nie dublujemy ich w „W toku”.
+  const due = new Set(followUps.map((g) => g.id));
+  const pipeline = allPipeline.filter((g) => !due.has(g.id));
+  return { upcoming, pipeline, followUps, month, recent };
 }
 
 /** Opcje do selectów w formularzach. */

@@ -65,11 +65,14 @@ export const contacts = sqliteTable("contacts", {
   createdAt: createdAt(),
 });
 
+/**
+ * Wiadomość / kontakt. Przy graniu (gigId) kontakt bywa pusty — np. open mic pisany do sceny.
+ * Kanał to tekst (patrz CHANNELS w labels.ts), żeby stare wpisy dalej się wyświetlały.
+ */
 export const interactions = sqliteTable("interactions", {
   id: id(),
-  contactId: integer("contact_id")
-    .notNull()
-    .references(() => contacts.id, { onDelete: "cascade" }),
+  contactId: integer("contact_id").references(() => contacts.id, { onDelete: "cascade" }),
+  gigId: integer("gig_id").references(() => gigs.id, { onDelete: "set null" }),
   date: text("date").notNull(),
   channel: text("channel").notNull(),
   topic: text("topic"),
@@ -96,8 +99,11 @@ export const venues = sqliteTable("venues", {
   createdAt: createdAt(),
 });
 
-/** "rejected" = odrzucony — nie liczy się do materiału i nie ma go do wyboru w logu. */
-export const BIT_STATUSES = ["tested", "testing", "vomit", "rejected"] as const;
+/**
+ * "editing" = do redakcji (wiem, że trzeba go przepisać). "rejected" = odrzucony —
+ * nie liczy się do materiału i nie ma go do wyboru w logu.
+ */
+export const BIT_STATUSES = ["tested", "testing", "editing", "vomit", "rejected"] as const;
 
 export const bits = sqliteTable("bits", {
   id: id(),
@@ -128,6 +134,8 @@ export const gigs = sqliteTable("gigs", {
   venueId: integer("venue_id").references(() => venues.id, { onDelete: "set null" }),
   cityId: integer("city_id").references(() => cities.id, { onDelete: "set null" }),
   status: text("status", { enum: GIG_STATUSES }).notNull().default("interested"),
+  /** Lokalny czas ostatniej zmiany statusu — z niego (i z wiadomości) liczymy, kiedy ponowić. */
+  statusChangedAt: text("status_changed_at"),
   context: text("context", { enum: GIG_CONTEXTS }),
   /** Przed kim gram (support) — kontakt z CRM. */
   headlinerId: integer("headliner_id").references(() => contacts.id, { onDelete: "set null" }),
@@ -176,6 +184,8 @@ export const gigBits = sqliteTable(
     bitId: integer("bit_id")
       .notNull()
       .references(() => bits.id, { onDelete: "cascade" }),
+    /** Jak poszedł bit tego wieczoru: 1 = siadł, 0 = tak sobie, -1 = nie siadł. */
+    reaction: integer("reaction"),
   },
   (t) => [primaryKey({ columns: [t.gigId, t.bitId] })],
 );

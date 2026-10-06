@@ -1,11 +1,12 @@
 "use server";
 
-import { eq, sql } from "drizzle-orm";
+import { desc, eq, sql } from "drizzle-orm";
 import { refresh, updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { matchContacts } from "@/lib/match";
 import { EVENTS_TAG, isOpenMic } from "@/lib/opportunities";
 import { normalize } from "@/lib/text";
+import { nowLocal } from "@/lib/time";
 import {
   BIT_STATUSES,
   bits,
@@ -78,9 +79,14 @@ export async function saveGig(fd: FormData) {
   };
   let gigId = id;
   if (gigId) {
-    await db.update(gigs).set(values).where(eq(gigs.id, gigId));
+    const [old] = await db.select({ status: gigs.status }).from(gigs).where(eq(gigs.id, gigId));
+    const changed = old?.status !== values.status ? { statusChangedAt: nowLocal() } : {};
+    await db.update(gigs).set({ ...values, ...changed }).where(eq(gigs.id, gigId));
   } else {
-    [{ id: gigId }] = await db.insert(gigs).values(values).returning({ id: gigs.id });
+    [{ id: gigId }] = await db
+      .insert(gigs)
+      .values({ ...values, statusChangedAt: nowLocal() })
+      .returning({ id: gigs.id });
   }
   const lineup = ids(fd, "lineup");
   await db.delete(gigContacts).where(eq(gigContacts.gigId, gigId));
@@ -91,7 +97,52 @@ export async function saveGig(fd: FormData) {
 }
 
 export async function setGigStatus(id: number, status: GigStatus) {
-  await db.update(gigs).set({ status }).where(eq(gigs.id, id));
+  await db.update(gigs).set({ status, statusChangedAt: nowLocal() }).where(eq(gigs.id, id));
+  refresh();
+}
+
+/**
+ * Zapisuje wysłaną wiadomość w sprawie grania. Pierwsza wiadomość przesuwa granie
+ * z „zainteresowany” na „napisałem”; kolejne (ponowienia) tylko odświeżają licznik ciszy.
+ */
+async function recordGigMessage(gigId: number, channel: string, contactId?: number | null) {
+  const [gig] = await db
+    .select({ title: gigs.title, status: gigs.status, headlinerId: gigs.headlinerId })
+    .from(gigs)
+    .where(eq(gigs.id, gigId));
+  if (!gig) throw new Error("Nie ma takiego grania");
+  await db.insert(interactions).values({
+    contactId: contactId ?? gig.headlinerId,
+    gigId,
+    date: nowLocal().slice(0, 10),
+    channel,
+    topic: gig.title,
+  });
+  if (gig.status === "interested") {
+    await db.update(gigs).set({ status: "contacted", statusChangedAt: nowLocal() }).where(eq(gigs.id, gigId));
+  }
+}
+
+/** „Napisałem przez …” z karty grania (też ponowienie na innym kanale). */
+export async function logGigMessage(gigId: number, fd: FormData) {
+  await recordGigMessage(gigId, required(str(fd, "channel"), "kanał"));
+  refresh();
+}
+
+/** „Odpisał” — ostatnia wiadomość w sprawie grania dostaje odpowiedź, granie znika z „Do ponowienia”. */
+export async function markGigReplied(gigId: number) {
+  const [last] = await db
+    .select({ id: interactions.id })
+    .from(interactions)
+    .where(eq(interactions.gigId, gigId))
+    .orderBy(desc(interactions.date), desc(interactions.id))
+    .limit(1);
+  if (last) await db.update(interactions).set({ replied: true }).where(eq(interactions.id, last.id));
+  refresh();
+}
+
+export async function deleteGigMessage(id: number) {
+  await db.delete(interactions).where(eq(interactions.id, id));
   refresh();
 }
 
@@ -128,7 +179,12 @@ export async function saveLog(fd: FormData) {
   const played = ids(fd, "bits");
   await db.delete(gigBits).where(eq(gigBits.gigId, gigId));
   if (played.length) {
-    await db.insert(gigBits).values(played.map((bitId) => ({ gigId, bitId })));
+    await db.insert(gigBits).values(
+      played.map((bitId) => {
+        const r = int(fd, `reaction-${bitId}`);
+        return { gigId, bitId, reaction: r === 1 || r === 0 || r === -1 ? r : null };
+      }),
+    );
   }
   done(str(fd, "returnTo") ?? `/gigs/${gigId}`);
 }
@@ -330,9 +386,36 @@ const isoDate = (daysFromNow: number) => new Date(Date.now() + daysFromNow * 864
 
 /** „Chcę zagrać” — zakłada granie w pipeline (status: zainteresowany) i podpina wydarzenie. */
 export async function eventToGig(id: number) {
+  const gigId = await gigFromEvent(id);
+  updateTag(EVENTS_TAG);
+  done(`/gigs/${gigId}`);
+}
+
+/**
+ * „Wysłałem przez …” z Okazji: zakłada granie (albo bierze istniejące), zapisuje wiadomość
+ * i zostawia mnie na liście, żeby od razu pisać do kolejnych.
+ */
+export async function messageFromEvent(fd: FormData) {
+  const eventId = required(int(fd, "eventId"), "wydarzenie");
+  const channel = required(str(fd, "channel"), "kanał");
+  const gigId = int(fd, "gigId") ?? (await gigFromEvent(eventId));
+  const name = str(fd, "name");
+  const [gig] = await db.select({ headlinerId: gigs.headlinerId, context: gigs.context }).from(gigs).where(eq(gigs.id, gigId));
+  // Piszę do komika spoza CRM — zakładam mu kontakt, żeby historia wiadomości miała gdzie trafić.
+  let contactId = int(fd, "contactId") ?? gig?.headlinerId ?? null;
+  if (!contactId && name && gig?.context !== "open_mic") contactId = await performerContactId(name);
+  if (contactId && gig && !gig.headlinerId && gig.context !== "open_mic") {
+    await db.update(gigs).set({ headlinerId: contactId }).where(eq(gigs.id, gigId));
+  }
+  await recordGigMessage(gigId, channel, contactId);
+  updateTag(EVENTS_TAG);
+  refresh();
+}
+
+async function gigFromEvent(id: number) {
   const [e] = await db.select().from(events).where(eq(events.id, id));
   if (!e) throw new Error("Nie ma takiego wydarzenia");
-  if (e.gigId) done(`/gigs/${e.gigId}`);
+  if (e.gigId) return e.gigId;
 
   const allCities = await db.select({ id: cities.id, name: cities.name }).from(cities);
   const city = allCities.find((c) => normalize(c.name) === normalize(e.cityName ?? ""));
@@ -352,6 +435,7 @@ export async function eventToGig(id: number) {
       venueId: venue?.id ?? null,
       cityId: venue ? null : (city?.id ?? null),
       status: "interested",
+      statusChangedAt: nowLocal(),
       context: openMic ? "open_mic" : "opener",
       headlinerId: openMic ? null : (headliner?.id ?? null),
       url: e.url,
@@ -359,8 +443,7 @@ export async function eventToGig(id: number) {
     })
     .returning({ id: gigs.id });
   await db.update(events).set({ gigId: gig.id }).where(eq(events.id, id));
-  updateTag(EVENTS_TAG);
-  done(`/gigs/${gig.id}`);
+  return gig.id;
 }
 
 /** Szybkie przypisanie czasu dojazdu miastu z raportu („~2 h”, „dalej”). */

@@ -24,6 +24,7 @@ export default async function GigLogPage({ params }: PageProps<"/gigs/[id]/log">
           context: gig.context,
           headlinerId: gig.headlinerId,
           bitIds: data.bits.map((b) => b.id),
+          reactions: Object.fromEntries(data.bits.map((b) => [b.id, b.reaction])),
         }}
       />
     </>

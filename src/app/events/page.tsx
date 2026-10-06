@@ -1,8 +1,9 @@
 import { ChevronDown, ExternalLink } from "lucide-react";
 import Link from "next/link";
 import { PendingButton } from "@/components/form";
-import { eventToGig, hidePerformer, setCityTravel, snoozePerformer, unsnoozeContact } from "@/app/actions";
+import { eventToGig, hidePerformer, messageFromEvent, setCityTravel, snoozePerformer, unsnoozeContact } from "@/app/actions";
 import { Empty, PageHeader, Pill, Section } from "@/components/ios";
+import { MessageComposer } from "@/components/message-composer";
 import { isMonth, MonthChips, monthCounts } from "@/components/month-chips";
 import { RELATION_LABEL, RELATION_TONE } from "@/lib/labels";
 import {
@@ -15,6 +16,7 @@ import {
   type OpportunityGroup,
 } from "@/lib/opportunities";
 import { loadUpcomingEventsCached } from "@/lib/events-cache";
+import { pitchMessage } from "@/lib/messages";
 import { plural } from "@/lib/text";
 import { fmtDate, fmtDateTime, fmtTravel, nowLocal } from "@/lib/time";
 import { cn } from "@/lib/utils";
@@ -69,6 +71,25 @@ function GigButton({ o, small }: { o: Opportunity; small?: boolean }) {
         Chcę zagrać
       </PendingButton>
     </form>
+  );
+}
+
+/** „Napisz ▾”: gotowa wiadomość; „Wysłałem przez …” zakłada granie w statusie „napisałem”. */
+function WriteMenu({ g }: { g: OpportunityGroup }) {
+  const o = g.primary;
+  return (
+    <details className="group/write open:basis-full">
+      <summary className="bg-secondary text-secondary-foreground flex h-9 w-fit cursor-pointer list-none items-center gap-1 rounded-lg px-3 text-[14px] [&::-webkit-details-marker]:hidden">
+        Napisz <ChevronDown className="size-3.5 transition-transform group-open/write:rotate-180" />
+      </summary>
+      <div className="bg-muted mt-2 rounded-xl p-2">
+        <MessageComposer
+          message={pitchMessage({ startsAt: o.event.startsAt, cityName: o.event.cityName, openMic: o.isOpenMic })}
+          action={messageFromEvent}
+          hidden={{ eventId: o.event.id, gigId: o.myGigId, contactId: g.performer.contactId, name: g.performer.name }}
+        />
+      </div>
+    </details>
   );
 }
 
@@ -129,6 +150,7 @@ function GroupCard({ g }: { g: OpportunityGroup }) {
 
       <div className="mt-2.5 flex flex-wrap gap-2">
         <GigButton o={o} />
+        <WriteMenu g={g} />
         <HideMenu g={g} />
       </div>
 

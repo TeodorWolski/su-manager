@@ -13,12 +13,10 @@ import { ConfirmButton, FieldRow, Select, SubmitButton, TextInput, PendingButton
 import { GigRow } from "@/components/gig-row";
 import { Empty, PageHeader, Pill, Row, Section } from "@/components/ios";
 import { Button } from "@/components/ui/button";
-import { IGNORE_REASON_LABEL, RELATION_LABEL, RELATION_TONE, ROLE_LABEL } from "@/lib/labels";
+import { CHANNELS, IGNORE_REASON_LABEL, RELATION_LABEL, RELATION_TONE, ROLE_LABEL } from "@/lib/labels";
 import { ACTIVE_GIG, COOLDOWN_DAYS, muteState } from "@/lib/opportunities";
 import { getContact } from "@/lib/queries";
 import { fmtDate, nowLocal } from "@/lib/time";
-
-const CHANNELS = ["Instagram", "Messenger", "WhatsApp", "SMS", "Telefon", "Mail", "Na żywo"];
 
 export default async function ContactPage({ params }: PageProps<"/contacts/[id]">) {
   const { id } = await params;
@@ -125,7 +123,15 @@ export default async function ContactPage({ params }: PageProps<"/contacts/[id]"
           history.map((i) => (
             <div key={i.id} className="flex items-center gap-3 border-b border-border/70 px-4 py-2.5 last:border-b-0">
               <div className="min-w-0 flex-1">
-                <div className="text-[16px]">{i.topic || i.channel}</div>
+                <div className="text-[16px]">
+                  {i.gigId ? (
+                    <Link href={`/gigs/${i.gigId}`} className="hover:underline">
+                      {i.topic || i.channel}
+                    </Link>
+                  ) : (
+                    i.topic || i.channel
+                  )}
+                </div>
                 <div className="text-muted-foreground text-[13px]">
                   {fmtDate(i.date)} · {i.channel}
                 </div>

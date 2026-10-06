@@ -1,13 +1,16 @@
 import { Check, ExternalLink } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { deleteGig, setGigStatus } from "@/app/actions";
+import { deleteGig, deleteGigMessage, logGigMessage, markGigReplied, setGigStatus } from "@/app/actions";
 import { ConfirmButton, PendingButton } from "@/components/form";
 import { PageHeader, Pill, Row, Section, Stat } from "@/components/ios";
+import { MessageComposer } from "@/components/message-composer";
 import { Button } from "@/components/ui/button";
-import { GIG_CONTEXT_LABEL, GIG_PIPELINE, GIG_STATUS_LABEL, GIG_STATUS_TONE } from "@/lib/labels";
+import { daysSince, FOLLOW_UP_AFTER_DAYS, lastActivity, nextChannel } from "@/lib/follow-up";
+import { GIG_CONTEXT_LABEL, GIG_PIPELINE, GIG_STATUS_LABEL, GIG_STATUS_TONE, REACTION_EMOJI } from "@/lib/labels";
+import { pitchMessage } from "@/lib/messages";
 import { getGig, type GigStatus } from "@/lib/queries";
-import { effectiveStart, fmtDateTime, nowLocal } from "@/lib/time";
+import { effectiveStart, fmtDate, fmtDateTime, nowLocal } from "@/lib/time";
 import { cn } from "@/lib/utils";
 
 /** Aktywny krok w kolorze swojego statusu (szary → niebieski → ochra → zieleń). */
@@ -25,6 +28,14 @@ export default async function GigPage({ params }: PageProps<"/gigs/[id]">) {
   const { gig, log } = data;
   const isPast = effectiveStart(gig.startsAt) < nowLocal();
   const stepIndex = GIG_PIPELINE.indexOf(gig.status);
+  const asking = !log && (["interested", "contacted", "waiting"] as GigStatus[]).includes(gig.status);
+  const used = [...new Set(data.messages.map((m) => m.channel))];
+  const lastMessage = data.messages.at(-1);
+  const quiet = daysSince(
+    lastActivity({ statusChangedAt: gig.statusChangedAt, createdAt: gig.createdAt, lastMessageAt: lastMessage?.date ?? null }),
+    nowLocal(),
+  );
+  const next = nextChannel(used);
 
   return (
     <>
@@ -84,6 +95,46 @@ export default async function GigPage({ params }: PageProps<"/gigs/[id]">) {
         </Section>
       )}
 
+      {asking && (
+        <Section
+          title="Wiadomości"
+          footer={
+            lastMessage && !lastMessage.replied
+              ? quiet >= FOLLOW_UP_AFTER_DAYS
+                ? `Cisza od ${quiet} dni — ${next ? `ponów na: ${next}` : "pisałeś już wszędzie"}.`
+                : `Napisane ${quiet === 0 ? "dziś" : `${quiet} dni temu`} — przypomnę po ${FOLLOW_UP_AFTER_DAYS} dniach ciszy.`
+              : undefined
+          }
+        >
+          {data.messages.map((m) => (
+            <div key={m.id} className="border-border/70 flex items-center gap-3 border-b px-4 py-2.5">
+              <div className="min-w-0 flex-1 text-[15px]">
+                {m.channel} <span className="text-muted-foreground text-[13px]">· {fmtDate(m.date)}</span>
+              </div>
+              {m.replied && <Pill tone="success">odpisał</Pill>}
+              <form action={deleteGigMessage.bind(null, m.id)}>
+                <PendingButton className="text-muted-foreground/60 hover:text-destructive px-1 text-lg" aria-label="Usuń wpis">
+                  ×
+                </PendingButton>
+              </form>
+            </div>
+          ))}
+          <div className="p-2">
+            <MessageComposer
+              message={pitchMessage({ startsAt: gig.startsAt, cityName: data.cityName, openMic: gig.context === "open_mic" })}
+              action={logGigMessage.bind(null, gig.id)}
+              used={used}
+              next={lastMessage ? next : "Instagram"}
+            />
+          </div>
+          {lastMessage && !lastMessage.replied && (
+            <form action={markGigReplied.bind(null, gig.id)} className="border-t">
+              <PendingButton className="text-primary h-11 w-full text-[15px]">Odpisał</PendingButton>
+            </form>
+          )}
+        </Section>
+      )}
+
       {log ? (
         <>
           <div className="mb-3 grid grid-cols-2 gap-3">
@@ -115,7 +166,7 @@ export default async function GigPage({ params }: PageProps<"/gigs/[id]">) {
           {data.bits.length > 0 && (
             <Section title="Zagrane bity">
               {data.bits.map((b) => (
-                <Row key={b.id} href={`/bits/${b.id}`} title={b.name} />
+                <Row key={b.id} href={`/bits/${b.id}`} title={b.name} detail={b.reaction != null && REACTION_EMOJI[b.reaction]} />
               ))}
             </Section>
           )}

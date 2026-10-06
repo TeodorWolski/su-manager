@@ -60,6 +60,7 @@ export const RELATION_TONE: Record<Contact["relation"], Tone> = {
 export const BIT_STATUS_LABEL: Record<Bit["status"], string> = {
   tested: "Sprawdzony",
   testing: "W testach",
+  editing: "Do redakcji",
   vomit: "Vomit",
   rejected: "Odrzucony",
 };
@@ -67,6 +68,7 @@ export const BIT_STATUS_LABEL: Record<Bit["status"], string> = {
 export const BIT_STATUS_TONE: Record<Bit["status"], Tone> = {
   tested: "success",
   testing: "warning",
+  editing: "info",
   vomit: "muted",
   rejected: "danger",
 };
@@ -101,5 +103,18 @@ export const IGNORE_REASON_LABEL: Record<IgnoreReason, string> = {
   no_openers: "Nie robi open miców przed sobą",
   other: "Inny powód",
 };
+
+/** Kanały, którymi piszę do komików — w tej kolejności proponuję ponowienie na kolejnym. */
+export const MESSAGE_CHANNELS = ["Instagram", "FB prywatny", "FB fanpage"] as const;
+export const CHANNELS = [...MESSAGE_CHANNELS, "WhatsApp", "SMS", "Telefon", "Mail", "Na żywo"];
+export const CHANNEL_SHORT: Record<string, string> = { Instagram: "IG", "FB prywatny": "FB", "FB fanpage": "Fanpage" };
+
+/** Reakcja na bit w danym graniu (gig_bits.reaction). */
+export const REACTIONS = [
+  { value: 1, emoji: "👍", label: "siadł" },
+  { value: 0, emoji: "😐", label: "tak sobie" },
+  { value: -1, emoji: "👎", label: "nie siadł" },
+] as const;
+export const REACTION_EMOJI: Record<number, string> = { 1: "👍", 0: "😐", [-1]: "👎" };
 
 export type Tone = "neutral" | "info" | "warning" | "success" | "danger" | "muted";
