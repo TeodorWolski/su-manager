@@ -153,6 +153,9 @@ async function loadContext() {
 
 type Ctx = Awaited<ReturnType<typeof loadContext>>;
 
+/** Notka wyszukiwarki dla wydarzeń samych pomijanych komików — te idą do osobnej listy. */
+export const IGNORED_NOTE = "komik pomijany";
+
 /**
  * `force` (wyszukiwarka): zamiast odrzucać wydarzenie, zapisz powód w `note` i pokaż je mimo to.
  */
@@ -172,7 +175,7 @@ function classify(e: EventRow, ctx: Ctx, newSince: string, force = false): Oppor
   const all = matchContacts(`${e.title} ${e.performers ?? ""}`, ctx.people);
   let matches = all.filter((m) => !m.ignoreInReport);
   if (all.length && !matches.length) {
-    if (drop("komik pomijany")) return null; // sami „pomijani” (nie interesuje / nie robi open miców)
+    if (drop(IGNORED_NOTE)) return null; // sami „pomijani” (nie interesuje / nie robi open miców)
     matches = all;
   }
 

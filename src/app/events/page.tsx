@@ -10,6 +10,7 @@ import {
   COOLDOWN_DAYS,
   getOpportunities,
   groupByPerformer,
+  IGNORED_NOTE,
   MAX_TRAVEL_MIN,
   NEW_FOR_DAYS,
   searchOpportunities,
@@ -298,20 +299,37 @@ async function SearchResults({ q }: { q: string }) {
     a.event.startsAt.localeCompare(b.event.startsAt),
   );
   // Każdy termin osobno — szukam jego grań, więc nie chowam ich pod „Inne terminy”.
-  const groups: OpportunityGroup[] = found.map((o) => ({
+  const card = (o: Opportunity): OpportunityGroup => ({
     performer: o.performer,
     primary: o,
     others: [],
     matches: o.matches,
     isNew: o.isNew,
-  }));
+  });
+  // Pomijani komicy (nie interesuje / nie robi open miców) osobno, pod głównymi wynikami.
+  const groups = found.filter((o) => o.note !== IGNORED_NOTE).map(card);
+  const ignored = found.filter((o) => o.note === IGNORED_NOTE).map(card);
   return (
     <>
       <PageHeader title="Okazje" subtitle={`„${q}” · ${plural(found.length, "termin", "terminy", "terminów")}`} />
       <SearchBox q={q} />
       <Section footer="Szukam po komiku, programie, scenie, mieście i dacie („14.10”, „14 paź”, „jutro”) we wszystkich nadchodzących wydarzeniach — także poza zasięgiem i u pomijanych; szara etykieta mówi, czemu normalnie ich nie widzisz.">
-        {groups.length ? groups.map((g) => <GroupCard key={g.primary.event.id} g={g} />) : <Empty>Nic nie znalazłem.</Empty>}
+        {groups.length ? (
+          groups.map((g) => <GroupCard key={g.primary.event.id} g={g} />)
+        ) : (
+          <Empty>{ignored.length ? "Nic poza pomijanymi komikami." : "Nic nie znalazłem."}</Empty>
+        )}
       </Section>
+      {ignored.length > 0 && (
+        <Section
+          title={`Pomijani komicy · ${ignored.length}`}
+          footer="Komicy, których pomijasz w Okazjach (nie interesuje / nie robi open miców). Przywrócisz ich na karcie kontaktu."
+        >
+          {ignored.map((g) => (
+            <GroupCard key={g.primary.event.id} g={g} />
+          ))}
+        </Section>
+      )}
     </>
   );
 }
