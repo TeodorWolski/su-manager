@@ -31,7 +31,7 @@ import {
 import { loadUpcomingEventsCached } from "@/lib/events-cache";
 import { findPlace, placeName } from "@/lib/geo";
 import { pitchMessage } from "@/lib/messages";
-import { INTERVAL_LABEL } from "@/lib/recurring";
+import { INTERVAL_LABEL, RECURRING_SOURCE } from "@/lib/recurring";
 import { parseDays, ROUTE_CORRIDORS, ROUTE_MAX_DAYS } from "@/lib/route";
 import { parseDateQuery } from "@/lib/time";
 import { plural } from "@/lib/text";
@@ -62,6 +62,8 @@ const where = (o: Opportunity) =>
     [o.event.venueName, o.event.cityName].filter(Boolean).join(", "),
     o.city?.travelMinutes != null && fmtTravel(o.city.travelMinutes),
     !o.inRange && o.city?.travelMinutes != null && "poza zasięgiem",
+    // Skąd termin — przewidywane serie mają swoją etykietę, więc tu tylko bileterie.
+    o.event.source !== RECURRING_SOURCE && o.event.source,
   ]
     .filter(Boolean)
     .join(" · ");

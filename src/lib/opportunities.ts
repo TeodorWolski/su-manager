@@ -326,7 +326,7 @@ export async function searchOpportunities(
       if (date && e.startsAt.slice(0, 10) !== date) return false;
       if (!q) return true;
       const who = `${e.title} ${e.performers ?? ""}`;
-      const text = `${who} ${e.venueName ?? ""} ${e.cityName ?? ""}`;
+      const text = `${who} ${e.venueName ?? ""} ${e.cityName ?? ""} ${e.source}`;
       return normalize(text).includes(q) || matchesQuery(rest, text) || matchContacts(who, people).length > 0;
     })
     .map((e) => classify(e, ctx, newSince, true))
