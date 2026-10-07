@@ -10,6 +10,7 @@
 import "dotenv/config";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { db, events, gigs } from "@/db";
+import { sameShow, showBucket } from "@/lib/dedupe";
 import { dedupeKey, getOpportunities } from "@/lib/opportunities";
 import { getFollowUps, getPlanning } from "@/lib/planning";
 import { sendReport } from "@/scraper/email";
@@ -44,10 +45,23 @@ async function main() {
   const now = new Date().toISOString().replace("T", " ").slice(0, 19);
   const toInsert: (typeof events.$inferInsert)[] = [];
   const seenIds: number[] = [];
+  // Ten sam występ z innej bileterii (inny tytuł) — kubełki dzień|miasto, żeby nie porównywać wszystkiego ze wszystkim.
+  const buckets = new Map<string, { source: string; title: string; performers: string | null; startsAt: string; cityName: string | null }[]>();
+  const remember = (e: { source: string; title: string; performers?: string | null; startsAt: string; cityName: string | null }) => {
+    const k = showBucket(e);
+    buckets.set(k, [...(buckets.get(k) ?? []), { ...e, performers: e.performers ?? null }]);
+  };
+  existing.forEach(remember);
+  let crossDupes = 0;
   for (const s of scraped) {
     const key = dedupeKey(s.title, s.startsAt, s.venueName);
     const prev = bySource.get(`${s.source}:${s.sourceId}`);
     if (!prev) {
+      if ((buckets.get(showBucket(s)) ?? []).some((o) => o.source !== s.source && sameShow(s, o))) {
+        crossDupes++;
+        continue;
+      }
+      remember(s);
       toInsert.push({ ...s, dedupeKey: key, lastSeenAt: now });
       continue;
     }
@@ -87,7 +101,9 @@ async function main() {
     await db.update(events).set({ lastSeenAt: now }).where(inArray(events.id, part));
   }
   const total = await db.select({ n: sql<number>`count(*)` }).from(events);
-  log(`zapisano: ${newIds.size} nowych, ${seenIds.length} odświeżonych, ${toInsert.length - newIds.size} duplikatów; w bazie ${total[0].n}`);
+  log(
+    `zapisano: ${newIds.size} nowych, ${seenIds.length} odświeżonych, ${toInsert.length - newIds.size + crossDupes} duplikatów (${crossDupes} między serwisami); w bazie ${total[0].n}`,
+  );
 
   if (firstRun) {
     log("pierwszy przebieg — tylko zasilam bazę, bez maila");
