@@ -1,4 +1,4 @@
-import { ChevronDown, ExternalLink, MapPin, Search, X } from "lucide-react";
+import { ChevronDown, ExternalLink, MapPin, Navigation, Search, X } from "lucide-react";
 import Link from "next/link";
 import { PendingButton } from "@/components/form";
 import { eventToGig, hidePerformer, messageFromEvent, setCityTravel, snoozePerformer, unsnoozeContact } from "@/app/actions";
@@ -13,6 +13,7 @@ import {
   IGNORED_NOTE,
   NEAR_RADII,
   nearOpportunities,
+  routeOpportunities,
   MAX_TRAVEL_MIN,
   NEW_FOR_DAYS,
   searchOpportunities,
@@ -20,7 +21,10 @@ import {
   type OpportunityGroup,
 } from "@/lib/opportunities";
 import { loadUpcomingEventsCached } from "@/lib/events-cache";
+import { findPlace, placeName } from "@/lib/geo";
 import { pitchMessage } from "@/lib/messages";
+import { parseDays, ROUTE_CORRIDORS, ROUTE_MAX_DAYS } from "@/lib/route";
+import { parseDateQuery } from "@/lib/time";
 import { plural } from "@/lib/text";
 import { fmtDate, fmtDateTime, fmtTravel, nowLocal } from "@/lib/time";
 import { cn } from "@/lib/utils";
@@ -137,6 +141,7 @@ function GroupCard({ g }: { g: OpportunityGroup }) {
           )}
           {g.isNew && <Pill tone="info">nowe</Pill>}
           {o.note && <Pill tone="muted">{o.note}</Pill>}
+          {o.badge && <Pill tone="neutral">{o.badge}</Pill>}
           {o.distanceKm != null && <Pill tone="neutral">{o.distanceKm < 3 ? "na miejscu" : `~${o.distanceKm} km`}</Pill>}
           <ExternalLink className="text-muted-foreground/60 mt-1 size-3.5 shrink-0" />
         </div>
@@ -304,6 +309,165 @@ function SearchBox({ q }: { q: string }) {
   );
 }
 
+type RouteParams = { from: string; to: string; date: string; days: number; corridor: number };
+
+/** „Trasa”: jadę do [miasta] na [dzień] — grania po drodze przez N dni wcześniej. */
+function RouteForm({ p, open }: { p: Partial<RouteParams> & { date: string }; open?: boolean }) {
+  const field = "bg-card h-10 rounded-lg px-3 text-[15px] outline-none min-w-0";
+  return (
+    <details className="group/route mb-3" open={open}>
+      <summary className="text-primary flex cursor-pointer list-none items-center gap-1.5 px-1 text-[14px] [&::-webkit-details-marker]:hidden">
+        <Navigation className="size-4" /> Trasa — grania po drodze
+        <ChevronDown className="size-3.5 transition-transform group-open/route:rotate-180" />
+      </summary>
+      <form action="/events" className="bg-muted mt-2 space-y-2 rounded-xl p-2">
+        <input type="hidden" name="route" value="1" />
+        {!open && (
+          <input
+            name="rt"
+            placeholder="np. 30.10 Słupsk 3 dni"
+            className={cn(field, "w-full")}
+            aria-label="Opisz trasę jednym zdaniem"
+          />
+        )}
+        <div className="grid grid-cols-2 gap-2">
+          <input name="from" defaultValue={p.from ?? "Warszawa"} placeholder="Skąd" className={field} aria-label="Skąd" />
+          <input name="to" defaultValue={p.to} placeholder="Dokąd, np. Słupsk" className={field} aria-label="Dokąd" />
+          <input name="d" type="date" defaultValue={p.date} className={field} aria-label="Muszę być na miejscu" />
+          <select name="n" defaultValue={p.days ?? 2} className={field} aria-label="Ile dni drogi">
+            {Array.from({ length: ROUTE_MAX_DAYS }, (_, i) => i + 1).map((n) => (
+              <option key={n} value={n}>
+                {plural(n, "dzień", "dni", "dni")} drogi
+              </option>
+            ))}
+          </select>
+          <select name="w" defaultValue={p.corridor ?? 50} className={cn(field, "col-span-2")} aria-label="Jak daleko od trasy">
+            {ROUTE_CORRIDORS.map((w) => (
+              <option key={w} value={w}>
+                do {w} km od trasy
+              </option>
+            ))}
+          </select>
+        </div>
+        <p className="text-muted-foreground px-1 text-[12px]">Wpisz zdanie albo wypełnij pola — to, co rozpoznam w zdaniu, ma pierwszeństwo.</p>
+        <button type="submit" className="bg-primary text-primary-foreground h-10 w-full rounded-lg text-[15px] font-medium active:scale-[0.98]">
+          Pokaż trasę
+        </button>
+      </form>
+    </details>
+  );
+}
+
+async function RouteResults({ p }: { p: RouteParams }) {
+  const r = await routeOpportunities(
+    { from: p.from, to: p.to, arriveBy: p.date, days: p.days, corridorKm: p.corridor },
+    loadUpcomingEventsCached,
+  );
+  const title = `${p.from} → ${p.to}`;
+  return (
+    <>
+      <PageHeader
+        title="Trasa"
+        back={{ href: "/events", label: "Okazje" }}
+        subtitle={`${title} · na ${fmtDate(p.date)} · ${plural(p.days, "dzień", "dni", "dni")} drogi${r.ok ? ` · ok. ${Math.round(r.totalKm)} km` : ""}`}
+      />
+      <RouteForm p={p} open />
+      {!r.ok ? (
+        <Section>
+          <Empty>Nie znam miejscowości „{r.missing}” — wpisz pełną polską nazwę, np. Słupsk albo Bielsko-Biała.</Empty>
+        </Section>
+      ) : r.plan.length === 0 ? (
+        <Section>
+          <Empty>Te dni już minęły — wybierz późniejszą datę.</Empty>
+        </Section>
+      ) : (
+        <>
+          {r.plan.map((d) => {
+            const busy = r.busy.filter((g) => g.startsAt.slice(0, 10) === d.day);
+            const card = (o: (typeof d.alternatives)[number]): OpportunityGroup => ({
+              performer: o.performer,
+              primary: { ...o, badge: `${Math.round(o.offKm)} km od trasy` },
+              others: [],
+              matches: o.matches,
+              isNew: o.isNew,
+            });
+            return (
+              <Section
+                key={d.day}
+                title={
+                  <span className="capitalize">
+                    {fmtDate(d.day)} · ok. {Math.round(d.ideal * r.totalKm)} km od startu
+                  </span>
+                }
+              >
+                {busy.length > 0 ? (
+                  busy.map((g) => (
+                    <Link key={g.id} href={`/gigs/${g.id}`} className="block px-4 py-3 text-[15px]">
+                      Masz już granie: <b className="font-semibold">{g.title}</b>
+                      {g.cityName && <span className="text-muted-foreground"> · {g.cityName}</span>}
+                    </Link>
+                  ))
+                ) : d.pick ? (
+                  <>
+                    <GroupCard g={card(d.pick)} />
+                    {d.alternatives.length > 0 && (
+                      <details className="group/alt border-t">
+                        <summary className="text-primary flex cursor-pointer list-none items-center gap-1 px-4 py-2.5 text-[14px] [&::-webkit-details-marker]:hidden">
+                          Inne tego dnia ({d.alternatives.length})
+                          <ChevronDown className="size-3.5 transition-transform group-open/alt:rotate-180" />
+                        </summary>
+                        {d.alternatives.map((o) => (
+                          <GroupCard key={o.id} g={card(o)} />
+                        ))}
+                      </details>
+                    )}
+                  </>
+                ) : d.alternatives.length ? (
+                  <>
+                    <p className="text-muted-foreground px-4 pt-2.5 text-[12.5px]">
+                      Nie pasuje do kolejności trasy (wymagałoby cofania), ale jest tego dnia:
+                    </p>
+                    {d.alternatives.map((o) => (
+                      <GroupCard key={o.id} g={card(o)} />
+                    ))}
+                  </>
+                ) : (
+                  <Empty>Nic po drodze tego dnia — może dzień przerwy albo szerszy korytarz.</Empty>
+                )}
+              </Section>
+            );
+          })}
+          <p className="text-muted-foreground -mt-4 mb-7 px-1 text-[12.5px] leading-relaxed">
+            Propozycje są ułożone tak, żeby każdego dnia jechać dalej w stronę celu. Korytarz liczę od linii prostej start–cel —
+            prawdziwa droga bywa inna (np. przez Trójmiasto), wtedy poszerz korytarz. Bez pomijanych i wyciszonych komików.
+          </p>
+        </>
+      )}
+    </>
+  );
+}
+
+/** Z pola „30.10 Słupsk 3 dni” (albo pól formularza) robi parametry trasy. */
+function routeParams(sp: Record<string, string | string[] | undefined>): RouteParams | null {
+  const str = (k: string) => (typeof sp[k] === "string" ? (sp[k] as string).trim() : "");
+  const today = nowLocal().slice(0, 10);
+  const text = str("rt");
+  const fromText = text ? findPlace(text, ["z", "ze"]) : null;
+  const toText = text ? (findPlace(text, ["do", "ku"]) ?? findPlace(text)) : null;
+  const dateText = text ? parseDateQuery(text, today).date : null;
+  // Zdanie ma pierwszeństwo (pola formularza zawsze mają wartości domyślne), pola uzupełniają braki.
+  const to = (toText ? placeName(toText) : "") || str("to");
+  if (!to) return null;
+  const d = str("d");
+  return {
+    from: (fromText ? placeName(fromText) : "") || str("from") || "Warszawa",
+    to,
+    date: dateText ?? (/^\d{4}-\d{2}-\d{2}$/.test(d) ? d : today),
+    days: (text && /\d\s*(dni|dzie|doby)/i.test(text) ? parseDays(text) : Number(str("n"))) || 2,
+    corridor: ROUTE_CORRIDORS.find((w) => String(w) === str("w")) ?? 50,
+  };
+}
+
 /** „Jestem w [mieście] [dnia]” — co gra w okolicy, żeby dopisać się przy okazji wyjazdu. */
 function NearForm({ near = "", date, radius = 60, span = false, cities }: { near?: string; date: string; radius?: number; span?: boolean; cities: string[] }) {
   const field = "bg-card h-10 rounded-lg px-3 text-[15px] outline-none";
@@ -441,6 +605,10 @@ export default async function EventsPage({ searchParams }: PageProps<"/events">)
   const sp = await searchParams;
   const q = typeof sp.q === "string" ? sp.q.trim() : "";
   if (q) return <SearchResults q={q} />;
+  if (sp.route === "1") {
+    const rp = routeParams(sp);
+    if (rp) return <RouteResults p={rp} />;
+  }
   const near = typeof sp.near === "string" ? sp.near.trim() : "";
   if (near) {
     const d = typeof sp.d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(sp.d) ? sp.d : nowLocal().slice(0, 10);
@@ -495,6 +663,7 @@ export default async function EventsPage({ searchParams }: PageProps<"/events">)
       />
 
       <SearchBox q="" />
+      <RouteForm p={{ date: nowLocal().slice(0, 10) }} open={sp.route === "1"} />
       <NearForm date={nowLocal().slice(0, 10)} cities={[...new Set(everything.map((o) => o.event.cityName).filter((c): c is string => !!c))].sort((a, b) => a.localeCompare(b, "pl"))} />
 
       <div className="bg-muted mb-3 grid grid-cols-4 gap-1 rounded-xl p-1">

@@ -6,8 +6,8 @@
  *   pnpm tsx scripts/build-places.ts PL.txt
  *
  * Bierzemy miejscowości z populacją albo będące siedzibą gminy/powiatu/województwa (bez tysięcy
- * bezludnych przysiółków) + każdą, która już wystąpiła w wydarzeniach. Klucz = znormalizowana nazwa;
- * przy powtórce wygrywa większa populacja.
+ * bezludnych przysiółków) + każdą, która już wystąpiła w wydarzeniach. Klucz = znormalizowana nazwa,
+ * wartość = [szer., dł., nazwa z polskimi znakami]; przy powtórce wygrywa większa populacja.
  */
 import "dotenv/config";
 import { readFileSync, writeFileSync } from "node:fs";
@@ -24,12 +24,12 @@ async function main() {
     (await db.selectDistinct({ c: events.cityName }).from(events)).map((r) => (r.c ? placeKey(r.c) : "")),
   );
 
-  const best = new Map<string, { lat: number; lon: number; pop: number }>();
+  const best = new Map<string, { lat: number; lon: number; pop: number; name: string }>();
   const put = (name: string, r: string[]) => {
     const key = placeKey(name);
     const pop = Number(r[14]) || 0;
     const prev = best.get(key);
-    if (!prev || pop > prev.pop) best.set(key, { lat: Number(r[4]), lon: Number(r[5]), pop });
+    if (!prev || pop > prev.pop) best.set(key, { lat: Number(r[4]), lon: Number(r[5]), pop, name: r[7] === "PPLC" ? "Warszawa" : r[1] });
   };
   for (const r of rows) {
     const keep = Number(r[14]) > 0 || r[7].startsWith("PPLA") || r[7] === "PPLC" || eventCities.has(placeKey(r[1]));
@@ -42,7 +42,7 @@ async function main() {
   if (capital) put("Warszawa", capital);
 
   const out = Object.fromEntries(
-    [...best.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => [k, [+v.lat.toFixed(3), +v.lon.toFixed(3)]]),
+    [...best.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => [k, [+v.lat.toFixed(3), +v.lon.toFixed(3), v.name]]),
   );
   writeFileSync("src/data/places-pl.json", JSON.stringify(out));
   const missing = [...eventCities].filter((c) => c && !best.has(c));

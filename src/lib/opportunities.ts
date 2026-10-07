@@ -4,7 +4,8 @@
  */
 import { and, eq, gte, sql } from "drizzle-orm";
 import { cities, contacts, db, events, gigs, hiddenTitles, venues, type City, type Contact, type Event } from "@/db";
-import { coords, distanceKm } from "./geo";
+import { alongRoute, coords, distanceKm } from "./geo";
+import { planRoute, routeDays } from "./route";
 import { matchContacts, matchesQuery } from "./match";
 import { isWantedLanguage, performerKey, performerName } from "./performer";
 import { normalize } from "./text";
@@ -53,6 +54,8 @@ export type Opportunity = {
   note: string | null;
   /** Tylko w „Jestem w…”: odległość od miasta, w którym będę (km w linii prostej). */
   distanceKm?: number;
+  /** Dodatkowa etykieta na karcie (np. w „Trasie”: „12 km od trasy”). */
+  badge?: string;
 };
 
 /** Wszystkie terminy jednego komika w danej zakładce: najbliższy w zasięgu + reszta jako alternatywy. */
@@ -142,6 +145,7 @@ async function loadContext() {
     db
       .select({
         id: gigs.id,
+        title: gigs.title,
         startsAt: gigs.startsAt,
         headlinerId: gigs.headlinerId,
         cityName: sql<string | null>`coalesce(
@@ -350,6 +354,43 @@ export async function nearOpportunities(
   }
   items.sort((a, b) => a.distanceKm! - b.distanceKm! || a.event.startsAt.localeCompare(b.event.startsAt));
   return { origin, items };
+}
+
+/**
+ * „Trasa”: grania po drodze z `from` do `to` przez `days` dni przed `arriveBy`, w korytarzu `corridorKm`.
+ * Bez pomijanych i wyciszonych komików; dni, w które mam już granie (też w toku), są zajęte.
+ */
+export async function routeOpportunities(
+  { from, to, arriveBy, days, corridorKm }: { from: string; to: string; arriveBy: string; days: number; corridorKm: number },
+  loadEvents: (today: string) => Promise<EventRow[]> = loadUpcomingEvents,
+) {
+  const a = coords(from);
+  const b = coords(to);
+  if (!a || !b) return { ok: false as const, missing: !a ? from : to };
+  const today = nowLocal().slice(0, 10);
+  const [ctx, rows] = await Promise.all([loadContext(), loadEvents(today)]);
+  const dayList = routeDays(arriveBy, days).filter((d) => d >= today);
+  const newSince = new Date(Date.now() - NEW_FOR_DAYS * 864e5).toISOString().replace("T", " ").slice(0, 19);
+  const totalKm = alongRoute(b, a, b).totalKm;
+
+  const candidates = rows
+    .filter((e) => dayList.includes(e.startsAt.slice(0, 10)))
+    .flatMap((e) => {
+      const at = coords(e.cityName);
+      const o = at && classify(e, ctx, newSince, true);
+      // Zostają zwykłe okazje i te „poza zasięgiem” z Warszawy — w trasie zasięg liczy się inaczej.
+      if (!at || !o || o.tab === "muted" || (o.note && o.note !== "poza zasięgiem")) return [];
+      const r = alongRoute(at, a, b);
+      const base = (o.tab === "friends" ? 3 : o.isOpenMic ? 2 : 1) + (e.availability ? 1.5 : 0) + (o.isNew ? 0.3 : 0);
+      return [{ ...o, note: null, inRange: true, id: e.id, day: e.startsAt.slice(0, 10), progress: r.progress, offKm: r.offKm, base }];
+    });
+  const busyDays = new Set(ctx.myGigs.map((g) => g.startsAt.slice(0, 10)));
+  return {
+    ok: true as const,
+    totalKm,
+    plan: planRoute(candidates, { days: dayList, corridorKm, busyDays }),
+    busy: ctx.myGigs.filter((g) => dayList.includes(g.startsAt.slice(0, 10))),
+  };
 }
 
 /**

@@ -92,6 +92,11 @@ Ocena grania **nie jest** oceną bitu, bo zależy od publiki, line-upu itd. Bit 
 - **Dostępność biletów** (`events.availability`): z kupbilecik etykieta „ostatnie bilety” / „sold out” z kafelka listy, odświeżana przy każdym przebiegu. Liczby sprzedanych biletów serwis nie podaje. Evently nie daje tej informacji (`undefined` = nie nadpisuj).
 - **Wyszukiwarka** (`?q=`, `searchOpportunities`): komik, program, scena, miasto i/lub data („14.10”, „14 paź”, „jutro”; `parseDateQuery` w `time.ts`). Szuka we wszystkich nadchodzących wydarzeniach, także odfiltrowanych; powód odfiltrowania jest w szarej etykiecie (`Opportunity.note`). Dopasowanie toleruje odmianę w obie strony („Modzelewskiego”) i obejmuje aliasy z CRM. Każdy termin to osobna karta.
 - **„Jestem w…”** (`?near=&d=&r=&span=`, `nearOpportunities`): miasto i data, a w wyniku wydarzenia w promieniu 30/60/100 km (w linii prostej), opcjonalnie ±1 dzień, najbliższe najpierw. Zasięg z Warszawy jest tu ignorowany. Współrzędne są w `src/data/places-pl.json` (GeoNames, generator `scripts/build-places.ts`). Miasta spoza pliku nie mają odległości i są pomijane.
+- **Trasa** (`?route=1&from=&to=&d=&n=&w=` albo `&rt=` ze zdaniem, `routeOpportunities`, logika w `src/lib/route.ts`):
+  - „30.10 Słupsk 3 dni” / „w drodze do Słupska na 30 października”: cel i start z odmiany (`findPlace` w `geo.ts`, „z X do Y”), data z `parseDateQuery`, liczba dni z „N dni”; to, co rozpoznane w zdaniu, ma pierwszeństwo przed polami,
+  - korytarz 30/50/80 km od **linii prostej** start–cel (prawdziwa droga bywa inna, wtedy szerszy korytarz),
+  - dni drogi = N dni przed dniem przyjazdu; każdy dzień ma idealny postęp (ostatni tuż przed celem), plan wybiera max. jedno granie na dzień tak, żeby jechać do przodu (programowanie dynamiczne), reszta jako „Inne tego dnia”,
+  - dni z moim graniem (też w toku) są zajęte; bez pomijanych i wyciszonych komików; zasięg z Warszawy ignorowany.
 - **Historia przy komiku:** na karcie widać „pisałeś 12.09 (IG) · bez odpowiedzi / odpisał” z ostatniej interakcji w CRM, żeby nie pytać za często.
 - **Grupowanie:** jedna karta na komika; najbliższy termin główny, reszta jako „Inne terminy”.
 - **Wyciszanie komika:**
