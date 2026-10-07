@@ -4,9 +4,9 @@
  * Bez `server-only` — uruchamia to skrypt z GitHub Actions.
  */
 import { and, eq, gte, inArray, isNotNull, lte, sql } from "drizzle-orm";
-import { bits, db, gigBits, gigLogs, gigs, interactions, venues, writingSessions } from "@/db";
+import { bits, db, gigBits, gigLogs, gigs, interactions, venues } from "@/db";
 import { GIG_CONTEXT_LABEL, GIG_OUTCOME_LABEL, REACTION_EMOJI } from "./labels";
-import { getPlanning, getWriting } from "./planning";
+import { getPlanning, getWritingDigest } from "./planning";
 import { addDays, MAX_OPENERS_PER_WEEK, WEEK_MAX, WEEK_MIN, weekStart } from "./rhythm";
 import { plural } from "./text";
 import { effectiveStart, fmtDate, fmtDateTime, nowLocal } from "./time";
@@ -23,7 +23,7 @@ export async function getWeekly() {
   const to = addDays(from, 6);
   const inWeek = and(gte(sql`substr(${gigs.startsAt}, 1, 10)`, from), lte(sql`substr(${gigs.startsAt}, 1, 10)`, to));
 
-  const [played, bitReactions, sent, outcomes, planning, writing, sessions] = await Promise.all([
+  const [played, bitReactions, sent, outcomes, planning, writing] = await Promise.all([
     db
       .select({ id: gigs.id, title: gigs.title, startsAt: gigs.startsAt, context: gigs.context, venueName: venues.name, rating: gigLogs.rating })
       .from(gigs)
@@ -54,18 +54,12 @@ export async function getWeekly() {
       )
       .groupBy(gigs.outcome),
     getPlanning(),
-    getWriting(),
-    db
-      .select({ kind: writingSessions.kind, n: sql<number>`count(*)`, days: sql<number>`count(distinct ${writingSessions.date})` })
-      .from(writingSessions)
-      .where(and(gte(writingSessions.date, from), lte(writingSessions.date, to)))
-      .groupBy(writingSessions.kind),
+    getWritingDigest(from, to),
   ]);
 
   const nextStart = addDays(from, 7);
   const next = planning.weeks.find((w) => w.start === nextStart) ?? null;
   // Tylko te, które już się odbyły (mail idzie w niedzielę wieczorem, ale ręcznie można odpalić wcześniej).
-  const k = (kind: string) => sessions.find((s) => s.kind === kind);
   return {
     from,
     to,
@@ -75,20 +69,52 @@ export async function getWeekly() {
     outcomes,
     next,
     hot: planning.hot,
-    writing: {
-      punchDays: Number(k("punchlines")?.days ?? 0),
-      generate: Number(k("generate")?.n ?? 0),
-      edit: Number(k("edit")?.n ?? 0),
-      streak: writing.punchlines.streak,
-      best: writing.punchlines.best,
-      fixed: writing.fixed.filter((f) => f.date.slice(0, 10) >= from && f.date.slice(0, 10) <= to),
-      queue: writing.queue.length,
-      targets: { generate: writing.generate.target, edit: writing.edit.target },
-    },
+    writing,
   };
 }
 
 export type Weekly = Awaited<ReturnType<typeof getWeekly>>;
+
+const KIND_LABEL: Record<string, string> = { punchlines: "trening", generate: "generowanie", edit: "redakcja" };
+const list = (items: string[]) =>
+  items.length ? `<ul style="margin:4px 0 0;padding-left:18px">${items.map((i) => `<li style="margin:2px 0">${i}</li>`).join("")}</ul>` : "";
+const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n).trimEnd()}…` : s);
+
+/** Osobna sekcja o pisaniu: regularność, premisy, pomysły, praca nad bitami, kolejka do poprawki ze sceny. */
+function writingSection(wr: Weekly["writing"]) {
+  const regular = [
+    `Trening puent: <b>${wr.punchDays}/7 dni</b> · seria ${plural(wr.streak, "dzień", "dni", "dni")}${wr.best > wr.streak ? ` (rekord ${wr.best})` : ""}`,
+    `Generowanie: <b>${wr.generate}/${wr.targets.generate}</b> · redakcja: <b>${wr.edit}/${wr.targets.edit}</b>`,
+  ].join("<br>");
+  const parts = [regular];
+  if (wr.fixed.length) parts.push(`🎯 Poprawki, które siadły: <b>${esc(wr.fixed.map((f) => f.name).join(", "))}</b>`);
+  if (wr.premises.length) {
+    parts.push(`<div style="margin-top:8px"><b>Premisy z treningów</b>${list(wr.premises.map((p) => esc(p.note)))}</div>`);
+  }
+  if (wr.worked.length) {
+    parts.push(
+      `<div style="margin-top:8px"><b>Praca nad bitami</b>${list(wr.worked.map((b) => `${esc(b.name)} ${muted(`(${b.kinds.map((k) => KIND_LABEL[k]).join(", ")})`)}`))}</div>`,
+    );
+  }
+  if (wr.queue.length) {
+    parts.push(
+      `<div style="margin-top:8px"><b>Do poprawki po scenie</b>${list(
+        wr.queue.map((q) => {
+          const where = q.last?.venue ? `${q.last.venue}, ` : "";
+          const note = q.last?.thoughts ? `<br>${muted(`„${esc(clip(q.last.thoughts.replace(/\n+/g, " / "), 220))}”`)}` : "";
+          const doc = q.docUrl ? ` · <a href="${esc(q.docUrl)}" style="color:#13824a">tekst</a>` : "";
+          return `${esc(q.name)} ${q.reaction < 0 ? "👎" : "😐"} ${muted(`${where}${fmtDate(q.gigDate)}`)}${doc}${note}`;
+        }),
+      )}</div>`,
+    );
+  }
+  if (wr.newIdeas.length || wr.openIdeas) {
+    parts.push(
+      `<div style="margin-top:8px"><b>Pomysły</b> ${muted(`(${plural(wr.newIdeas.length, "nowy", "nowe", "nowych")} w tym tygodniu, ${wr.openIdeas} do rozwinięcia)`)}${list(wr.newIdeas.map((t) => esc(clip(t, 160))))}</div>`,
+    );
+  }
+  return parts.join("");
+}
 
 export function renderWeekly(w: Weekly) {
   const rated = w.played.filter((g) => g.rating != null);
@@ -144,16 +170,7 @@ export function renderWeekly(w: Weekly) {
         .join("<br>")
     : "";
 
-  const wr = w.writing;
-  const writingHtml = [
-    `Trening puent: <b>${wr.punchDays}/7 dni</b> · seria ${plural(wr.streak, "dzień", "dni", "dni")}${wr.best > wr.streak ? ` (rekord ${wr.best})` : ""}`,
-    `Generowanie: ${wr.generate}/${wr.targets.generate} · redakcja: ${wr.edit}/${wr.targets.edit}`,
-    wr.fixed.length ? `🎯 Poprawki, które siadły: ${esc(wr.fixed.map((f) => f.name).join(", "))}` : "",
-    wr.queue ? muted(`${plural(wr.queue, "bit czeka", "bity czekają", "bitów czeka")} na redakcję po scenie`) : "",
-    `<a href="${APP_URL}/writing/report?d=7" style="color:#13824a">Raport tygodnia do wklejenia w Claude →</a>`,
-  ]
-    .filter(Boolean)
-    .join("<br>");
+  const writingHtml = writingSection(w.writing);
 
   const subject = `SU Manager: tydzień ${fmtDate(w.from)} – ${fmtDate(w.to)} · ${plural(w.played.length, "granie", "grania", "grań")}${avg != null ? ` · ★ ${avg.toFixed(1).replace(".", ",")}` : ""}`;
   const html = `<div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:600px;color:#1c2a23">
@@ -161,7 +178,7 @@ export function renderWeekly(w: Weekly) {
     ${muted(`${esc(fmtDate(w.from))} – ${esc(fmtDate(w.to))} · <a href="${APP_URL}" style="color:#13824a">Otwórz aplikację</a>`)}
     ${h3(`Zagrane · ${w.played.length}${avg != null ? ` · średnio ★ ${avg.toFixed(1).replace(".", ",")}` : ""}`)}${gigsHtml}
     ${h3("Bity")}${bitsHtml}
-    ${h3("Pisanie i redakcja")}${writingHtml}
+    ${h3("✍️ Pisanie")}${writingHtml}
     ${h3("Wiadomości do komików")}${outreachHtml}
     ${h3("Przyszły tydzień")}${nextHtml}
     ${hotHtml ? `${h3("🔥 Warto napisać")}${hotHtml}` : ""}

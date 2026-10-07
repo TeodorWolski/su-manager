@@ -4,7 +4,7 @@
  */
 import { and, asc, eq, gte, inArray, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/sqlite-core";
-import { bits, cities, contacts, db, gigBits, gigLogs, gigs, venues, writingSessions } from "@/db";
+import { bits, cities, contacts, db, gigBits, gigLogs, gigs, ideas, venues, writingSessions } from "@/db";
 import { daysSince, followUpTiming, lastActivity, nextChannel } from "./follow-up";
 import { hotOpportunities, type HotCandidate } from "./hot";
 import { getOpportunities, loadUpcomingEvents, type EventRow } from "./opportunities";
@@ -153,3 +153,54 @@ export async function getWriting() {
 }
 
 export type Writing = Awaited<ReturnType<typeof getWriting>>;
+
+/**
+ * Pisanie w danym okresie — do niedzielnego podsumowania: premisy z treningów, nowe pomysły,
+ * bity, nad którymi pracowałem, i kolejka do poprawki z notatką z ostatniego grania.
+ */
+export async function getWritingDigest(from: string, to: string) {
+  const [sessions, newIdeas, openIdeas, w, lastThoughts] = await Promise.all([
+    db
+      .select({ date: writingSessions.date, kind: writingSessions.kind, note: writingSessions.note, bitId: writingSessions.bitId, bitName: bits.name })
+      .from(writingSessions)
+      .leftJoin(bits, eq(bits.id, writingSessions.bitId))
+      .where(and(gte(writingSessions.date, from), sql`${writingSessions.date} <= ${to}`))
+      .orderBy(asc(writingSessions.date), asc(writingSessions.id)),
+    db
+      .select({ text: ideas.text })
+      .from(ideas)
+      .where(and(eq(ideas.status, "new"), gte(ideas.createdAt, from), sql`substr(${ideas.createdAt}, 1, 10) <= ${to}`)),
+    db.select({ n: sql<number>`count(*)` }).from(ideas).where(eq(ideas.status, "new")),
+    getWriting(),
+    // Notatka po ostatnim graniu z danym bitem — kontekst do redakcji.
+    db
+      .select({ bitId: gigBits.bitId, startsAt: gigs.startsAt, thoughts: gigLogs.thoughts, venue: venues.name })
+      .from(gigBits)
+      .innerJoin(gigs, eq(gigs.id, gigBits.gigId))
+      .innerJoin(gigLogs, eq(gigLogs.gigId, gigs.id))
+      .leftJoin(venues, eq(venues.id, gigs.venueId))
+      .orderBy(asc(gigs.startsAt)),
+  ]);
+  const days = new Set(sessions.filter((s) => s.kind === "punchlines").map((s) => s.date)).size;
+  const count = (k: string) => sessions.filter((s) => s.kind === k).length;
+  // Bity, nad którymi pracowałem: nazwa → rodzaje sesji.
+  const worked = new Map<string, Set<string>>();
+  for (const s of sessions) if (s.bitName) worked.set(s.bitName, new Set([...(worked.get(s.bitName) ?? []), s.kind]));
+  const lastByBit = new Map(lastThoughts.map((t) => [t.bitId, t])); // posortowane rosnąco → zostaje ostatnie
+  return {
+    punchDays: days,
+    generate: count("generate"),
+    edit: count("edit"),
+    targets: { generate: w.generate.target, edit: w.edit.target },
+    streak: w.punchlines.streak,
+    best: w.punchlines.best,
+    premises: sessions.filter((s) => s.kind === "punchlines" && s.note).map((s) => ({ date: s.date, note: s.note! })),
+    newIdeas: newIdeas.map((i) => i.text),
+    openIdeas: Number(openIdeas[0]?.n ?? 0),
+    worked: [...worked.entries()].map(([name, kinds]) => ({ name, kinds: [...kinds] })),
+    queue: w.queue.map((q) => ({ ...q, last: lastByBit.get(q.bitId) ?? null })),
+    fixed: w.fixed.filter((f) => f.date.slice(0, 10) >= from && f.date.slice(0, 10) <= to),
+  };
+}
+
+export type WritingDigest = Awaited<ReturnType<typeof getWritingDigest>>;

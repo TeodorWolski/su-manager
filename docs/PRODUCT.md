@@ -129,8 +129,8 @@ Pisze się poza apką (Notion / Docs) — apka liczy regularność, wiąże prac
   - **redakcja** — cel tygodniowy (2), **zawsze z bitem** (bity z kolejki ⚠ na górze listy).
 - **Do poprawki po scenie** (`editQueue`): ostatnia reakcja bitu 😐/👎 i od tamtego grania brak redakcji tego bitu. **Poprawka siadła** (`fixedBits`): 😐/👎 → redakcja → 👍.
 - **Bity w pracy** (do redakcji / w testach / drafty): link do tekstu (`bits.docUrl`), ostatnia reakcja ze sceny, ostatnia sesja. Materiał (`/bits`) jest pod tą zakładką.
-- **Raport do Claude** (`/writing/report?d=7|28`, `writingReport` w `src/lib/writing-report.ts`): Markdown z prośbą na górze (regularność, które bity redagować, które pomysły rozwinąć, plan na tydzień), regularność, premisy, pomysły, sesje, bity w pracy z ostatnimi 5 występami (reakcja, ocena występu, notatka po graniu). Przycisk Kopiuj.
-- Historia sesji: `/writing/history`. Maile: poranny (seria, tydzień, kolejka), niedzielny (sekcja pisania + link do raportu tygodnia).
+- Historia sesji: `/writing/history`.
+- **W raportach mailowych** (nie w aplikacji): poranny — linijka o serii puent, tygodniu i kolejce; niedzielne podsumowanie — osobna sekcja „✍️ Pisanie” (`getWritingDigest` w `planning.ts`): regularność, poprawki, które siadły, premisy z treningów, praca nad bitami, do poprawki po scenie (z notatką z ostatniego grania i linkiem do tekstu), pomysły.
 
 ### Ludzie (`/contacts`, w zakładce Więcej)
 - **CRM:** rola (komik / organizator / scena), relacja, aliasy (pomagają dopasować nazwiska ze scrapera), notatki.

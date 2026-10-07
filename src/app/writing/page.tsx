@@ -1,4 +1,4 @@
-import { ExternalLink, FileText, Lightbulb, X } from "lucide-react";
+import { ExternalLink, Lightbulb, X } from "lucide-react";
 import Link from "next/link";
 import { addIdea, ideaAsPremise, ideaToBit, setIdeaStatus } from "@/app/actions";
 import { PendingButton } from "@/components/form";
@@ -18,14 +18,7 @@ export default async function WritingPage() {
   const queued = new Set(w.queue.map((q) => q.bitId));
   return (
     <>
-      <PageHeader
-        title="Pisanie"
-        action={
-          <Link href="/writing/report" className="text-primary flex items-center gap-1 text-[15px]">
-            <FileText className="size-4" /> Raport do Claude
-          </Link>
-        }
-      />
+      <PageHeader title="Pisanie" />
 
       <form action={addIdea} className="mb-7 flex gap-2">
         <div className="bg-card border-border flex h-11 min-w-0 flex-1 items-center gap-2 rounded-xl border px-3">
