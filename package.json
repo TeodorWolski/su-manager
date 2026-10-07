@@ -11,7 +11,7 @@
     "db:migrate": "drizzle-kit migrate",
     "db:seed": "tsx src/db/seed.ts",
     "db:studio": "drizzle-kit studio",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "next typegen && tsc --noEmit",
     "scrape": "tsx scripts/scrape.ts",
     "backup": "tsx scripts/backup.ts",
     "weekly": "tsx scripts/weekly.ts",
