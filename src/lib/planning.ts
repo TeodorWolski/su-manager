@@ -4,12 +4,14 @@
  */
 import { and, asc, eq, gte, inArray, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/sqlite-core";
-import { cities, contacts, db, gigs, venues } from "@/db";
+import { bits, cities, contacts, db, gigBits, gigLogs, gigs, venues, writingSessions } from "@/db";
 import { daysSince, followUpTiming, lastActivity, nextChannel } from "./follow-up";
 import { hotOpportunities, type HotCandidate } from "./hot";
 import { getOpportunities, loadUpcomingEvents, type EventRow } from "./opportunities";
 import { getInsights, type RhythmOpportunity } from "./rhythm";
+import { addDays, weekStart } from "./rhythm";
 import { nowLocal } from "./time";
+import { countInWeek, dayStreak, editQueue, fixedBits, WEEKLY_TARGET, weekDots, weekStreak, type BitReaction } from "./writing";
 
 const headliner = alias(contacts, "headliner");
 
@@ -104,3 +106,36 @@ export async function getPlanning(loadEvents: (today: string) => Promise<EventRo
 }
 
 export type Rhythm = Awaited<ReturnType<typeof getPlanning>>;
+
+/** Pisanie: seria treningu puent, tydzień generowania / redakcji, kolejka „do poprawki” po scenie. */
+export async function getWriting() {
+  const today = nowLocal().slice(0, 10);
+  const since = addDays(today, -180);
+  const [sessions, reactions] = await Promise.all([
+    db
+      .select({ id: writingSessions.id, date: writingSessions.date, kind: writingSessions.kind, bitId: writingSessions.bitId, minutes: writingSessions.minutes, note: writingSessions.note })
+      .from(writingSessions)
+      .where(gte(writingSessions.date, since)),
+    // Reakcje na bity z zalogowanych grań (bez odrzuconych bitów).
+    db
+      .select({ bitId: bits.id, name: bits.name, docUrl: bits.docUrl, gigDate: gigs.startsAt, reaction: gigBits.reaction })
+      .from(gigBits)
+      .innerJoin(bits, eq(bits.id, gigBits.bitId))
+      .innerJoin(gigs, eq(gigs.id, gigBits.gigId))
+      .innerJoin(gigLogs, eq(gigLogs.gigId, gigs.id))
+      .where(and(sql`${gigBits.reaction} is not null`, sql`${bits.status} <> 'rejected'`)),
+  ]);
+  const punchDays = new Set(sessions.filter((s) => s.kind === "punchlines").map((s) => s.date));
+  const week = weekStart(today);
+  return {
+    today,
+    punchlines: { ...dayStreak(punchDays, today), dots: weekDots(punchDays, today) },
+    generate: { done: countInWeek(sessions, "generate", week), target: WEEKLY_TARGET.generate, streak: weekStreak(sessions, "generate", today) },
+    edit: { done: countInWeek(sessions, "edit", week), target: WEEKLY_TARGET.edit, streak: weekStreak(sessions, "edit", today) },
+    queue: editQueue(reactions as BitReaction[], sessions),
+    fixed: fixedBits(reactions as BitReaction[], sessions),
+    todaySessions: sessions.filter((s) => s.date === today),
+  };
+}
+
+export type Writing = Awaited<ReturnType<typeof getWriting>>;

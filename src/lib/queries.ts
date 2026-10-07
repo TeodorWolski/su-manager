@@ -12,6 +12,7 @@ import {
   gigs,
   interactions,
   venues,
+  writingSessions,
   type GigStatus,
 } from "@/db";
 import { loadUpcomingEventsCached } from "./events-cache";
@@ -244,7 +245,31 @@ export async function getBit(id: number) {
     .innerJoin(gigBits, eq(gigBits.gigId, gigs.id))
     .where(eq(gigBits.bitId, id))
     .orderBy(desc(gigs.startsAt));
-  return { bit, gigs: bitGigs };
+  const sessions = await db
+    .select()
+    .from(writingSessions)
+    .where(eq(writingSessions.bitId, id))
+    .orderBy(desc(writingSessions.date), desc(writingSessions.id));
+  return { bit, gigs: bitGigs, sessions };
+}
+
+/** Historia pisania: sesje z ostatnich `days` dni (najnowsze najpierw), z nazwą bitu. */
+export async function listWriting(days = 60) {
+  const since = new Date(Date.now() - days * 864e5).toISOString().slice(0, 10);
+  return db
+    .select({
+      id: writingSessions.id,
+      date: writingSessions.date,
+      kind: writingSessions.kind,
+      minutes: writingSessions.minutes,
+      note: writingSessions.note,
+      bitId: writingSessions.bitId,
+      bitName: bits.name,
+    })
+    .from(writingSessions)
+    .leftJoin(bits, eq(bits.id, writingSessions.bitId))
+    .where(gte(writingSessions.date, since))
+    .orderBy(desc(writingSessions.date), desc(writingSessions.id));
 }
 
 export async function listThoughts(query?: string) {

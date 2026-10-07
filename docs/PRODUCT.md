@@ -59,6 +59,13 @@ Ocena grania **nie jest** oceną bitu, bo zależy od publiki, line-upu itd. Bit 
   - kiedy: granie „napisałem/czekam” bez odpowiedzi, ok. 1,5 tygodnia (10 dni) przed graniem i min. 2 dni po ostatniej wiadomości,
   - pokazuje, gdzie już pisałem, i podpowiada kolejny kanał: Instagram → FB prywatny → FB fanpage,
   - ponowienie zwykle idzie innym komunikatorem niż pierwsza wiadomość.
+- **Pisanie** (`src/lib/writing.ts`, `components/writing.tsx`, historia `/writing`; dane w `getWriting`, `planning.ts`). Pisze się poza apką (Notion / Docs) — apka liczy tylko regularność:
+  - trzy rodzaje (`WRITING_KINDS`): **trening puent** (premisa + 10 puent) — codziennie, seria dni i kropki tygodnia, jeden tap „Zrobiłem” z opcjonalną premisą; **generowanie** (wypluwanie, zalążki, draft) i **redakcja** (po nagraniach / scenie) — cel tygodniowy (`WEEKLY_TARGET`, po 2), seria tygodni,
+  - seria puent nie zrywa się, dopóki dzień trwa („dziś jeszcze nie — nie zrywaj serii”),
+  - **do poprawki po scenie:** bit, którego ostatnia reakcja to 😐/👎, a od tamtego grania nie było redakcji tego bitu (`editQueue`); „Zredagowane” loguje sesję redakcji dla bitu,
+  - **poprawka siadła:** 😐/👎 → redakcja → następne granie 👍 (`fixedBits`),
+  - bit ma `docUrl` (link do tekstu) — jednym tapem z karty bitu i kolejki,
+  - poranny mail: linijka o serii puent, tygodniu i kolejce; niedzielny: sekcja „Pisanie i redakcja”.
 - Nadchodzące, W toku (pipeline) i ostatnie „myśli” z logów.
 
 ### Grania (`/gigs`)

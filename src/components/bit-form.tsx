@@ -23,6 +23,9 @@ export function BitForm({ bit }: { bit?: Bit }) {
         <FieldRow label="Długość">
           <NumberInput name="lengthMin" defaultValue={bit?.lengthMin ?? ""} placeholder="min" />
         </FieldRow>
+        <FieldRow label="Tekst">
+          <TextInput name="docUrl" type="url" defaultValue={bit?.docUrl ?? ""} placeholder="link do Notion / Docs" />
+        </FieldRow>
       </Section>
       <Section>
         <div className="px-4 py-3">

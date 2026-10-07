@@ -14,7 +14,7 @@ import { sameShow, showBucket } from "@/lib/dedupe";
 import { dedupeKey, getOpportunities } from "@/lib/opportunities";
 import { RECURRING_SOURCE } from "@/lib/recurring";
 import { syncRecurring } from "@/lib/recurring-sync";
-import { getFollowUps, getPlanning } from "@/lib/planning";
+import { getFollowUps, getPlanning, getWriting } from "@/lib/planning";
 import { sendReport } from "@/scraper/email";
 import { healthIssues } from "@/scraper/health";
 import { fetchHtml } from "@/scraper/http";
@@ -128,9 +128,9 @@ async function main() {
     log("pierwszy przebieg — tylko zasilam bazę, bez maila");
   } else {
     const fresh = newIds.size ? (await getOpportunities(newIds)).filter((o) => !o.myGigId && o.tab !== "muted") : [];
-    const [followUps, { hot }] = await Promise.all([getFollowUps(), getPlanning()]);
+    const [followUps, { hot }, writing] = await Promise.all([getFollowUps(), getPlanning(), getWriting()]);
     log(`mail: ${fresh.length} nowych okazji, ${followUps.length} do ponowienia, ${hot.length} gorących`);
-    await sendReport({ fresh, followUps, hot }, log);
+    await sendReport({ fresh, followUps, hot, writing }, log);
   }
 
   // Padnięty parser = czerwony build w Actions, żeby GitHub dał znać mailem.

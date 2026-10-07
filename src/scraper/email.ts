@@ -1,7 +1,7 @@
 import type { Hot } from "@/lib/hot";
 import { AVAILABILITY_LABEL, CHANNEL_SHORT, RELATION_LABEL } from "@/lib/labels";
 import { pitchMessage } from "@/lib/messages";
-import type { FollowUp } from "@/lib/planning";
+import type { FollowUp, Writing } from "@/lib/planning";
 import { groupByPerformer, type Opportunity, type OpportunityGroup } from "@/lib/opportunities";
 import { plural } from "@/lib/text";
 import { fmtDate, fmtDateTime, fmtTravel } from "@/lib/time";
@@ -88,9 +88,24 @@ function hotSection(items: Hot[]) {
     <table style="width:100%;border-collapse:collapse">${rows.join("")}</table>`;
 }
 
-export type Digest = { fresh: Opportunity[]; followUps: FollowUp[]; hot: Hot[] };
+/** Jedna–dwie linijki o pisaniu: seria treningu puent, tydzień, co czeka na poprawkę po scenie. */
+function writingSection(w: Writing | undefined) {
+  if (!w) return "";
+  const p = w.punchlines;
+  const streak = p.streak > 0 ? `seria ${plural(p.streak, "dzień", "dni", "dni")} — dziś też premisa + 10 puent` : "dziś premisa + 10 puent";
+  const week = `generowanie ${w.generate.done}/${w.generate.target}, redakcja ${w.edit.done}/${w.edit.target} w tym tygodniu`;
+  const queue = w.queue.length
+    ? `<br>Do poprawki po scenie: ${w.queue
+        .slice(0, 3)
+        .map((q) => `<b>${esc(q.name)}</b> ${q.reaction < 0 ? "👎" : "😐"}`)
+        .join(", ")}`
+    : "";
+  return `<p style="margin:16px 0 0;padding:10px 12px;background:#f2f5f3;border-radius:8px;font-size:14px">✍️ ${streak}<br>${muted(week)}${queue}</p>`;
+}
 
-export function renderReport({ fresh: items, followUps, hot }: Digest) {
+export type Digest = { fresh: Opportunity[]; followUps: FollowUp[]; hot: Hot[]; writing?: Writing };
+
+export function renderReport({ fresh: items, followUps, hot, writing }: Digest) {
   const friends = groupByPerformer(items.filter((o) => o.tab === "friends"));
   const openMic = groupByPerformer(items.filter((o) => o.tab === "openMic"));
   const inRange = groupByPerformer(items.filter((o) => o.tab === "inRange"));
@@ -107,6 +122,7 @@ export function renderReport({ fresh: items, followUps, hot }: Digest) {
   const html = `<div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:600px;color:#1c2a23">
     <h2 style="margin:0 0 4px">SU Manager · dzień dobry</h2>
     <p style="margin:0;color:#5b6b63"><a href="${APP_URL}" style="color:#13824a">Otwórz aplikację</a></p>
+    ${writingSection(writing)}
     ${followUpSection(followUps)}
     ${hotSection(hot)}
     ${friends.length || openMic.length || inRange.length ? `<h2 style="margin:28px 0 0;font-size:17px">Nowe terminy w bileteriach</h2>` : ""}

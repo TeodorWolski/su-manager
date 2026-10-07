@@ -4,9 +4,9 @@
  * Bez `server-only` — uruchamia to skrypt z GitHub Actions.
  */
 import { and, eq, gte, inArray, isNotNull, lte, sql } from "drizzle-orm";
-import { bits, db, gigBits, gigLogs, gigs, interactions, venues } from "@/db";
+import { bits, db, gigBits, gigLogs, gigs, interactions, venues, writingSessions } from "@/db";
 import { GIG_CONTEXT_LABEL, GIG_OUTCOME_LABEL, REACTION_EMOJI } from "./labels";
-import { getPlanning } from "./planning";
+import { getPlanning, getWriting } from "./planning";
 import { addDays, MAX_OPENERS_PER_WEEK, WEEK_MAX, WEEK_MIN, weekStart } from "./rhythm";
 import { plural } from "./text";
 import { effectiveStart, fmtDate, fmtDateTime, nowLocal } from "./time";
@@ -23,7 +23,7 @@ export async function getWeekly() {
   const to = addDays(from, 6);
   const inWeek = and(gte(sql`substr(${gigs.startsAt}, 1, 10)`, from), lte(sql`substr(${gigs.startsAt}, 1, 10)`, to));
 
-  const [played, bitReactions, sent, outcomes, planning] = await Promise.all([
+  const [played, bitReactions, sent, outcomes, planning, writing, sessions] = await Promise.all([
     db
       .select({ id: gigs.id, title: gigs.title, startsAt: gigs.startsAt, context: gigs.context, venueName: venues.name, rating: gigLogs.rating })
       .from(gigs)
@@ -54,12 +54,38 @@ export async function getWeekly() {
       )
       .groupBy(gigs.outcome),
     getPlanning(),
+    getWriting(),
+    db
+      .select({ kind: writingSessions.kind, n: sql<number>`count(*)`, days: sql<number>`count(distinct ${writingSessions.date})` })
+      .from(writingSessions)
+      .where(and(gte(writingSessions.date, from), lte(writingSessions.date, to)))
+      .groupBy(writingSessions.kind),
   ]);
 
   const nextStart = addDays(from, 7);
   const next = planning.weeks.find((w) => w.start === nextStart) ?? null;
   // Tylko te, które już się odbyły (mail idzie w niedzielę wieczorem, ale ręcznie można odpalić wcześniej).
-  return { from, to, played: played.filter((g) => effectiveStart(g.startsAt) < now), bitReactions, sent: Number(sent[0]?.n ?? 0), outcomes, next, hot: planning.hot };
+  const k = (kind: string) => sessions.find((s) => s.kind === kind);
+  return {
+    from,
+    to,
+    played: played.filter((g) => effectiveStart(g.startsAt) < now),
+    bitReactions,
+    sent: Number(sent[0]?.n ?? 0),
+    outcomes,
+    next,
+    hot: planning.hot,
+    writing: {
+      punchDays: Number(k("punchlines")?.days ?? 0),
+      generate: Number(k("generate")?.n ?? 0),
+      edit: Number(k("edit")?.n ?? 0),
+      streak: writing.punchlines.streak,
+      best: writing.punchlines.best,
+      fixed: writing.fixed.filter((f) => f.date.slice(0, 10) >= from && f.date.slice(0, 10) <= to),
+      queue: writing.queue.length,
+      targets: { generate: writing.generate.target, edit: writing.edit.target },
+    },
+  };
 }
 
 export type Weekly = Awaited<ReturnType<typeof getWeekly>>;
@@ -118,13 +144,24 @@ export function renderWeekly(w: Weekly) {
         .join("<br>")
     : "";
 
+  const wr = w.writing;
+  const writingHtml = [
+    `Trening puent: <b>${wr.punchDays}/7 dni</b> · seria ${plural(wr.streak, "dzień", "dni", "dni")}${wr.best > wr.streak ? ` (rekord ${wr.best})` : ""}`,
+    `Generowanie: ${wr.generate}/${wr.targets.generate} · redakcja: ${wr.edit}/${wr.targets.edit}`,
+    wr.fixed.length ? `🎯 Poprawki, które siadły: ${esc(wr.fixed.map((f) => f.name).join(", "))}` : "",
+    wr.queue ? muted(`${plural(wr.queue, "bit czeka", "bity czekają", "bitów czeka")} na redakcję po scenie`) : "",
+  ]
+    .filter(Boolean)
+    .join("<br>");
+
   const subject = `SU Manager: tydzień ${fmtDate(w.from)} – ${fmtDate(w.to)} · ${plural(w.played.length, "granie", "grania", "grań")}${avg != null ? ` · ★ ${avg.toFixed(1).replace(".", ",")}` : ""}`;
   const html = `<div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:600px;color:#1c2a23">
     <h2 style="margin:0 0 4px">Podsumowanie tygodnia</h2>
     ${muted(`${esc(fmtDate(w.from))} – ${esc(fmtDate(w.to))} · <a href="${APP_URL}" style="color:#13824a">Otwórz aplikację</a>`)}
     ${h3(`Zagrane · ${w.played.length}${avg != null ? ` · średnio ★ ${avg.toFixed(1).replace(".", ",")}` : ""}`)}${gigsHtml}
     ${h3("Bity")}${bitsHtml}
-    ${h3("Pisanie")}${outreachHtml}
+    ${h3("Pisanie i redakcja")}${writingHtml}
+    ${h3("Wiadomości do komików")}${outreachHtml}
     ${h3("Przyszły tydzień")}${nextHtml}
     ${hotHtml ? `${h3("🔥 Warto napisać")}${hotHtml}` : ""}
   </div>`;

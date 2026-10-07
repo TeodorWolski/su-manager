@@ -111,6 +111,29 @@ export const bits = sqliteTable("bits", {
   status: text("status", { enum: BIT_STATUSES }).notNull().default("testing"),
   lengthMin: integer("length_min"),
   notes: text("notes"),
+  /** Link do tekstu (Notion / Google Docs) — piszę poza apką, tu tylko szybkie otwarcie. */
+  docUrl: text("doc_url"),
+  createdAt: createdAt(),
+});
+
+/**
+ * Trzy rodzaje pracy nad materiałem:
+ * punchlines = trening puent (premisa + 10 puent, codziennie),
+ * generate = generowanie (wypluwanie, zalążki, pierwszy draft),
+ * edit = redakcja na podstawie nagrań / sceny.
+ */
+export const WRITING_KINDS = ["punchlines", "generate", "edit"] as const;
+
+/** Sesja pisania — samo „że i nad czym”, tekst zostaje w Notion / Docs. */
+export const writingSessions = sqliteTable("writing_sessions", {
+  id: id(),
+  /** Lokalny dzień "YYYY-MM-DD". */
+  date: text("date").notNull(),
+  kind: text("kind", { enum: WRITING_KINDS }).notNull(),
+  minutes: integer("minutes"),
+  bitId: integer("bit_id").references(() => bits.id, { onDelete: "set null" }),
+  /** Krótka notka, np. premisa z treningu puent. */
+  note: text("note"),
   createdAt: createdAt(),
 });
 
@@ -279,6 +302,8 @@ export type Bit = typeof bits.$inferSelect;
 export type Gig = typeof gigs.$inferSelect;
 export type GigLog = typeof gigLogs.$inferSelect;
 export type Event = typeof events.$inferSelect;
+export type WritingKind = (typeof WRITING_KINDS)[number];
+export type WritingSession = typeof writingSessions.$inferSelect;
 export type RecurrenceInterval = (typeof RECURRENCE_INTERVALS)[number];
 export type RecurringSeries = typeof recurringSeries.$inferSelect;
 export type GigStatus = (typeof GIG_STATUSES)[number];

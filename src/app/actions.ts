@@ -28,6 +28,8 @@ import {
   interactions,
   RECURRENCE_INTERVALS,
   recurringSeries,
+  WRITING_KINDS,
+  writingSessions,
   VENUE_VERDICTS,
   venues,
   type GigOutcome,
@@ -374,6 +376,7 @@ export async function saveBit(fd: FormData) {
     status: oneOf(BIT_STATUSES, str(fd, "status")) ?? "testing",
     lengthMin: int(fd, "lengthMin"),
     notes: str(fd, "notes"),
+    docUrl: str(fd, "docUrl"),
   };
   if (id) {
     await db.update(bits).set(values).where(eq(bits.id, id));
@@ -386,6 +389,27 @@ export async function saveBit(fd: FormData) {
 export async function deleteBit(id: number) {
   await db.delete(bits).where(eq(bits.id, id));
   done("/bits");
+}
+
+/**
+ * Sesja pisania jednym tapem: rodzaj (trening puent / generowanie / redakcja), opcjonalnie bit,
+ * minuty i notka (np. premisa). Data = dziś (lokalnie).
+ */
+export async function logWriting(fd: FormData) {
+  const kind = required(oneOf(WRITING_KINDS, str(fd, "kind")), "rodzaj");
+  await db.insert(writingSessions).values({
+    date: nowLocal().slice(0, 10),
+    kind,
+    minutes: int(fd, "minutes"),
+    bitId: int(fd, "bitId"),
+    note: str(fd, "note"),
+  });
+  refresh();
+}
+
+export async function deleteWriting(id: number) {
+  await db.delete(writingSessions).where(eq(writingSessions.id, id));
+  refresh();
 }
 
 // ── Miasta ──────────────────────────────────────────────────────────────

@@ -1,3 +1,4 @@
+import { ExternalLink } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { deleteBit } from "@/app/actions";
@@ -7,6 +8,8 @@ import { Empty, PageHeader, Pill, Section, Stat } from "@/components/ios";
 import { Button } from "@/components/ui/button";
 import { BIT_STATUS_LABEL, BIT_STATUS_TONE, REACTIONS } from "@/lib/labels";
 import { getBit } from "@/lib/queries";
+import { fmtDate } from "@/lib/time";
+import { WRITING_LABEL } from "@/lib/writing";
 
 export default async function BitPage({ params }: PageProps<"/bits/[id]">) {
   const { id } = await params;
@@ -40,6 +43,21 @@ export default async function BitPage({ params }: PageProps<"/bits/[id]">) {
           value={gigs.some((g) => g.reaction != null) ? REACTIONS.map((r) => `${r.emoji} ${count(r.value)}`).join("  ") : "—"}
         />
       </div>
+      {bit.docUrl && (
+        <a href={bit.docUrl} target="_blank" rel="noreferrer" className="bg-card border-border text-primary mb-7 flex h-12 items-center justify-center gap-2 rounded-[14px] border text-[16px] font-medium">
+          Otwórz tekst <ExternalLink className="size-4" />
+        </a>
+      )}
+      {data.sessions.length > 0 && (
+        <Section title="Praca nad bitem">
+          {data.sessions.slice(0, 8).map((s) => (
+            <div key={s.id} className="border-border/70 flex items-baseline justify-between px-4 py-2.5 text-[15px] [&:not(:last-child)]:border-b">
+              <span>{WRITING_LABEL[s.kind]}</span>
+              <span className="text-muted-foreground text-[13px]">{fmtDate(s.date)}</span>
+            </div>
+          ))}
+        </Section>
+      )}
       {bit.notes && (
         <Section title="Notatki">
           <p className="px-4 py-3 text-[16px] whitespace-pre-wrap">{bit.notes}</p>

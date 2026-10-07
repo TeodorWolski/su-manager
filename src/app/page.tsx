@@ -8,15 +8,18 @@ import { FOLLOW_UP_BEFORE_DAYS } from "@/lib/follow-up";
 import { CHANNEL_SHORT } from "@/lib/labels";
 import { HotOpportunities } from "@/components/hot";
 import { RhythmCard } from "@/components/rhythm";
+import { WritingCard } from "@/components/writing";
+import { getWriting } from "@/lib/planning";
 import { getDashboard, getRhythm } from "@/lib/queries";
 import { getGoals } from "@/lib/goals";
 import { fmtDate, fmtDateLong, nowLocal } from "@/lib/time";
 
 export default async function Home() {
-  const [{ upcoming, pipeline, followUps, month, recent }, goals, rhythm] = await Promise.all([
+  const [{ upcoming, pipeline, followUps, month, recent }, goals, rhythm, writing] = await Promise.all([
     getDashboard(),
     getGoals(),
     getRhythm(),
+    getWriting(),
   ]);
   const today = nowLocal();
 
@@ -41,6 +44,8 @@ export default async function Home() {
           <RatingTile avg={month.avg} count={month.count} />
         </div>
       </div>
+
+      <WritingCard w={writing} />
 
       <RhythmCard rhythm={rhythm} />
 
