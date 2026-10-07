@@ -69,16 +69,42 @@ function done(path: string): never {
 
 // ── Grania ──────────────────────────────────────────────────────────────
 
+/** Miasto po nazwie (bez polskich znaków i wielkości liter) albo nowe — z „Wpisz inne…” w formularzu. */
+async function cityIdByName(name: string) {
+  const all = await db.select({ id: cities.id, name: cities.name }).from(cities);
+  const found = all.find((c) => normalize(c.name) === normalize(name));
+  if (found) return found.id;
+  const [row] = await db.insert(cities).values({ name }).returning({ id: cities.id });
+  return row.id;
+}
+
+/** Scena po nazwie (w danym mieście, jeśli podane) albo nowa. */
+async function venueIdByName(name: string, cityId: number | null) {
+  const all = await db.select({ id: venues.id, name: venues.name, cityId: venues.cityId }).from(venues);
+  const found = all.find((v) => normalize(v.name) === normalize(name) && (!cityId || !v.cityId || v.cityId === cityId));
+  if (found) return found.id;
+  const [row] = await db.insert(venues).values({ name, cityId }).returning({ id: venues.id });
+  return row.id;
+}
+
 export async function saveGig(fd: FormData) {
   const id = int(fd, "id");
+  // „Wpisz inne…”: nowe miasto / scena / komik — po nazwie istniejący albo nowy wpis w katalogu.
+  const newCity = str(fd, "cityName");
+  const cityId = newCity ? await cityIdByName(newCity) : int(fd, "cityId");
+  const newVenue = str(fd, "venueName");
+  const venueId = newVenue ? await venueIdByName(newVenue, cityId) : int(fd, "venueId");
+  const newHeadliner = str(fd, "headlinerName");
+  const headlinerId = newHeadliner ? await performerContactId(newHeadliner) : int(fd, "headlinerId");
   const values = {
     title: required(str(fd, "title"), "nazwa"),
     startsAt: required(str(fd, "startsAt"), "data"),
-    venueId: int(fd, "venueId"),
-    cityId: int(fd, "cityId"),
+    venueId,
+    // Nowa scena dostała miasto — granie nie potrzebuje go osobno (jak przy wyborze sceny z listy).
+    cityId: newVenue ? null : cityId,
     status: oneOf(GIG_STATUSES, str(fd, "status")) ?? "interested",
     context: oneOf(GIG_CONTEXTS, str(fd, "context")),
-    headlinerId: int(fd, "headlinerId"),
+    headlinerId,
     url: str(fd, "url"),
     notes: str(fd, "notes"),
   };
@@ -94,6 +120,10 @@ export async function saveGig(fd: FormData) {
       .returning({ id: gigs.id });
   }
   const lineup = ids(fd, "lineup");
+  for (const name of (str(fd, "lineupNew") ?? "").split(",").map((n) => n.trim()).filter(Boolean)) {
+    const contactId = await performerContactId(name);
+    if (!lineup.includes(contactId)) lineup.push(contactId);
+  }
   await db.delete(gigContacts).where(eq(gigContacts.gigId, gigId));
   if (lineup.length) {
     await db.insert(gigContacts).values(lineup.map((contactId) => ({ gigId: gigId!, contactId })));
@@ -221,11 +251,12 @@ export async function saveLog(fd: FormData) {
     .values({ gigId, ...log })
     .onConflictDoUpdate({ target: gigLogs.gigId, set: log });
 
+  const newHeadliner = str(fd, "headlinerName");
   await db
     .update(gigs)
     .set({
       context: oneOf(GIG_CONTEXTS, str(fd, "context")),
-      headlinerId: int(fd, "headlinerId"),
+      headlinerId: newHeadliner ? await performerContactId(newHeadliner) : int(fd, "headlinerId"),
     })
     .where(eq(gigs.id, gigId));
 

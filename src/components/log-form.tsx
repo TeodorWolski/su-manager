@@ -6,7 +6,7 @@ import type { GigContext } from "@/db/schema";
 import { GIG_CONTEXT_LABEL, REACTIONS } from "@/lib/labels";
 import type { FormOptions } from "@/lib/queries";
 import { cn } from "@/lib/utils";
-import { FieldRow, NumberInput, Select, SubmitButton, TextArea } from "./form";
+import { FieldRow, NumberInput, SelectOrNew, SubmitButton, TextArea } from "./form";
 
 const RATING_HINT = ["", "Zabiłem się", "Słabo", "OK", "Dobrze", "Rozwaliłem"];
 const VENUE_HINT = ["", "Dramat", "Słabo", "OK", "Dobre", "Świetne"];
@@ -168,9 +168,11 @@ export function LogForm({
         {(context === "opener" || context === "support") && (
           <div className="bg-card mt-2 overflow-hidden rounded-2xl">
             <FieldRow label="Przed kim">
-              <Select
+              <SelectOrNew
                 name="headlinerId"
-                defaultValue={defaults.headlinerId ?? ""}
+                newName="headlinerName"
+                defaultValue={defaults.headlinerId}
+                newPlaceholder="imię i nazwisko"
                 options={options.contacts.filter((c) => c.role === "comedian").map((c) => ({ value: c.id, label: c.name }))}
               />
             </FieldRow>

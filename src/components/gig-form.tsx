@@ -4,7 +4,7 @@ import { GIG_CONTEXT_LABEL, GIG_STATUS_LABEL } from "@/lib/labels";
 import type { FormOptions } from "@/lib/queries";
 import { effectiveStart } from "@/lib/time";
 import { Chips } from "./chips";
-import { FieldRow, Select, SubmitButton, TextArea, TextInput } from "./form";
+import { FieldRow, Select, SelectOrNew, SubmitButton, TextArea, TextInput } from "./form";
 import { Section } from "./ios";
 
 const HIDDEN_REASONS: readonly string[] = ["not_interested", "no_openers"];
@@ -51,19 +51,26 @@ export function GigForm({
         </FieldRow>
       </Section>
 
-      <Section title="Gdzie" footer="Wybierz scenę z katalogu albo samo miasto, jeśli to jednorazowe miejsce.">
+      <Section
+        title="Gdzie"
+        footer="Wybierz scenę z katalogu albo samo miasto, jeśli to jednorazowe miejsce. Nie ma na liście? „Wpisz inne…” — dodam do katalogu."
+      >
         <FieldRow label="Scena">
-          <Select
+          <SelectOrNew
             name="venueId"
-            defaultValue={gig?.venueId ?? ""}
+            newName="venueName"
+            defaultValue={gig?.venueId}
+            newPlaceholder="nazwa sceny"
             options={options.venues.map((v) => ({ value: v.id, label: v.cityName ? `${v.name} · ${v.cityName}` : v.name }))}
           />
         </FieldRow>
         <FieldRow label="Miasto">
-          <Select
+          <SelectOrNew
             name="cityId"
-            defaultValue={gig?.cityId ?? ""}
+            newName="cityName"
+            defaultValue={gig?.cityId}
             placeholder="z miejsca sceny"
+            newPlaceholder="nazwa miasta"
             options={options.cities.map((c) => ({ value: c.id, label: c.name }))}
           />
         </FieldRow>
@@ -78,9 +85,11 @@ export function GigForm({
           />
         </FieldRow>
         <FieldRow label="Przed kim">
-          <Select
+          <SelectOrNew
             name="headlinerId"
-            defaultValue={gig?.headlinerId ?? ""}
+            newName="headlinerName"
+            defaultValue={gig?.headlinerId}
+            newPlaceholder="imię i nazwisko"
             options={comedians}
           />
         </FieldRow>
@@ -91,11 +100,11 @@ export function GigForm({
 
       <div className="mb-7">
         <div className="text-muted-foreground mb-1.5 px-1 text-[12.5px] font-medium">Kto jeszcze gra</div>
-        <Chips
-          name="lineup"
-          selected={lineup}
-          options={comedians}
-          empty="Dodaj komików w zakładce Ludzie, żeby oznaczać, z kim grasz."
+        <Chips name="lineup" selected={lineup} options={comedians} empty="Nikogo jeszcze nie ma w Ludziach — dopisz poniżej." />
+        <input
+          name="lineupNew"
+          placeholder="Ktoś spoza listy? Wpisz, po przecinku"
+          className="bg-card placeholder:text-muted-foreground/60 mt-2 h-10 w-full rounded-xl px-4 text-[15px] outline-none"
         />
       </div>
 

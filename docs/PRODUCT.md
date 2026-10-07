@@ -81,7 +81,7 @@ Ocena grania **nie jest** oceną bitu, bo zależy od publiki, line-upu itd. Bit 
   - frekwencja, minuty zagrane/dostępne, kontekst,
   - zagrane bity z reakcją 👍/😐/👎.
 - **Wszystkie** (`/gigs?view=all`): bez odrzuconych.
-- **Nowe granie:** w polach komików nie ma pomijanych z powodu `not_interested` / `no_openers`.
+- **Nowe granie:** w polach komików nie ma pomijanych z powodu `not_interested` / `no_openers`. Scena, miasto i „przed kim” to `SelectOrNew` (`form.tsx`): „＋ Wpisz inne…” pokazuje pole tekstowe, a `saveGig` szuka po nazwie (komik — fuzzy jak w scraperze, `performerContactId`) albo zakłada nowy wpis; nowa scena dostaje wybrane/wpisane miasto. „Kto jeszcze gra” ma pole na nowe nazwiska po przecinku. To samo „przed kim” jest w logu.
 
 ### Okazje (`/events`)
 - **Podsumowanie tygodnia** (niedziela 19:00, `src/lib/weekly.ts`, `scripts/weekly.ts`, `.github/workflows/weekly.yml`): zagrane grania z oceną, bity 👍/👎, wysłane wiadomości i wyniki rozmów, przyszły tydzień względem rytmu 2–3 i balansu, do 3 najgorętszych okazji.

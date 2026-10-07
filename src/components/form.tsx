@@ -1,6 +1,7 @@
 "use client";
 
 import { Loader2 } from "lucide-react";
+import { useState } from "react";
 import { useFormStatus } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -61,6 +62,53 @@ export function Select({
         </option>
       ))}
     </select>
+  );
+}
+
+/** Wartość opcji „wpisz inne” — serwer widzi ją jako brak id i bierze tekst z pola `newName`. */
+const NEW = "__new__";
+
+/**
+ * Select z bazy + „＋ Wpisz inne…”, gdy wartości nie ma na liście: pojawia się pole tekstowe
+ * (`newName`), a akcja serwerowa szuka po nazwie albo zakłada nowy wpis.
+ */
+export function SelectOrNew({
+  name,
+  newName,
+  options,
+  defaultValue,
+  placeholder,
+  newPlaceholder = "wpisz nazwę",
+}: {
+  name: string;
+  newName: string;
+  options: { value: string | number; label: string }[];
+  defaultValue?: string | number | null;
+  placeholder?: string;
+  newPlaceholder?: string;
+}) {
+  const [value, setValue] = useState(String(defaultValue ?? ""));
+  return value === NEW ? (
+    <span className="flex w-full items-center gap-2">
+      <input
+        name={newName}
+        autoFocus
+        required
+        placeholder={newPlaceholder}
+        className={cn(control, "min-w-0 flex-1")}
+      />
+      <button type="button" onClick={() => setValue("")} className="text-muted-foreground shrink-0 text-[14px]" aria-label="Wróć do listy">
+        lista
+      </button>
+    </span>
+  ) : (
+    <Select
+      name={name}
+      value={value}
+      onChange={(e) => setValue(e.target.value)}
+      placeholder={placeholder}
+      options={[...options, { value: NEW, label: "＋ Wpisz inne…" }]}
+    />
   );
 }
 
