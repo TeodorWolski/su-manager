@@ -86,7 +86,7 @@ Ocena grania **nie jest** oceną bitu, bo zależy od publiki, line-upu itd. Bit 
 ### Okazje (`/events`)
 - **Podsumowanie tygodnia** (niedziela 19:00, `src/lib/weekly.ts`, `scripts/weekly.ts`, `.github/workflows/weekly.yml`): zagrane grania z oceną, bity 👍/👎, wysłane wiadomości i wyniki rozmów, przyszły tydzień względem rytmu 2–3 i balansu, do 3 najgorętszych okazji.
 - **Poranny mail** (10:30, `src/scraper/email.ts`): „Do ponowienia”, „Najgorętsze okazje” z gotowym tekstem i nowe terminy z bileterii. Wysyłany, gdy którakolwiek sekcja nie jest pusta.
-- **Źródła:** kupbilecik, evently, Biletyna (`src/scraper/sources/*`). Biletyna: programy z publicznej sitemapy (`/sitemap/sitemap-events.xml`, robots.txt zabrania `/ajax/`), terminy ze schema.org na stronie programu, ~135 stron dziennie (+~4,5 min joba). „Ostatnie bilety” z `remainingAttendeeCapacity` ≤ 10 (to pula Biletyny, bywa mała przy normalnej sprzedaży).
+- **Źródła:** kupbilecik, evently, Biletyna (`src/scraper/sources/*`). Biletyna: programy z publicznej sitemapy (`/sitemap/sitemap-events.xml`, robots.txt zabrania `/ajax/`), terminy ze schema.org na stronie artysty/programu (do 30 terminów; gdy strona jest pełna, a 30. termin wypada przed horyzontem — dociąga strony miast). „Ostatnie bilety” z `remainingAttendeeCapacity` ≤ 10 (to pula Biletyny, bywa mała przy normalnej sprzedaży).
 - **Duplikaty między serwisami** (`src/lib/dedupe.ts`, `sameShow`): ten sam dzień i miasto, start ±60 min, wspólne nazwisko (słowo spoza ogólnych typu stand-up/festiwal/open mic) albo jeden tytuł zaczyna drugi. Wygrywa serwis wcześniej na liście `SOURCES`; duplikat nie jest zapisywany.
 - **Scraper** (`src/scraper/sources/*`, cron GitHub Actions codziennie o 10:30 czasu polskiego, razem z mailem) zbiera wydarzenia. Klasyfikacja jest w `src/lib/opportunities.ts`.
 - **Zakładki:** Znajomi (komicy z CRM), W zasięgu (≤3 h dojazdu albo nocleg), Open miki, Uzupełnij (miasta bez czasu dojazdu).
@@ -139,6 +139,7 @@ Ocena grania **nie jest** oceną bitu, bo zależy od publiki, line-upu itd. Bit 
 - **Etykiety, tony i listy kanałów** są w `src/lib/labels.ts`. Enumy statusów są w `src/db/schema.ts` (`*_STATUSES`). Enumy drizzle na kolumnach `text` nie tworzą CHECK w SQLite, więc nowa wartość nie wymaga migracji.
 - **Progi i stałe** są nazwane i opisane przy definicji (`FOLLOW_UP_BEFORE_DAYS`, `WEEK_MIN/MAX`, `STREAK_WARN`, `COOLDOWN_DAYS`, `MAX_TRAVEL_MIN`, `REVIEW_DELAY_MIN`…).
 - **UI:** komponenty iOS-owe z `src/components/ios.tsx` (`Section`, `Row`, `Pill`, `Stat`) i `form.tsx` (`FieldRow`, `PendingButton`). Kolory statusów to tokeny `--st-*` w `globals.css`, akcent limonka `#E4F323`. Wspierany jest tryb jasny i ciemny.
+- **Testy:** `pnpm test` (`node:test` przez `tsx`, `tests/*.test.ts`), dane w `tests/fixtures/` (odświeżane `scripts/update-fixtures.ts`). Nowy parser = nowy test na przyciętej stronie + oczekiwane wartości. Kontrola zdrowia przebiegu: `src/scraper/health.ts`.
 - **Next.js 16** z breaking changes: przed pisaniem kodu czytaj `node_modules/next/dist/docs/` (patrz `AGENTS.md`).
 
 ## Baza i wdrożenia

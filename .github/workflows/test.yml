@@ -1,0 +1,23 @@
+name: Testy
+
+# Przy każdym pushu i PR: testy parserów (na zapisanych stronach), typecheck i lint.
+# Czerwony = coś zepsuliśmy w kodzie. Zmianę strony bileterii łapie kontrola zdrowia w „Scraper okazji”.
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test
+      - run: pnpm typecheck
+      - run: pnpm lint

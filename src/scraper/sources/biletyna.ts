@@ -1,6 +1,8 @@
 import type { ScrapedEvent, Source } from "../types";
 
 const BASE = "https://biletyna.pl";
+/** Strona programu pokazuje najwyżej tyle terminów — przy pełnej dociągamy strony miast. */
+const PAGE_LIMIT = 30;
 /**
  * Tyle wolnych miejsc i mniej = „ostatnie bilety”. Biletyna podaje liczbę dla swojej puli biletów,
  * która bywa mała przy normalnej sprzedaży (9, 15…), stąd niski próg.
@@ -44,7 +46,7 @@ export function eventsFromHtml(html: string): LdEvent[] {
 /** „Czersk (pow. chojnicki)” → „Czersk”. */
 const cleanCity = (c: string | undefined) => c?.replace(/\s*\(.*\)\s*$/, "").trim() || null;
 
-function availability(e: LdEvent): "last" | "sold_out" | null {
+export function availability(e: LdEvent): "last" | "sold_out" | null {
   if (e.offers?.availability?.endsWith("SoldOut") || e.remainingAttendeeCapacity === 0) return "sold_out";
   if (e.remainingAttendeeCapacity != null && e.remainingAttendeeCapacity <= LAST_TICKETS) return "last";
   return null;
@@ -53,27 +55,37 @@ function availability(e: LdEvent): "last" | "sold_out" | null {
 /**
  * Biletyna: lista /stand-up doczytuje kolejne strony przez /ajax/ (zabronione w robots.txt), więc
  * programy bierzemy z publicznej sitemapy wydarzeń, a terminy — ze schema.org na stronie programu
- * (/stand-up/Artysta/Program pokazuje wszystkie miasta i daty). ~130 stron dziennie, 1 req / 2 s.
+ * (/stand-up/Artysta[/Program] pokazuje do 30 terminów; przy pełnej — strony miast). ~50–100 stron dziennie, 1 req / 2 s.
  */
 export const biletyna: Source = {
   name: "biletyna",
   async scrape({ fetchHtml, until, log }) {
     const sitemap = await fetchHtml(`${BASE}/sitemap/sitemap-events.xml`);
-    const programs = new Set<string>();
+    // Adresy to „Artysta/Miasto” albo „Artysta/Program/Miasto” — strona bez miasta pokazuje wszystkie terminy
+    // (do PAGE_LIMIT), strony miast trzymamy w zapasie dla długich tras.
+    const programs = new Map<string, string[]>();
     for (const m of sitemap.matchAll(/<loc>https:\/\/biletyna\.pl\/stand-up\/([^<]+)<\/loc>/g)) {
-      programs.add(m[1].split("/").slice(0, 2).join("/"));
+      const program = m[1].split("/").slice(0, -1).join("/");
+      programs.set(program, [...(programs.get(program) ?? []), m[1]]);
     }
     if (!programs.size) throw new Error("biletyna: pusta sitemapa stand-upu — zmienił się format?");
     log(`biletyna: ${programs.size} programów`);
 
     const out = new Map<string, ScrapedEvent>();
     let done = 0;
-    for (const program of programs) {
-      const html = await fetchHtml(`${BASE}/stand-up/${program}`).catch((e: Error) => {
-        log(`biletyna: pomijam ${program} (${e.message})`);
+    const page = (path: string) =>
+      fetchHtml(`${BASE}/stand-up/${path}`).catch((e: Error) => {
+        log(`biletyna: pomijam ${path} (${e.message})`);
         return "";
       });
-      for (const e of eventsFromHtml(html)) {
+    for (const [program, cityPages] of programs) {
+      let found = eventsFromHtml(await page(program));
+      // Pełna strona ucina dalsze terminy — ma to znaczenie tylko, gdy ostatni widoczny jest przed horyzontem.
+      const last = found.map((e) => e.startDate ?? "").sort().at(-1) ?? "";
+      if (found.length >= PAGE_LIMIT && last.slice(0, 10) <= until) {
+        for (const c of cityPages) found = found.concat(eventsFromHtml(await page(c)));
+      }
+      for (const e of found) {
         const id = e.url?.match(/[?&]eid=(\d+)/)?.[1];
         if (!id || !e.name || !e.startDate) continue;
         if (/Cancelled|Postponed/.test(e.eventStatus ?? "")) continue;

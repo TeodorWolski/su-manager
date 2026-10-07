@@ -14,6 +14,7 @@ import { sameShow, showBucket } from "@/lib/dedupe";
 import { dedupeKey, getOpportunities } from "@/lib/opportunities";
 import { getFollowUps, getPlanning } from "@/lib/planning";
 import { sendReport } from "@/scraper/email";
+import { healthIssues } from "@/scraper/health";
 import { fetchHtml } from "@/scraper/http";
 import { SOURCES } from "@/scraper/sources";
 import type { ScrapedEvent } from "@/scraper/types";
@@ -36,6 +37,15 @@ async function main() {
       const found = await source.scrape({ fetchHtml, known, until, log });
       log(`${source.name}: ${found.length} wydarzeń`);
       scraped.push(...found);
+      // Ile nadchodzących wydarzeń z tego źródła widziały ostatnie przebiegi (3 dni) — punkt odniesienia.
+      const recent = new Date(Date.now() - 3 * 864e5).toISOString().replace("T", " ").slice(0, 19);
+      const today = new Date().toISOString().slice(0, 10);
+      const knownUpcoming = existing.filter(
+        (e) => e.source === source.name && e.startsAt >= today && e.startsAt <= until && e.lastSeenAt >= recent,
+      ).length;
+      const issues = healthIssues(source.name, found, knownUpcoming);
+      issues.forEach((i) => log(`UWAGA ${i}`));
+      failures.push(...issues);
     } catch (e) {
       failures.push(`${source.name}: ${(e as Error).message}`);
       log(`BŁĄD ${source.name}: ${(e as Error).stack}`);
