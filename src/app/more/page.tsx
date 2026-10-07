@@ -1,4 +1,4 @@
-import { BarChart3, Building2, CalendarDays, MapPin, MessageSquareQuote, Repeat, Target, Users } from "lucide-react";
+import { BarChart3, Bell, Building2, CalendarDays, MapPin, MessageSquareQuote, Repeat, Target, Users } from "lucide-react";
 import { PageHeader, Row, Section } from "@/components/ios";
 import { ThemeSwitch } from "@/components/theme";
 
@@ -17,6 +17,7 @@ export default function MorePage() {
         <Row href="/thoughts" leading={<Icon className="bg-primary"><MessageSquareQuote className="size-4.5" /></Icon>} title="Myśli po graniach" />
         <Row href="/recurring" leading={<Icon className="bg-teal-600"><Repeat className="size-4.5" /></Icon>} title="Cykliczne open miki" />
         <Row href="/venues" leading={<Icon className="bg-sky-500"><Building2 className="size-4.5" /></Icon>} title="Sceny" />
+        <Row href="/settings/notifications" leading={<Icon className="bg-red-500"><Bell className="size-4.5" /></Icon>} title="Powiadomienia" />
         <Row href="/settings/calendar" leading={<Icon className="bg-indigo-500"><CalendarDays className="size-4.5" /></Icon>} title="Kalendarz" />
         <Row href="/cities" leading={<Icon className="bg-amber-500"><MapPin className="size-4.5" /></Icon>} title="Miasta i dojazd" />
       </Section>

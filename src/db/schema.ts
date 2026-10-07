@@ -286,6 +286,23 @@ export const recurringSeries = sqliteTable("recurring_series", {
   createdAt: createdAt(),
 });
 
+/** Subskrypcje Web Push (telefon, przeglądarka) — jeden wiersz na urządzenie. */
+export const pushSubscriptions = sqliteTable("push_subscriptions", {
+  endpoint: text("endpoint").primaryKey(),
+  p256dh: text("p256dh").notNull(),
+  auth: text("auth").notNull(),
+  createdAt: createdAt(),
+});
+
+/** Drobny stan aplikacji klucz → wartość (np. dzień ostatnio wysłanego porannego maila). */
+export const appState = sqliteTable("app_state", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
+  updatedAt: text("updated_at")
+    .notNull()
+    .default(sql`(datetime('now'))`),
+});
+
 /** Programy wyciszone w raporcie („Ukryj ten program wszędzie”) — po znormalizowanym tytule. */
 export const hiddenTitles = sqliteTable("hidden_titles", {
   normalizedTitle: text("normalized_title").primaryKey(),

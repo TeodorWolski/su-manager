@@ -1,27 +1,32 @@
 name: Podsumowanie tygodnia
 
 on:
-  # W niedzielę o 19:00 czasu polskiego. Cron jest w UTC: latem (UTC+2) pasuje 17:00 UTC,
-  # zimą (UTC+1) 18:00 UTC. Krok „pora” przepuszcza tylko właściwy (jak w scrape.yml).
+  # Główny wyzwalacz: zewnętrzny cron w niedzielę o 19:00 czasu polskiego (workflow_dispatch przez API).
+  # Harmonogram to zapas o 21:00 (latem 19:00 UTC, zimą 20:00 UTC); mail idzie raz („weekly-mail”).
   schedule:
-    - cron: "0 17 * * 0"
-    - cron: "0 18 * * 0"
-  workflow_dispatch: # ręczne uruchomienie z zakładki Actions
+    - cron: "0 19 * * 0"
+    - cron: "0 20 * * 0"
+  workflow_dispatch:
+    inputs:
+      force_mail:
+        description: "Wyślij podsumowanie, nawet jeśli dziś już poszło"
+        type: boolean
+        default: false
 
 jobs:
   weekly:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Pora (19:00 w Warszawie)
+      - name: Pora (zapas 21:00 w Warszawie)
         id: time
         run: |
           offset=$(TZ=Europe/Warsaw date +%z)
-          want="0 18 * * 0"; [ "$offset" = "+0200" ] && want="0 17 * * 0"
+          want="0 20 * * 0"; [ "$offset" = "+0200" ] && want="0 19 * * 0"
           if [ "${{ github.event_name }}" != "schedule" ] || [ "${{ github.event.schedule }}" = "$want" ]; then
             echo "run=true" >> "$GITHUB_OUTPUT"
           else
-            echo "Pomijam: ten cron nie odpowiada 19:00 przy przesunięciu $offset"
+            echo "Pomijam: ten cron nie odpowiada 21:00 przy przesunięciu $offset"
           fi
       - uses: actions/checkout@v4
         if: steps.time.outputs.run
@@ -41,3 +46,4 @@ jobs:
           DATABASE_AUTH_TOKEN: ${{ secrets.DATABASE_AUTH_TOKEN }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           REPORT_EMAIL: ${{ secrets.REPORT_EMAIL }}
+          FORCE_MAIL: ${{ inputs.force_mail }}

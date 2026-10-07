@@ -1,12 +1,19 @@
 name: Scraper okazji
 
 on:
-  # Codziennie o 10:30 czasu polskiego. Cron jest w UTC, więc dwa wpisy: latem (UTC+2)
-  # pasuje 8:30 UTC, zimą (UTC+1) 9:30 UTC. Krok „pora” przepuszcza tylko właściwy.
+  # Główny wyzwalacz: zewnętrzny cron (cron-job.org) o 10:30 czasu polskiego woła workflow_dispatch
+  # przez API GitHuba — GitHubowy harmonogram potrafi spóźnić się o kilka godzin.
+  # Harmonogram poniżej to tylko zapas o 12:00 (latem 10:00 UTC, zimą 11:00 UTC; krok „pora” wybiera
+  # właściwy). Mail wychodzi raz dziennie (app_state „morning-mail”), zapas tylko odświeży wydarzenia.
   schedule:
-    - cron: "30 8 * * *"
-    - cron: "30 9 * * *"
-  workflow_dispatch: # ręczne uruchomienie z zakładki Actions
+    - cron: "0 10 * * *"
+    - cron: "0 11 * * *"
+  workflow_dispatch:
+    inputs:
+      force_mail:
+        description: "Wyślij poranny mail, nawet jeśli dziś już poszedł"
+        type: boolean
+        default: false
 
 concurrency:
   group: scrape
@@ -17,15 +24,15 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - name: Pora (10:30 w Warszawie)
+      - name: Pora (zapas 12:00 w Warszawie)
         id: time
         run: |
           offset=$(TZ=Europe/Warsaw date +%z)
-          want="30 9 * * *"; [ "$offset" = "+0200" ] && want="30 8 * * *"
+          want="0 11 * * *"; [ "$offset" = "+0200" ] && want="0 10 * * *"
           if [ "${{ github.event_name }}" != "schedule" ] || [ "${{ github.event.schedule }}" = "$want" ]; then
             echo "run=true" >> "$GITHUB_OUTPUT"
           else
-            echo "Pomijam: ten cron nie odpowiada 10:30 przy przesunięciu $offset"
+            echo "Pomijam: ten cron nie odpowiada 12:00 przy przesunięciu $offset"
           fi
       - uses: actions/checkout@v4
         if: steps.time.outputs.run
@@ -45,3 +52,4 @@ jobs:
           DATABASE_AUTH_TOKEN: ${{ secrets.DATABASE_AUTH_TOKEN }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           REPORT_EMAIL: ${{ secrets.REPORT_EMAIL }}
+          FORCE_MAIL: ${{ inputs.force_mail }}

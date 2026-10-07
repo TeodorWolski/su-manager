@@ -11,6 +11,7 @@ import "dotenv/config";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { db, events, gigs } from "@/db";
 import { sameShow, showBucket } from "@/lib/dedupe";
+import { oncePerDay } from "@/lib/app-state";
 import { dedupeKey, getOpportunities } from "@/lib/opportunities";
 import { RECURRING_SOURCE } from "@/lib/recurring";
 import { syncRecurring } from "@/lib/recurring-sync";
@@ -124,8 +125,12 @@ async function main() {
     `zapisano: ${newIds.size} nowych, ${seenIds.length} odświeżonych, ${toInsert.length - newIds.size + crossDupes} duplikatów (${crossDupes} między serwisami); w bazie ${total[0].n}`,
   );
 
+  // Główny (zewnętrzny cron 10:30) i zapasowy (GitHub 12:00) przebieg — mail tylko raz dziennie.
+  const today = new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Warsaw" });
   if (firstRun) {
     log("pierwszy przebieg — tylko zasilam bazę, bez maila");
+  } else if (!(await oncePerDay("morning-mail", today, process.env.FORCE_MAIL === "true"))) {
+    log("poranny mail już dziś wysłany — tylko aktualizacja wydarzeń");
   } else {
     const fresh = newIds.size ? (await getOpportunities(newIds)).filter((o) => !o.myGigId && o.tab !== "muted") : [];
     const [followUps, { hot }, writing] = await Promise.all([getFollowUps(), getPlanning(), getWriting()]);

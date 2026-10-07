@@ -36,6 +36,21 @@ Zmiana schematu: edytuj `src/db/schema.ts`, potem `pnpm db:generate && pnpm db:m
 - Filtr i dopasowanie do CRM: `src/lib/opportunities.ts`, `src/lib/match.ts`.
 - Cron: `.github/workflows/scrape.yml` (codziennie o 10:30 czasu polskiego, niezależnie od czasu letniego/zimowego + ręcznie z zakładki Actions). Podsumowanie tygodnia: `.github/workflows/weekly.yml` (niedziela 19:00, `pnpm weekly`, te same sekrety). Sekrety repo: `DATABASE_URL`, `DATABASE_AUTH_TOKEN`, `RESEND_API_KEY`, `REPORT_EMAIL`. Padnięty parser = czerwony build, GitHub wysyła o tym mail.
 
+## Zewnętrzny cron (cron-job.org) i powiadomienia
+
+GitHubowy harmonogram potrafi spóźnić się o kilka godzin, więc godziny trzyma darmowy cron-job.org (strefa **Europe/Warsaw**). GitHub zostaje jako zapas (poranny 12:00, niedzielny 21:00); maile idą raz dziennie (`app_state`), więc zapas ich nie dubluje.
+
+| Kiedy | Żądanie | Nagłówki |
+| --- | --- | --- |
+| codziennie 10:30 | `POST https://api.github.com/repos/TeodorWolski/su-manager/actions/workflows/scrape.yml/dispatches`, body `{"ref":"main"}` | `Authorization: Bearer <token GitHub>`, `Accept: application/vnd.github+json` |
+| niedziela 19:00 | to samo dla `weekly.yml` | jw. |
+| codziennie 10:35 | `GET https://su-manager.vercel.app/api/notify/morning` | `Authorization: Bearer <CRON_SECRET>` |
+| codziennie 21:00 | `GET https://su-manager.vercel.app/api/notify/evening` | jw. |
+
+- **Token GitHub:** fine-grained, tylko repo `su-manager`, uprawnienie *Actions: Read and write*.
+- **Powiadomienia (Web Push):** zmienne w Vercelu (Production): `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `CRON_SECRET` — wartości z `.env.local` (wygenerowane `web-push`). Publiczny klucz wchodzi w build, więc ustaw je **przed** deployem. Włączenie na telefonie: Więcej → Powiadomienia (iPhone: najpierw „Do ekranu początkowego”).
+- Ręcznie z Actions: „Run workflow” z opcją „wyślij mail mimo to”, gdy chcesz drugi mail tego samego dnia.
+
 ## Testy scraperów
 
 - `pnpm test` — parsery kupbilecik / evently / Biletyny na zapisanych, przyciętych stronach (`tests/fixtures/`), deduplikacja i kontrola zdrowia. Puszczane automatycznie przy każdym pushu (`.github/workflows/test.yml`, razem z typecheckiem i lintem).

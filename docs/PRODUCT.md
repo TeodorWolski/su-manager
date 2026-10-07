@@ -89,7 +89,7 @@ Ocena grania **nie jest** oceną bitu, bo zależy od publiki, line-upu itd. Bit 
 - **Poranny mail** (10:30, `src/scraper/email.ts`): „Do ponowienia”, „Najgorętsze okazje” z gotowym tekstem i nowe terminy z bileterii. Wysyłany, gdy którakolwiek sekcja nie jest pusta.
 - **Źródła:** kupbilecik, evently, Biletyna (`src/scraper/sources/*`). Biletyna: programy z publicznej sitemapy (`/sitemap/sitemap-events.xml`, robots.txt zabrania `/ajax/`), terminy ze schema.org na stronie artysty/programu (do 30 terminów; gdy strona jest pełna, a 30. termin wypada przed horyzontem — dociąga strony miast). „Ostatnie bilety” z `remainingAttendeeCapacity` ≤ 10 (to pula Biletyny, bywa mała przy normalnej sprzedaży).
 - **Duplikaty między serwisami** (`src/lib/dedupe.ts`, `sameShow`): ten sam dzień i miasto, start ±60 min, wspólne nazwisko (słowo spoza ogólnych typu stand-up/festiwal/open mic) albo jeden tytuł zaczyna drugi. Wygrywa serwis wcześniej na liście `SOURCES`; duplikat nie jest zapisywany.
-- **Scraper** (`src/scraper/sources/*`, cron GitHub Actions codziennie o 10:30 czasu polskiego, razem z mailem) zbiera wydarzenia. Klasyfikacja jest w `src/lib/opportunities.ts`.
+- **Scraper** (`src/scraper/sources/*`, zewnętrzny cron o 10:30 czasu polskiego, razem z mailem; GitHub o 12:00 jako zapas) zbiera wydarzenia. Klasyfikacja jest w `src/lib/opportunities.ts`.
 - **Zakładki:** Znajomi (komicy z CRM), W zasięgu (≤3 h dojazdu albo nocleg), Open miki, Uzupełnij (miasta bez czasu dojazdu).
 - **Poranne godziny z kupbilecik:** godzina przed 12:00 to zwykle pomyłka organizatora (06:00 zamiast 18:00). Parser bierze wtedy „Start Wydarzenia” ze strony wydarzenia; bez niego przed 10:00 dodaje 12 h (`fixMorning`).
 - **Dostępność biletów** (`events.availability`): z kupbilecik etykieta „ostatnie bilety” / „sold out” z kafelka listy, odświeżana przy każdym przebiegu. Liczby sprzedanych biletów serwis nie podaje. Evently nie daje tej informacji (`undefined` = nie nadpisuj).
@@ -149,6 +149,10 @@ Pisze się poza apką (Notion / Docs) — apka liczy regularność, wiąże prac
 - **Sceny:** werdykt, ocena miejsca, czas dojazdu.
 - **Miasta:** czas dojazdu z Warszawy, nocleg, priorytet.
 - **Kalendarz:** feed `.ics` z potwierdzonymi graniami pod tajnym tokenem (`/calendar/<token>.ics`).
+
+### Powiadomienia i harmonogram
+- **Web Push** (PWA, `public/sw.js`, `src/lib/push.ts`, włącznik: Więcej → Powiadomienia, tabela `push_subscriptions`): rano grania do ponowienia, wieczorem trening puent (jeśli dziś nie było, z serią) i „jak poszło?” 90 min po starcie grania bez logu (`src/lib/notify.ts`). Każde przypomnienie raz dziennie (`oncePerDay`, tabela `app_state`).
+- **Wyzwalanie:** zewnętrzny cron (cron-job.org, Europe/Warsaw) — 10:30 scraper + poranny mail (workflow_dispatch przez API GitHuba), niedziela 19:00 podsumowanie, 10:35 / 21:00 `/api/notify/morning|evening` (Bearer `CRON_SECRET`, poza basic auth). Harmonogram GitHuba to zapas (12:00 / niedz. 21:00); maile wychodzą raz dziennie (`morning-mail`, `weekly-mail`), ręcznie można wymusić (`force_mail`). Szczegóły konfiguracji: README.
 
 ## Konwencje w kodzie
 

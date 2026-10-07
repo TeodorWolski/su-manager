@@ -31,6 +31,7 @@ import {
   WRITING_KINDS,
   writingSessions,
   ideas,
+  pushSubscriptions,
   VENUE_VERDICTS,
   venues,
   type GigOutcome,
@@ -413,6 +414,27 @@ export async function logWriting(fd: FormData) {
     note: str(fd, "note"),
   });
   refresh();
+}
+
+// ── Powiadomienia ───────────────────────────────────────────────────────
+
+/** Zapis urządzenia do powiadomień (subskrypcja Web Push z przeglądarki). */
+export async function subscribePush(sub: { endpoint: string; keys: { p256dh: string; auth: string } }) {
+  const values = { p256dh: sub.keys.p256dh, auth: sub.keys.auth };
+  await db
+    .insert(pushSubscriptions)
+    .values({ endpoint: sub.endpoint, ...values })
+    .onConflictDoUpdate({ target: pushSubscriptions.endpoint, set: values });
+}
+
+export async function unsubscribePush(endpoint: string) {
+  await db.delete(pushSubscriptions).where(eq(pushSubscriptions.endpoint, endpoint));
+}
+
+export async function sendTestPush() {
+  const { sendPush } = await import("@/lib/push");
+  const n = await sendPush({ title: "SU Manager 🎤", body: "Powiadomienia działają.", url: "/", tag: "test" });
+  return n;
 }
 
 // ── Pomysły ─────────────────────────────────────────────────────────────
