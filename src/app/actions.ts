@@ -30,6 +30,7 @@ import {
   recurringSeries,
   WRITING_KINDS,
   writingSessions,
+  ideas,
   VENUE_VERDICTS,
   venues,
   type GigOutcome,
@@ -397,13 +398,52 @@ export async function deleteBit(id: number) {
  */
 export async function logWriting(fd: FormData) {
   const kind = required(oneOf(WRITING_KINDS, str(fd, "kind")), "rodzaj");
+  // Generowanie może od razu założyć nowy bit-draft („Wpisz inne…” → status Vomit).
+  const newBit = str(fd, "newBitName");
+  const bitId = newBit
+    ? (await db.insert(bits).values({ name: newBit, status: "vomit" }).returning({ id: bits.id }))[0].id
+    : int(fd, "bitId");
+  // Redakcja zawsze dotyczy konkretnego bitu.
+  if (kind === "edit" && !bitId) throw new Error("Wybierz bit, który redagowałeś");
   await db.insert(writingSessions).values({
     date: nowLocal().slice(0, 10),
     kind,
     minutes: int(fd, "minutes"),
-    bitId: int(fd, "bitId"),
+    bitId,
     note: str(fd, "note"),
   });
+  refresh();
+}
+
+// ── Pomysły ─────────────────────────────────────────────────────────────
+
+/** Pomysł na szybko — jedno pole, zapis jednym tapem. */
+export async function addIdea(fd: FormData) {
+  await db.insert(ideas).values({ text: required(str(fd, "text"), "pomysł") });
+  refresh();
+}
+
+/** Pomysł → bit roboczy (Vomit): krótka nazwa z początku, cały tekst w notatkach. */
+export async function ideaToBit(id: number) {
+  const [idea] = await db.select().from(ideas).where(eq(ideas.id, id));
+  if (!idea) throw new Error("Nie ma takiego pomysłu");
+  const name = idea.text.length > 50 ? `${idea.text.slice(0, 47).trimEnd()}…` : idea.text;
+  const [bit] = await db.insert(bits).values({ name, status: "vomit", notes: idea.text }).returning({ id: bits.id });
+  await db.update(ideas).set({ status: "used", bitId: bit.id }).where(eq(ideas.id, id));
+  done(`/bits/${bit.id}`);
+}
+
+/** Pomysł jako premisa dzisiejszego treningu puent — loguje trening. */
+export async function ideaAsPremise(id: number) {
+  const [idea] = await db.select().from(ideas).where(eq(ideas.id, id));
+  if (!idea) throw new Error("Nie ma takiego pomysłu");
+  await db.insert(writingSessions).values({ date: nowLocal().slice(0, 10), kind: "punchlines", note: idea.text });
+  await db.update(ideas).set({ status: "used" }).where(eq(ideas.id, id));
+  refresh();
+}
+
+export async function setIdeaStatus(id: number, status: "new" | "dropped") {
+  await db.update(ideas).set({ status }).where(eq(ideas.id, id));
   refresh();
 }
 

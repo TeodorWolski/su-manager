@@ -13,10 +13,11 @@ import {
   interactions,
   venues,
   writingSessions,
+  ideas,
   type GigStatus,
 } from "@/db";
 import { loadUpcomingEventsCached } from "./events-cache";
-import { getFollowUps, getPlanning } from "./planning";
+import { getFollowUps, getPlanning, getWriting } from "./planning";
 import { DEFAULT_START_TIME, nowLocal } from "./time";
 import { normalize } from "./text";
 
@@ -251,6 +252,94 @@ export async function getBit(id: number) {
     .where(eq(writingSessions.bitId, id))
     .orderBy(desc(writingSessions.date), desc(writingSessions.id));
   return { bit, gigs: bitGigs, sessions };
+}
+
+/** Pomysły do przejrzenia (nowe, najświeższe najpierw). */
+export async function listIdeas() {
+  return db.select().from(ideas).where(eq(ideas.status, "new")).orderBy(desc(ideas.createdAt), desc(ideas.id));
+}
+
+/**
+ * Bity w pracy (do redakcji, w testach, drafty) z tym, co przydaje się przy pisaniu:
+ * link do tekstu, ostatnia sesja nad bitem, ostatnia reakcja ze sceny.
+ */
+export async function listBitsInProgress() {
+  return db
+    .select({
+      id: bits.id,
+      name: bits.name,
+      status: bits.status,
+      lengthMin: bits.lengthMin,
+      docUrl: bits.docUrl,
+      lastSession: sql<string | null>`(select max(ws.date) from writing_sessions ws where ws.bit_id = bits.id)`,
+      lastReaction: sql<number | null>`(select gb.reaction from gig_bits gb join gigs g on g.id = gb.gig_id where gb.bit_id = bits.id and gb.reaction is not null order by g.starts_at desc limit 1)`,
+      lastPlayed: sql<string | null>`(select max(g.starts_at) from gig_bits gb join gigs g on g.id = gb.gig_id where gb.bit_id = bits.id)`,
+    })
+    .from(bits)
+    .where(inArray(bits.status, ["editing", "testing", "vomit"]))
+    .orderBy(sql`case ${bits.status} when 'editing' then 0 when 'testing' then 1 else 2 end`, asc(bits.name));
+}
+
+/**
+ * Dane do raportu dla Claude: sesje z ostatnich `days` dni, nowe pomysły i bity w pracy
+ * z historią ze sceny (reakcja na bit, ocena występu, notatka po graniu).
+ */
+export async function getWritingReport(days: number) {
+  const to = nowLocal().slice(0, 10);
+  const from = new Date(Date.parse(to) - (days - 1) * 864e5).toISOString().slice(0, 10);
+  const [sessions, ideaRows, bitRows, allBitSessions, stage, w] = await Promise.all([
+    db
+      .select({ date: writingSessions.date, kind: writingSessions.kind, note: writingSessions.note, bitName: bits.name })
+      .from(writingSessions)
+      .leftJoin(bits, eq(bits.id, writingSessions.bitId))
+      .where(gte(writingSessions.date, from))
+      .orderBy(asc(writingSessions.date), asc(writingSessions.id)),
+    listIdeas(),
+    db
+      .select()
+      .from(bits)
+      .where(inArray(bits.status, ["editing", "testing", "vomit"]))
+      .orderBy(sql`case ${bits.status} when 'editing' then 0 when 'testing' then 1 else 2 end`, asc(bits.name)),
+    db.select({ bitId: writingSessions.bitId, date: writingSessions.date, kind: writingSessions.kind }).from(writingSessions).where(gte(writingSessions.date, from)),
+    db
+      .select({
+        bitId: gigBits.bitId,
+        date: gigs.startsAt,
+        where: sql<string | null>`coalesce(${venues.name}, ${cities.name})`,
+        context: gigs.context,
+        reaction: gigBits.reaction,
+        rating: gigLogs.rating,
+        thoughts: gigLogs.thoughts,
+      })
+      .from(gigBits)
+      .innerJoin(gigs, eq(gigs.id, gigBits.gigId))
+      .leftJoin(venues, eq(venues.id, gigs.venueId))
+      .leftJoin(cities, eq(cities.id, gigs.cityId))
+      .leftJoin(gigLogs, eq(gigLogs.gigId, gigs.id))
+      .orderBy(asc(gigs.startsAt)),
+    getWriting(),
+  ]);
+  const queued = new Set(w.queue.map((q) => q.bitId));
+  return {
+    from,
+    to,
+    days,
+    sessions,
+    streak: w.punchlines.streak,
+    best: w.punchlines.best,
+    ideas: ideaRows.map((i) => ({ text: i.text, createdAt: i.createdAt })),
+    bits: bitRows.map((b) => ({
+      name: b.name,
+      status: b.status,
+      lengthMin: b.lengthMin,
+      docUrl: b.docUrl,
+      notes: b.notes,
+      queued: queued.has(b.id),
+      sessions: allBitSessions.filter((s) => s.bitId === b.id),
+      // Ostatnie 5 występów z tym bitem — starsze rzadko pomagają w redakcji.
+      stage: stage.filter((g) => g.bitId === b.id).slice(-5),
+    })),
+  };
 }
 
 /** Historia pisania: sesje z ostatnich `days` dni (najnowsze najpierw), z nazwą bitu. */

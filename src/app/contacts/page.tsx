@@ -22,6 +22,7 @@ export default async function ContactsPage() {
     <>
       <PageHeader
         title="Ludzie"
+        back={{ href: "/more", label: "Więcej" }}
         subtitle={plural(all.length, "kontakt", "kontakty", "kontaktów")}
         action={
           <Button asChild size="icon-lg" className="rounded-[10px]">

@@ -45,3 +45,40 @@ describe("kolejka redakcji i zamknięte pętle", () => {
     assert.deepEqual(fixedBits(reactions, []).length, 0, "bez redakcji to nie zasługa poprawki");
   });
 });
+
+describe("raport do Claude", async () => {
+  const { writingReport } = await import("@/lib/writing-report");
+  test("prośba na górze, regularność, premisy, pomysły i bity ze sceną", () => {
+    const md = writingReport({
+      from: "2026-09-10",
+      to: "2026-10-07",
+      days: 28,
+      streak: 3,
+      best: 5,
+      sessions: [
+        { date: "2026-10-05", kind: "punchlines", bitName: null, note: "teściowa na Tinderze" },
+        { date: "2026-10-06", kind: "edit", bitName: "Tinder", note: null },
+      ],
+      ideas: [{ text: "kolejka w Żabce o 6 rano", createdAt: "2026-10-06 08:00:00" }],
+      bits: [
+        {
+          name: "Tinder",
+          status: "editing",
+          lengthMin: 3,
+          docUrl: "https://notion.so/tinder",
+          notes: null,
+          queued: true,
+          sessions: [{ date: "2026-10-06", kind: "edit" }],
+          stage: [{ date: "2026-10-01T20:00", where: "Resort", context: "open_mic", reaction: -1, rating: 3, thoughts: "puenta o swipe nie siadła" }],
+        },
+      ],
+    });
+    assert.match(md, /^Jestem komikiem stand-upowym/);
+    assert.match(md, /Pomóż mi:/);
+    assert.match(md, /Trening puent: 1\/28 dni · obecna seria: 3 dni \(rekord 5\)/);
+    assert.match(md, /05\.10: teściowa na Tinderze/);
+    assert.match(md, /kolejka w Żabce/);
+    assert.match(md, /### Tinder ⚠ czeka na redakcję po scenie/);
+    assert.match(md, /01\.10 \(Resort, Open mic, bit: 👎, cały występ: 3\/5\) — notatka po występie: „puenta o swipe nie siadła”/);
+  });
+});

@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarDays, Ellipsis, House, Sparkles, Users } from "lucide-react";
+import { CalendarDays, Ellipsis, House, PenLine, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -8,13 +8,15 @@ import { cn } from "@/lib/utils";
 const TABS = [
   { href: "/", label: "Dziś", icon: House, match: (p: string) => p === "/" },
   { href: "/gigs", label: "Grania", icon: CalendarDays, match: (p: string) => p.startsWith("/gigs") },
-  { href: "/contacts", label: "Ludzie", icon: Users, match: (p: string) => p.startsWith("/contacts") },
   { href: "/events", label: "Okazje", icon: Sparkles, match: (p: string) => p.startsWith("/events") },
+  // Pisanie: trening, sesje, pomysły i materiał (bity) — wszystko o tworzeniu w jednym miejscu.
+  { href: "/writing", label: "Pisanie", icon: PenLine, match: (p: string) => ["/writing", "/bits"].some((x) => p.startsWith(x)) },
   {
     href: "/more",
     label: "Więcej",
     icon: Ellipsis,
-    match: (p: string) => ["/more", "/goals", "/bits", "/venues", "/cities", "/thoughts", "/settings"].some((x) => p.startsWith(x)),
+    match: (p: string) =>
+      ["/more", "/goals", "/contacts", "/venues", "/cities", "/thoughts", "/settings", "/stats", "/recurring"].some((x) => p.startsWith(x)),
   },
 ];
 

@@ -111,7 +111,7 @@ export type Rhythm = Awaited<ReturnType<typeof getPlanning>>;
 export async function getWriting() {
   const today = nowLocal().slice(0, 10);
   const since = addDays(today, -180);
-  const [sessions, reactions] = await Promise.all([
+  const [sessions, reactions, bitList] = await Promise.all([
     db
       .select({ id: writingSessions.id, date: writingSessions.date, kind: writingSessions.kind, bitId: writingSessions.bitId, minutes: writingSessions.minutes, note: writingSessions.note })
       .from(writingSessions)
@@ -124,17 +124,31 @@ export async function getWriting() {
       .innerJoin(gigs, eq(gigs.id, gigBits.gigId))
       .innerJoin(gigLogs, eq(gigLogs.gigId, gigs.id))
       .where(and(sql`${gigBits.reaction} is not null`, sql`${bits.status} <> 'rejected'`)),
+    db
+      .select({ id: bits.id, name: bits.name, status: bits.status, docUrl: bits.docUrl })
+      .from(bits)
+      .where(sql`${bits.status} <> 'rejected'`)
+      .orderBy(bits.name),
   ]);
   const punchDays = new Set(sessions.filter((s) => s.kind === "punchlines").map((s) => s.date));
+  const queue = editQueue(reactions as BitReaction[], sessions);
   const week = weekStart(today);
   return {
     today,
     punchlines: { ...dayStreak(punchDays, today), dots: weekDots(punchDays, today) },
     generate: { done: countInWeek(sessions, "generate", week), target: WEEKLY_TARGET.generate, streak: weekStreak(sessions, "generate", today) },
     edit: { done: countInWeek(sessions, "edit", week), target: WEEKLY_TARGET.edit, streak: weekStreak(sessions, "edit", today) },
-    queue: editQueue(reactions as BitReaction[], sessions),
+    queue,
     fixed: fixedBits(reactions as BitReaction[], sessions),
     todaySessions: sessions.filter((s) => s.date === today),
+    /** Bity do wyboru przy sesji: najpierw kolejka do poprawki, potem do redakcji, w testach, drafty, sprawdzone. */
+    bitOptions: (() => {
+      const queued = new Set(queue.map((q) => q.bitId));
+      const rank = { editing: 1, testing: 2, vomit: 3, tested: 4 } as Record<string, number>;
+      return [...bitList].sort(
+        (a, b) => Number(queued.has(b.id)) - Number(queued.has(a.id)) || (rank[a.status] ?? 9) - (rank[b.status] ?? 9),
+      );
+    })(),
   };
 }
 

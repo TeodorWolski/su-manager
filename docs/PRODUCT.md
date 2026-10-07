@@ -59,13 +59,7 @@ Ocena grania **nie jest** oceną bitu, bo zależy od publiki, line-upu itd. Bit 
   - kiedy: granie „napisałem/czekam” bez odpowiedzi, ok. 1,5 tygodnia (10 dni) przed graniem i min. 2 dni po ostatniej wiadomości,
   - pokazuje, gdzie już pisałem, i podpowiada kolejny kanał: Instagram → FB prywatny → FB fanpage,
   - ponowienie zwykle idzie innym komunikatorem niż pierwsza wiadomość.
-- **Pisanie** (`src/lib/writing.ts`, `components/writing.tsx`, historia `/writing`; dane w `getWriting`, `planning.ts`). Pisze się poza apką (Notion / Docs) — apka liczy tylko regularność:
-  - trzy rodzaje (`WRITING_KINDS`): **trening puent** (premisa + 10 puent) — codziennie, seria dni i kropki tygodnia, jeden tap „Zrobiłem” z opcjonalną premisą; **generowanie** (wypluwanie, zalążki, draft) i **redakcja** (po nagraniach / scenie) — cel tygodniowy (`WEEKLY_TARGET`, po 2), seria tygodni,
-  - seria puent nie zrywa się, dopóki dzień trwa („dziś jeszcze nie — nie zrywaj serii”),
-  - **do poprawki po scenie:** bit, którego ostatnia reakcja to 😐/👎, a od tamtego grania nie było redakcji tego bitu (`editQueue`); „Zredagowane” loguje sesję redakcji dla bitu,
-  - **poprawka siadła:** 😐/👎 → redakcja → następne granie 👍 (`fixedBits`),
-  - bit ma `docUrl` (link do tekstu) — jednym tapem z karty bitu i kolejki,
-  - poranny mail: linijka o serii puent, tygodniu i kolejce; niedzielny: sekcja „Pisanie i redakcja”.
+- **Pisanie na Dziś:** karta z treningiem puent i tygodniem generowania / redakcji (ta sama co w zakładce Pisanie, szczegóły niżej).
 - Nadchodzące, W toku (pipeline) i ostatnie „myśli” z logów.
 
 ### Grania (`/gigs`)
@@ -126,7 +120,19 @@ Ocena grania **nie jest** oceną bitu, bo zależy od publiki, line-upu itd. Bit 
   - open mic: „Siemanko, macie może wolny slot na [d.MM]?”,
   - „Wysłałem przez…” zakłada granie jako `contacted` i zostawia na liście.
 
-### Ludzie (`/contacts`)
+### Pisanie (`/writing`, zakładka na dolnym pasku)
+Pisze się poza apką (Notion / Docs) — apka liczy regularność, wiąże pracę z bitami i składa raport. Logika: `src/lib/writing.ts`, dane: `getWriting` (`planning.ts`), karta: `components/writing.tsx`.
+- **Pomysł na szybko:** jedno pole na górze (tabela `ideas`). Z pomysłu: „Premisa” (loguje dzisiejszy trening puent z tą premisą), „→ bit” (bit roboczy Vomit, cały tekst w notatkach), ✕ (odrzucony).
+- **Trzy rodzaje pracy** (`WRITING_KINDS`):
+  - **trening puent** (premisa + 10 puent) — codziennie: seria dni, kropki tygodnia, „Zrobiłem” z opcjonalną premisą; seria nie zrywa się, dopóki dzień trwa,
+  - **generowanie** — cel tygodniowy (`WEEKLY_TARGET`, 2), bit opcjonalny albo nowy draft („Wpisz inne…” zakłada bit Vomit),
+  - **redakcja** — cel tygodniowy (2), **zawsze z bitem** (bity z kolejki ⚠ na górze listy).
+- **Do poprawki po scenie** (`editQueue`): ostatnia reakcja bitu 😐/👎 i od tamtego grania brak redakcji tego bitu. **Poprawka siadła** (`fixedBits`): 😐/👎 → redakcja → 👍.
+- **Bity w pracy** (do redakcji / w testach / drafty): link do tekstu (`bits.docUrl`), ostatnia reakcja ze sceny, ostatnia sesja. Materiał (`/bits`) jest pod tą zakładką.
+- **Raport do Claude** (`/writing/report?d=7|28`, `writingReport` w `src/lib/writing-report.ts`): Markdown z prośbą na górze (regularność, które bity redagować, które pomysły rozwinąć, plan na tydzień), regularność, premisy, pomysły, sesje, bity w pracy z ostatnimi 5 występami (reakcja, ocena występu, notatka po graniu). Przycisk Kopiuj.
+- Historia sesji: `/writing/history`. Maile: poranny (seria, tydzień, kolejka), niedzielny (sekcja pisania + link do raportu tygodnia).
+
+### Ludzie (`/contacts`, w zakładce Więcej)
 - **CRM:** rola (komik / organizator / scena), relacja, aliasy (pomagają dopasować nazwiska ze scrapera), notatki.
 - **Historia kontaktu** (`interactions`):
   - kanał to tekst z listy `CHANNELS` w `labels.ts`,

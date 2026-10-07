@@ -6,12 +6,32 @@ import { plural } from "@/lib/text";
 import { fmtDate } from "@/lib/time";
 import { cn } from "@/lib/utils";
 import { WRITING_HINT, WRITING_LABEL } from "@/lib/writing";
-import { PendingButton } from "./form";
+import { PendingButton, Select, SelectOrNew } from "./form";
 
 const DAY_LETTERS = ["P", "W", "Ś", "C", "P", "S", "N"];
 
-/** Kafelek generowania / redakcji: x z celu w tym tygodniu + „+ sesja”. */
-function WeeklyTile({ kind, done, target, streak }: { kind: "generate" | "edit"; done: number; target: number; streak: number }) {
+type BitOption = Writing["bitOptions"][number];
+
+/**
+ * Kafelek generowania / redakcji: x z celu w tym tygodniu + „+ sesja” z wyborem bitu.
+ * Redakcja — bit obowiązkowy (kolejka do poprawki na górze), generowanie — bit opcjonalny albo nowy draft.
+ */
+function WeeklyTile({
+  kind,
+  done,
+  target,
+  streak,
+  bits,
+  queued,
+}: {
+  kind: "generate" | "edit";
+  done: number;
+  target: number;
+  streak: number;
+  bits: BitOption[];
+  queued: Set<number>;
+}) {
+  const options = bits.map((b) => ({ value: b.id, label: queued.has(b.id) ? `⚠ ${b.name}` : b.name }));
   const hit = done >= target;
   return (
     <div className="bg-card border-border flex flex-col rounded-[14px] border p-3.5">
@@ -24,12 +44,24 @@ function WeeklyTile({ kind, done, target, streak }: { kind: "generate" | "edit";
       <div className="text-muted-foreground mt-0.5 min-h-4 text-[11.5px]">
         {streak > 1 ? `seria ${plural(streak, "tydzień", "tygodnie", "tygodni")}` : WRITING_HINT[kind]}
       </div>
-      <form action={logWriting} className="mt-2.5">
-        <input type="hidden" name="kind" value={kind} />
-        <PendingButton className="bg-secondary text-secondary-foreground h-9 w-full rounded-lg text-[14px] font-medium active:scale-95">
-          + sesja
-        </PendingButton>
-      </form>
+      <details className="group/s mt-2.5">
+        <summary className="bg-secondary text-secondary-foreground flex h-9 cursor-pointer list-none items-center justify-center gap-1 rounded-lg text-[14px] font-medium [&::-webkit-details-marker]:hidden">
+          + sesja <ChevronDown className="size-3.5 transition-transform group-open/s:rotate-180" />
+        </summary>
+        <form action={logWriting} className="bg-muted mt-2 space-y-2 rounded-lg p-2">
+          <input type="hidden" name="kind" value={kind} />
+          <div className="bg-card rounded-md px-2 py-1.5">
+            {kind === "edit" ? (
+              <Select name="bitId" required placeholder="który bit?" options={options} className="text-left text-[14px]" />
+            ) : (
+              <SelectOrNew name="bitId" newName="newBitName" placeholder="bit (opcjonalnie)" newPlaceholder="nowy draft" options={options} />
+            )}
+          </div>
+          <PendingButton className="bg-primary text-primary-foreground h-9 w-full rounded-lg text-[14px] font-semibold active:scale-95">
+            Zapisz
+          </PendingButton>
+        </form>
+      </details>
     </div>
   );
 }
@@ -38,9 +70,10 @@ function WeeklyTile({ kind, done, target, streak }: { kind: "generate" | "edit";
  * Ekran Dziś: regularność pisania. Trening puent — codziennie (seria dni), generowanie i redakcja —
  * cel tygodniowy, plus kolejka bitów do poprawki po scenie. Samo pisanie dzieje się w Notion / Docs.
  */
-export function WritingCard({ w }: { w: Writing }) {
+export function WritingCard({ w, link = { href: "/writing", label: "Pisanie →" } }: { w: Writing; link?: { href: string; label: string } }) {
   const p = w.punchlines;
   const todayPunch = w.todaySessions.find((s) => s.kind === "punchlines");
+  const queued = new Set(w.queue.map((q) => q.bitId));
   const recentFix = w.fixed.filter((f) => f.date.slice(0, 10) >= w.today.slice(0, 8) + "01").at(-1);
   return (
     <section className="mb-7">
@@ -48,8 +81,8 @@ export function WritingCard({ w }: { w: Writing }) {
         <h2 className="text-muted-foreground flex items-center gap-1 text-[12.5px] font-medium">
           <PenLine className="size-3.5" /> Pisanie
         </h2>
-        <Link href="/writing" className="text-primary text-[13px]">
-          Historia
+        <Link href={link.href} className="text-primary text-[13px]">
+          {link.label}
         </Link>
       </div>
 
@@ -109,8 +142,8 @@ export function WritingCard({ w }: { w: Writing }) {
       </div>
 
       <div className="mt-2.5 grid grid-cols-2 gap-2.5">
-        <WeeklyTile kind="generate" {...w.generate} />
-        <WeeklyTile kind="edit" {...w.edit} />
+        <WeeklyTile kind="generate" {...w.generate} bits={w.bitOptions} queued={queued} />
+        <WeeklyTile kind="edit" {...w.edit} bits={w.bitOptions} queued={queued} />
       </div>
 
       {(w.queue.length > 0 || recentFix) && (

@@ -150,6 +150,7 @@ export function renderWeekly(w: Weekly) {
     `Generowanie: ${wr.generate}/${wr.targets.generate} · redakcja: ${wr.edit}/${wr.targets.edit}`,
     wr.fixed.length ? `🎯 Poprawki, które siadły: ${esc(wr.fixed.map((f) => f.name).join(", "))}` : "",
     wr.queue ? muted(`${plural(wr.queue, "bit czeka", "bity czekają", "bitów czeka")} na redakcję po scenie`) : "",
+    `<a href="${APP_URL}/writing/report?d=7" style="color:#13824a">Raport tygodnia do wklejenia w Claude →</a>`,
   ]
     .filter(Boolean)
     .join("<br>");

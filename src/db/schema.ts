@@ -124,6 +124,18 @@ export const bits = sqliteTable("bits", {
  */
 export const WRITING_KINDS = ["punchlines", "generate", "edit"] as const;
 
+/** Pomysł zapisany na szybko: new → used (zamieniony w bit / premisa treningu) albo dropped. */
+export const IDEA_STATUSES = ["new", "used", "dropped"] as const;
+
+export const ideas = sqliteTable("ideas", {
+  id: id(),
+  text: text("text").notNull(),
+  status: text("status", { enum: IDEA_STATUSES }).notNull().default("new"),
+  /** Bit, który z pomysłu powstał. */
+  bitId: integer("bit_id").references(() => bits.id, { onDelete: "set null" }),
+  createdAt: createdAt(),
+});
+
 /** Sesja pisania — samo „że i nad czym”, tekst zostaje w Notion / Docs. */
 export const writingSessions = sqliteTable("writing_sessions", {
   id: id(),
@@ -303,6 +315,8 @@ export type Gig = typeof gigs.$inferSelect;
 export type GigLog = typeof gigLogs.$inferSelect;
 export type Event = typeof events.$inferSelect;
 export type WritingKind = (typeof WRITING_KINDS)[number];
+export type BitStatus = (typeof BIT_STATUSES)[number];
+export type Idea = typeof ideas.$inferSelect;
 export type WritingSession = typeof writingSessions.$inferSelect;
 export type RecurrenceInterval = (typeof RECURRENCE_INTERVALS)[number];
 export type RecurringSeries = typeof recurringSeries.$inferSelect;
