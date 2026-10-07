@@ -12,6 +12,8 @@ import { and, eq, inArray, sql } from "drizzle-orm";
 import { db, events, gigs } from "@/db";
 import { sameShow, showBucket } from "@/lib/dedupe";
 import { dedupeKey, getOpportunities } from "@/lib/opportunities";
+import { RECURRING_SOURCE } from "@/lib/recurring";
+import { syncRecurring } from "@/lib/recurring-sync";
 import { getFollowUps, getPlanning } from "@/lib/planning";
 import { sendReport } from "@/scraper/email";
 import { healthIssues } from "@/scraper/health";
@@ -61,7 +63,8 @@ async function main() {
     const k = showBucket(e);
     buckets.set(k, [...(buckets.get(k) ?? []), { ...e, performers: e.performers ?? null }]);
   };
-  existing.forEach(remember);
+  // Przewidywane terminy serii nie blokują prawdziwych — prawdziwy wygrywa, a syncRecurring sprząta.
+  existing.filter((e) => e.source !== RECURRING_SOURCE).forEach(remember);
   let crossDupes = 0;
   for (const s of scraped) {
     const key = dedupeKey(s.title, s.startsAt, s.venueName);
@@ -109,6 +112,12 @@ async function main() {
   }
   for (const part of chunk(seenIds, 500)) {
     await db.update(events).set({ lastSeenAt: now }).where(inArray(events.id, part));
+  }
+  // Cykliczne serie: przewidywane terminy na 8 tygodni (po zapisie prawdziwych, żeby je uwzględnić).
+  try {
+    await syncRecurring(log);
+  } catch (e) {
+    failures.push(`cykliczne: ${(e as Error).message}`);
   }
   const total = await db.select({ n: sql<number>`count(*)` }).from(events);
   log(

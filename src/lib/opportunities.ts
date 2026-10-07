@@ -5,6 +5,8 @@
 import { and, eq, gte, sql } from "drizzle-orm";
 import { cities, contacts, db, events, gigs, hiddenTitles, venues, type City, type Contact, type Event } from "@/db";
 import { alongRoute, coords, distanceKm } from "./geo";
+import { describe as describeSeries, RECURRING_SOURCE, seriesKey } from "./recurring";
+import { loadSeries } from "./recurring-sync";
 import { planRoute, routeDays } from "./route";
 import { matchContacts, matchesQuery } from "./match";
 import { isWantedLanguage, performerKey, performerName } from "./performer";
@@ -56,6 +58,10 @@ export type Opportunity = {
   distanceKm?: number;
   /** Dodatkowa etykieta na karcie (np. w „Trasie”: „12 km od trasy”). */
   badge?: string;
+  /** Wydarzenie należy do cyklicznej serii (wykrytej albo oznaczonej przeze mnie). */
+  series: { key: string; how: "auto" | "manual"; text: string } | null;
+  /** Termin przewidziany z rytmu serii — jeszcze nie ma go w bileterii. */
+  predicted: boolean;
 };
 
 /** Wszystkie terminy jednego komika w danej zakładce: najbliższy w zasięgu + reszta jako alternatywy. */
@@ -114,7 +120,7 @@ const nextGigSql = (column: string) =>
 async function loadContext() {
   const now = nowLocal();
   const today = now.slice(0, 10);
-  const [allCities, people, never, hidden, myGigs] = await Promise.all([
+  const [allCities, people, never, hidden, myGigs, recurring] = await Promise.all([
     db.select().from(cities),
     db
       .select({
@@ -154,6 +160,7 @@ async function loadContext() {
       })
       .from(gigs)
       .where(and(gte(gigs.startsAt, today), sql`${gigs.status} not in ('rejected', 'cancelled')`)),
+    loadSeries(),
   ]);
   return {
     citiesByName: new Map(allCities.map((c) => [normalize(c.name), c])),
@@ -164,6 +171,9 @@ async function loadContext() {
     blacklist: new Set(never.map((v) => `${normalize(v.name)}|${normalize(v.cityName ?? "")}`)),
     hidden: new Set(hidden.map((h) => h.t)),
     myGigs,
+    series: new Map(recurring.series.map((s) => [s.key, { key: s.key, how: s.how, text: describeSeries(s.interval, s.anchor) }])),
+    /** Serie, które sam wyłączyłem — do menu „Cykliczne?” (pokazać „wyłączone”). */
+    seriesOff: new Set(recurring.decisions.filter((d) => d.mode === "off").map((d) => d.key)),
   };
 }
 
@@ -230,6 +240,8 @@ function classify(e: EventRow, ctx: Ctx, newSince: string, force = false): Oppor
       : { key: performerKey(e.title), name: performerName(e.title), contactId: null },
     tab,
     note,
+    series: ctx.series.get(seriesKey(e)) ?? null,
+    predicted: e.source === RECURRING_SOURCE,
   };
 }
 
@@ -249,6 +261,7 @@ export type EventRow = Pick<
   | "dismissed"
   | "gigId"
   | "availability"
+  | "source"
 >;
 
 /** Nadchodzące, nieukryte wydarzenia — tylko kolumny potrzebne w raporcie (mniej danych z bazy). */
@@ -266,6 +279,7 @@ export function loadUpcomingEvents(today: string): Promise<EventRow[]> {
       dismissed: events.dismissed,
       gigId: events.gigId,
       availability: events.availability,
+      source: events.source,
     })
     .from(events)
     .where(and(gte(events.startsAt, today), eq(events.dismissed, false)))

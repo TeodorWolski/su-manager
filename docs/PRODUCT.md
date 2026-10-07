@@ -99,6 +99,12 @@ Ocena grania **nie jest** oceną bitu, bo zależy od publiki, line-upu itd. Bit 
   - korytarz 30/50/80 km od **linii prostej** start–cel (prawdziwa droga bywa inna, wtedy szerszy korytarz),
   - dni drogi = N dni przed dniem przyjazdu; każdy dzień ma idealny postęp (ostatni tuż przed celem), plan wybiera max. jedno granie na dzień tak, żeby jechać do przodu (programowanie dynamiczne), reszta jako „Inne tego dnia”,
   - dni z moim graniem (też w toku) są zajęte; bez pomijanych i wyciszonych komików; zasięg z Warszawy ignorowany.
+- **Cykliczne serie** (open miki itp.; `src/lib/recurring.ts`, zapis `src/lib/recurring-sync.ts`, ekran `/recurring`):
+  - seria = ten sam tytuł + miasto + miejsce (`seriesKey`),
+  - wykrywanie: min. 3 terminy, ten sam dzień tygodnia, stały odstęp → co tydzień / co 2 tygodnie / „n-ty dzień tygodnia miesiąca” / co 4 tygodnie (`detectInterval`); wygasa po 42 dniach bez prawdziwego terminu,
+  - ręcznie przy wydarzeniu „Cykliczne?” (co tydzień / 2 / 4 tygodnie / co miesiąc / nie jest cykliczne / wykrywaj sam) — tabela `recurring_series` trzyma tylko moje decyzje (`manual` / `off`), wykryte liczone na bieżąco,
+  - przewidywane terminy na 8 tygodni naprzód, tylko **po** ostatnim znanym terminie, zapisane jako wydarzenia ze źródłem `cykliczne` — dzięki temu działają w Okazjach, Najgorętszych, Rytmie, Trasie i wyszukiwarce bez zmian; na karcie etykieta „przewidywane”, nie trafiają do maila jako nowe,
+  - prawdziwy termin z bileterii wygrywa: przewidywany jest usuwany przy synchronizacji (po każdym przebiegu scrapera i po mojej decyzji), a granie założone z przewidywanego przechodzi na prawdziwe wydarzenie.
 - **Historia przy komiku:** na karcie widać „pisałeś 12.09 (IG) · bez odpowiedzi / odpisał” z ostatniej interakcji w CRM, żeby nie pytać za często.
 - **Grupowanie:** jedna karta na komika; najbliższy termin główny, reszta jako „Inne terminy”.
 - **Wyciszanie komika:**

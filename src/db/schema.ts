@@ -227,6 +227,30 @@ export const events = sqliteTable(
   (t) => [uniqueIndex("events_source_id").on(t.source, t.sourceId)],
 );
 
+/**
+ * Rytm serii wydarzeń: co tydzień / co 2 / co 4 tygodnie albo co miesiąc (ten sam n-ty dzień tygodnia,
+ * np. „pierwsza środa”).
+ */
+export const RECURRENCE_INTERVALS = ["w1", "w2", "w4", "m"] as const;
+
+/**
+ * Moje decyzje o cykliczności serii (open miki itp.). Wykryte automatycznie serie nie są tu zapisywane —
+ * liczymy je na bieżąco z wydarzeń; wiersz pojawia się, gdy sam oznaczę serię („manual”)
+ * albo powiem, że to jednak nie jest cykliczne („off”). Klucz serii: patrz src/lib/recurring.ts.
+ */
+export const recurringSeries = sqliteTable("recurring_series", {
+  key: text("key").primaryKey(),
+  mode: text("mode", { enum: ["manual", "off"] }).notNull(),
+  interval: text("interval", { enum: RECURRENCE_INTERVALS }),
+  title: text("title").notNull(),
+  cityName: text("city_name"),
+  venueName: text("venue_name"),
+  url: text("url"),
+  /** Znany termin serii (lokalny czas, z godziną) — od niego liczymy kolejne. */
+  anchor: text("anchor"),
+  createdAt: createdAt(),
+});
+
 /** Programy wyciszone w raporcie („Ukryj ten program wszędzie”) — po znormalizowanym tytule. */
 export const hiddenTitles = sqliteTable("hidden_titles", {
   normalizedTitle: text("normalized_title").primaryKey(),
@@ -255,6 +279,8 @@ export type Bit = typeof bits.$inferSelect;
 export type Gig = typeof gigs.$inferSelect;
 export type GigLog = typeof gigLogs.$inferSelect;
 export type Event = typeof events.$inferSelect;
+export type RecurrenceInterval = (typeof RECURRENCE_INTERVALS)[number];
+export type RecurringSeries = typeof recurringSeries.$inferSelect;
 export type GigStatus = (typeof GIG_STATUSES)[number];
 export type GigContext = (typeof GIG_CONTEXTS)[number];
 export type GigOutcome = (typeof GIG_OUTCOMES)[number];

@@ -1,7 +1,15 @@
-import { ChevronDown, ExternalLink, MapPin, Navigation, Search, X } from "lucide-react";
+import { ChevronDown, ExternalLink, MapPin, Navigation, Repeat, Search, X } from "lucide-react";
 import Link from "next/link";
 import { PendingButton } from "@/components/form";
-import { eventToGig, hidePerformer, messageFromEvent, setCityTravel, snoozePerformer, unsnoozeContact } from "@/app/actions";
+import {
+  eventToGig,
+  hidePerformer,
+  markRecurring,
+  messageFromEvent,
+  setCityTravel,
+  snoozePerformer,
+  unsnoozeContact,
+} from "@/app/actions";
 import { Empty, PageHeader, Pill, Section } from "@/components/ios";
 import { MessageComposer } from "@/components/message-composer";
 import { isMonth, MonthChips, monthCounts } from "@/components/month-chips";
@@ -23,6 +31,7 @@ import {
 import { loadUpcomingEventsCached } from "@/lib/events-cache";
 import { findPlace, placeName } from "@/lib/geo";
 import { pitchMessage } from "@/lib/messages";
+import { INTERVAL_LABEL } from "@/lib/recurring";
 import { parseDays, ROUTE_CORRIDORS, ROUTE_MAX_DAYS } from "@/lib/route";
 import { parseDateQuery } from "@/lib/time";
 import { plural } from "@/lib/text";
@@ -129,6 +138,37 @@ function HideMenu({ g }: { g: OpportunityGroup }) {
   );
 }
 
+/** „↻ Cykliczne?”: oznacz rytm serii (albo że to nie seria) — apka dopisze przewidywane terminy. */
+function RecurringMenu({ o }: { o: Opportunity }) {
+  const button = "bg-card h-9 rounded-lg px-3 text-left text-[14px] active:scale-[0.98]";
+  return (
+    <details className="group/rec open:basis-full">
+      <summary className="bg-secondary text-secondary-foreground flex h-9 w-fit cursor-pointer list-none items-center gap-1 rounded-lg px-3 text-[14px] [&::-webkit-details-marker]:hidden">
+        <Repeat className="size-3.5" /> {o.series ? "Seria" : "Cykliczne?"}
+        <ChevronDown className="size-3.5 transition-transform group-open/rec:rotate-180" />
+      </summary>
+      <div className="bg-muted mt-2 grid grid-cols-2 gap-1.5 rounded-xl p-2">
+        {(Object.keys(INTERVAL_LABEL) as (keyof typeof INTERVAL_LABEL)[]).map((i) => (
+          <form key={i} action={markRecurring.bind(null, o.event.id, i)}>
+            <PendingButton className={cn(button, "w-full")}>{INTERVAL_LABEL[i]}</PendingButton>
+          </form>
+        ))}
+        <form action={markRecurring.bind(null, o.event.id, "off")}>
+          <PendingButton className={cn(button, "text-muted-foreground w-full")}>Nie jest cykliczne</PendingButton>
+        </form>
+        {o.series?.how === "manual" && (
+          <form action={markRecurring.bind(null, o.event.id, "auto")}>
+            <PendingButton className={cn(button, "text-muted-foreground w-full")}>Wykrywaj sam</PendingButton>
+          </form>
+        )}
+        <p className="text-muted-foreground col-span-2 px-1 text-[12px]">
+          Rytm liczę od tego terminu ({fmtDate(o.event.startsAt)}); przewidywane terminy pojawią się w Okazjach na 8 tygodni naprzód.
+        </p>
+      </div>
+    </details>
+  );
+}
+
 function GroupCard({ g }: { g: OpportunityGroup }) {
   const o = g.primary;
   return (
@@ -139,13 +179,21 @@ function GroupCard({ g }: { g: OpportunityGroup }) {
           {o.event.availability && (
             <Pill tone={AVAILABILITY_TONE[o.event.availability]}>{AVAILABILITY_LABEL[o.event.availability]}</Pill>
           )}
-          {g.isNew && <Pill tone="info">nowe</Pill>}
+          {o.predicted && <Pill tone="muted">przewidywane</Pill>}
+          {g.isNew && !o.predicted && <Pill tone="info">nowe</Pill>}
           {o.note && <Pill tone="muted">{o.note}</Pill>}
           {o.badge && <Pill tone="neutral">{o.badge}</Pill>}
           {o.distanceKm != null && <Pill tone="neutral">{o.distanceKm < 3 ? "na miejscu" : `~${o.distanceKm} km`}</Pill>}
           <ExternalLink className="text-muted-foreground/60 mt-1 size-3.5 shrink-0" />
         </div>
         <div className="text-muted-foreground mt-0.5 text-[13px]">{where(o)}</div>
+        {o.series && (
+          <div className="text-muted-foreground mt-0.5 flex items-center gap-1 text-[12.5px]">
+            <Repeat className="size-3" /> {o.series.text}
+            {o.series.how === "auto" && " · wykryte"}
+            {o.predicted && " · sprawdź u organizatora"}
+          </div>
+        )}
       </a>
 
       {g.matches.length > 0 && (
@@ -172,6 +220,7 @@ function GroupCard({ g }: { g: OpportunityGroup }) {
       <div className="mt-2.5 flex flex-wrap gap-2">
         <GigButton o={o} />
         <WriteMenu g={g} />
+        {(o.isOpenMic || o.series) && <RecurringMenu o={o} />}
         <HideMenu g={g} />
       </div>
 

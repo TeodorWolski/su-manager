@@ -5,6 +5,8 @@ import { refresh, updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { matchContacts } from "@/lib/match";
 import { EVENTS_TAG, isOpenMic, MUTE_AFTER_OUTCOME_DAYS } from "@/lib/opportunities";
+import { seriesKey } from "@/lib/recurring";
+import { syncRecurring } from "@/lib/recurring-sync";
 import { normalize } from "@/lib/text";
 import { nowLocal } from "@/lib/time";
 import {
@@ -24,6 +26,8 @@ import {
   goals,
   IGNORE_REASONS,
   interactions,
+  RECURRENCE_INTERVALS,
+  recurringSeries,
   VENUE_VERDICTS,
   venues,
   type GigOutcome,
@@ -493,6 +497,53 @@ async function gigFromEvent(id: number) {
     .returning({ id: gigs.id });
   await db.update(events).set({ gigId: gig.id }).where(eq(events.id, id));
   return gig.id;
+}
+
+/**
+ * „Cykliczne?” przy wydarzeniu: co tydzień / co 2 / co 4 tygodnie / co miesiąc („manual”),
+ * „off” = to nie jest cykliczne (wyłącza też wykrywanie), „auto” = zdaj się na wykrywanie.
+ * Od razu przelicza przewidywane terminy.
+ */
+export async function markRecurring(eventId: number, choice: string) {
+  const [e] = await db.select().from(events).where(eq(events.id, eventId));
+  if (!e) throw new Error("Nie ma takiego wydarzenia");
+  const key = seriesKey(e);
+  if (choice === "auto") {
+    await db.delete(recurringSeries).where(eq(recurringSeries.key, key));
+  } else {
+    const interval = oneOf(RECURRENCE_INTERVALS, choice);
+    if (!interval && choice !== "off") throw new Error("Nieznany rytm");
+    const values = {
+      mode: interval ? ("manual" as const) : ("off" as const),
+      interval,
+      title: e.title,
+      cityName: e.cityName,
+      venueName: e.venueName,
+      url: e.url || null,
+      anchor: e.startsAt,
+    };
+    await db
+      .insert(recurringSeries)
+      .values({ key, ...values })
+      .onConflictDoUpdate({ target: recurringSeries.key, set: values });
+  }
+  await syncRecurring();
+  updateTag(EVENTS_TAG);
+  refresh();
+}
+
+/** Wyłącz / przywróć serię z ekranu „Cykliczne” (po kluczu, bez wydarzenia pod ręką). */
+export async function setSeriesMode(key: string, mode: "off" | "auto", title: string) {
+  if (mode === "auto") await db.delete(recurringSeries).where(eq(recurringSeries.key, key));
+  else {
+    await db
+      .insert(recurringSeries)
+      .values({ key, mode: "off", interval: null, title })
+      .onConflictDoUpdate({ target: recurringSeries.key, set: { mode: "off", interval: null } });
+  }
+  await syncRecurring();
+  updateTag(EVENTS_TAG);
+  refresh();
 }
 
 /** Szybkie przypisanie czasu dojazdu miastu z raportu („~2 h”, „dalej”). */
