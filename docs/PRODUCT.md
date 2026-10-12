@@ -18,7 +18,7 @@ Używana głównie **z telefonu** (PWA, styl iOS). Produkcyjna baza to źródło
 - **Podpowiadaj, nie blokuj.** Rytm, ponawianie wiadomości, sugestie okazji to łagodne podpowiedzi („może warto…”), nigdy blokady ani wymuszenia. Wyjątek świadomy: bramka oceny po graniu (niżej).
 - **Jeden tap.** Najczęstsze akcje (status, ocena, „Wysłałem przez IG”) mają być przyciskiem, nie formularzem.
 - **UI i teksty po polsku**, ton luźny („Siemanko”, „Zabiłem się / Rozwaliłem”). Komentarze w kodzie też po polsku.
-- **Pojedynczy użytkownik.** Bez kont, ról i multi-tenancy. Dostęp chroni basic auth (`APP_PASSWORD`, `src/proxy.ts`).
+- **Pojedynczy użytkownik.** Bez kont, ról i multi-tenancy. Dostęp: logowanie hasłem (`APP_PASSWORD`) albo Face ID (passkey), sesja w ciasteczku na rok — szczegóły w „Logowanie i bezpieczeństwo”.
 - **Tanio i prosto.** Vercel Hobby + Turso. Bez kolejek, bez zewnętrznych serwisów poza scraperem i mailem (Resend).
 - **Rozróżnienia domenowe są ważne.** Patrz słownik niżej i nie upraszczaj ich.
 
@@ -155,6 +155,16 @@ Pisze się poza apką (Notion / Docs) — apka liczy regularność, wiąże prac
 - Miesiąc od poniedziałku, numery tygodni ISO, Σ grań w tygodniu względem rytmu 2–3 (zielone w normie, ochra >3).
 - **Kolor = typ grania** (tokeny `--ctx-*` w `globals.css`, paleta sprawdzona walidatorem w obu motywach): open mic niebieski, przed kimś pomarańczowy, support turkusowy, headline żółty, inne szare. **Pełne kółko = potwierdzone, obwódka = w toku**; kropka = drugie granie tego dnia. Legenda zawsze widoczna (jasny turkus/żółty mają <3:1 wobec białego — podpisy są wymagane).
 - Tap w dzień: lista grań z typem słownie i linkami; wolny dzień — „Co gra tego dnia?” (wyszukiwarka Okazji z datą). Dane: `/api/month?from=&to=` (bez odrzuconych i odwołanych).
+
+### Logowanie i bezpieczeństwo (`/login`, Więcej → Bezpieczeństwo)
+Basic auth zastąpione, bo w PWA na iOS nie trzymał sesji, a odmowy 401 w tle wyglądały jak „brak internetu”.
+- **Sesja** (`src/lib/session.ts`): ciasteczko `sum_session` HttpOnly + Secure + SameSite=Lax, rok, odnawiane raz dziennie (proxy). Format `<sid>.<issuedAt>.<hmac>`, klucz HMAC z `SESSION_SECRET` albo `APP_PASSWORD` (zmiana hasła = wylogowanie wszystkich). W tabeli `sessions` tylko SHA-256 z `sid`; ważność sprawdzana w bazie z 60-sekundowym cache.
+- **Proxy** (`src/proxy.ts`): bez sesji strony → `/login?next=…`, reszta → 401 JSON. Poza logowaniem: `/login`, `/calendar/<token>.ics`, `/api/notify` (CRON_SECRET), statyczne pliki, ikony, manifest, `sw.js`.
+- **Każda akcja serwerowa** zaczyna się od `requireSession()` (`src/lib/auth.ts`) — zgodnie z dokumentacją Next nie polegamy tylko na proxy. Layout bez sesji nie renderuje paska, kalendarza ani bramki oceny.
+- **Hasło:** `APP_PASSWORD`, porównanie stałoczasowe, 5 błędnych prób → 15 min blokady logowania hasłem (`app_state` „login-lock”); passkey działa dalej.
+- **Face ID / passkeys** (`@simplewebauthn`, tabela `passkeys`): dodawanie tylko po zalogowaniu (Bezpieczeństwo; po pierwszym logowaniu hasłem bez passkeya apka tam przenosi), logowanie bez hasła na `/login`. Wyzwanie w ciasteczku HttpOnly na 5 min, `userVerification: required`, RP = domena z nagłówków (produkcja: su-manager.vercel.app).
+- **Ekran Bezpieczeństwo:** passkeys (usuń), zalogowane urządzenia (wyloguj, wyloguj wszystkie inne), wyloguj się.
+- Bez `APP_PASSWORD` (lokalnie) logowanie jest wyłączone.
 
 ### Powiadomienia i harmonogram
 - **Web Push** (PWA, `public/sw.js`, `src/lib/push.ts`, włącznik: Więcej → Powiadomienia, tabela `push_subscriptions`): rano grania do ponowienia, wieczorem trening puent (jeśli dziś nie było, z serią) i „jak poszło?” 90 min po starcie grania bez logu (`src/lib/notify.ts`). Każde przypomnienie raz dziennie (`oncePerDay`, tabela `app_state`).

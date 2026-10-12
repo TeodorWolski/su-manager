@@ -1,30 +1,35 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { authEnabled, checkSession, cookieOptions, refreshSession, SESSION_COOKIE } from "@/lib/session";
 
 /**
- * Basic auth dla całej aplikacji. Bez APP_PASSWORD (lokalnie) — wpuszcza każdego.
- * Login dowolny, liczy się tylko hasło.
+ * Dostęp tylko po zalogowaniu (ciasteczko sesji, patrz src/lib/session.ts). Bez APP_PASSWORD
+ * (lokalnie) — wpuszcza każdego. Strony bez sesji → /login, zapytania w tle → 401 JSON
+ * (zamiast „problemu z internetem”, który dawał basic auth w PWA).
  */
-export function proxy(request: NextRequest) {
-  const password = process.env.APP_PASSWORD;
-  if (!password) return NextResponse.next();
+export async function proxy(request: NextRequest) {
+  if (!authEnabled()) return NextResponse.next();
 
-  const header = request.headers.get("authorization");
-  if (header?.startsWith("Basic ")) {
-    const decoded = atob(header.slice(6));
-    if (decoded.slice(decoded.indexOf(":") + 1) === password) {
-      return NextResponse.next();
+  const session = await checkSession(request.cookies.get(SESSION_COOKIE)?.value);
+  if (!session) {
+    const isPage = request.method === "GET" && (request.headers.get("accept") ?? "").includes("text/html");
+    if (isPage) {
+      const url = new URL("/login", request.url);
+      const next = request.nextUrl.pathname + request.nextUrl.search;
+      if (next !== "/") url.searchParams.set("next", next);
+      return NextResponse.redirect(url);
     }
+    return NextResponse.json({ error: "Sesja wygasła — zaloguj się ponownie" }, { status: 401 });
   }
 
-  return new NextResponse("Auth required", {
-    status: 401,
-    headers: { "WWW-Authenticate": 'Basic realm="SU Manager"' },
-  });
+  // Przesuwane okno: raz dziennie świeże ciasteczko na kolejny rok.
+  const response = NextResponse.next();
+  const fresh = await refreshSession(session);
+  if (fresh) response.cookies.set(SESSION_COOKIE, fresh, cookieOptions);
+  return response;
 }
 
 export const config = {
-  // /calendar/<token>.ics — feed dla Google Calendar, chroniony tokenem w adresie zamiast hasła.
-  // /api/notify — woła go zewnętrzny cron, chroniony CRON_SECRET (patrz route).
-  // Ikony, manifest i sw.js bez hasła — przeglądarka pobiera je w tle (instalacja, powiadomienia).
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|icon|apple-icon|calendar/|api/notify|sw.js).*)"],
+  // Bez logowania: /login (strona i jej akcje), /calendar/<token>.ics (tajny token), /api/notify
+  // (CRON_SECRET), statyczne pliki, ikony, manifest i sw.js — przeglądarka pobiera je w tle.
+  matcher: ["/((?!login|_next/static|_next/image|favicon.ico|manifest.webmanifest|icon|apple-icon|calendar/|api/notify|sw.js).*)"],
 };

@@ -3,6 +3,7 @@
 import { desc, eq, sql } from "drizzle-orm";
 import { refresh, updateTag } from "next/cache";
 import { redirect } from "next/navigation";
+import { requireSession } from "@/lib/auth";
 import { matchContacts } from "@/lib/match";
 import { EVENTS_TAG, isOpenMic, MUTE_AFTER_OUTCOME_DAYS } from "@/lib/opportunities";
 import { seriesKey } from "@/lib/recurring";
@@ -92,6 +93,7 @@ async function venueIdByName(name: string, cityId: number | null) {
 }
 
 export async function saveGig(fd: FormData) {
+  await requireSession();
   const id = int(fd, "id");
   // „Wpisz inne…”: nowe miasto / scena / komik — po nazwie istniejący albo nowy wpis w katalogu.
   const newCity = str(fd, "cityName");
@@ -136,6 +138,7 @@ export async function saveGig(fd: FormData) {
 }
 
 export async function setGigStatus(id: number, status: GigStatus) {
+  await requireSession();
   // Powrót do pipeline'u (np. jednak rozmawiamy dalej) kasuje wcześniejszy wynik rozmowy.
   const reopened = (["interested", "contacted", "waiting"] as GigStatus[]).includes(status);
   await db
@@ -169,6 +172,7 @@ async function recordGigMessage(gigId: number, channel: string, contactId?: numb
 
 /** „Napisałem przez …” z karty grania (też ponowienie na innym kanale). */
 export async function logGigMessage(gigId: number, fd: FormData) {
+  await requireSession();
   await recordGigMessage(gigId, required(str(fd, "channel"), "kanał"));
   refresh();
 }
@@ -186,6 +190,7 @@ const SOFT_RELATIONS = ["none", "want_to_play", "no_reply", "agreed", "declined"
  * - wait (bez wyniku) → odpisał, ale jeszcze nie wie: status „czekam”, przypomnienie dalej działa.
  */
 export async function replyToGig(gigId: number, outcome: GigOutcome | "wait") {
+  await requireSession();
   const [last] = await db
     .select({ id: interactions.id })
     .from(interactions)
@@ -229,16 +234,19 @@ export async function replyToGig(gigId: number, outcome: GigOutcome | "wait") {
 }
 
 export async function deleteGigMessage(id: number) {
+  await requireSession();
   await db.delete(interactions).where(eq(interactions.id, id));
   refresh();
 }
 
 export async function deleteGig(id: number) {
+  await requireSession();
   await db.delete(gigs).where(eq(gigs.id, id));
   done("/gigs");
 }
 
 export async function saveLog(fd: FormData) {
+  await requireSession();
   const gigId = required(int(fd, "gigId"), "granie");
   const rating = required(int(fd, "rating"), "ocena");
   const venueRating = int(fd, "venueRating");
@@ -279,12 +287,14 @@ export async function saveLog(fd: FormData) {
 
 /** Ucieczka z bramki oceny, gdy granie się nie odbyło. */
 export async function markGigCancelled(id: number) {
+  await requireSession();
   await setGigStatus(id, "cancelled");
 }
 
 // ── Kontakty ────────────────────────────────────────────────────────────
 
 export async function saveContact(fd: FormData) {
+  await requireSession();
   const id = int(fd, "id");
   const values = {
     name: required(str(fd, "name"), "imię i nazwisko"),
@@ -306,11 +316,13 @@ oneOf(CONTACT_RELATIONS, str(fd, "relation")) ?? "none",
 }
 
 export async function deleteContact(id: number) {
+  await requireSession();
   await db.delete(contacts).where(eq(contacts.id, id));
   done("/contacts");
 }
 
 export async function addInteraction(fd: FormData) {
+  await requireSession();
   const contactId = required(int(fd, "contactId"), "kontakt");
   const replied = str(fd, "replied");
   await db.insert(interactions).values({
@@ -331,6 +343,7 @@ export async function addInteraction(fd: FormData) {
 }
 
 export async function deleteInteraction(id: number, contactId: number) {
+  await requireSession();
   await db.delete(interactions).where(eq(interactions.id, id));
   done(`/contacts/${contactId}`);
 }
@@ -338,6 +351,7 @@ export async function deleteInteraction(id: number, contactId: number) {
 // ── Sceny ───────────────────────────────────────────────────────────────
 
 export async function saveVenue(fd: FormData) {
+  await requireSession();
   const id = int(fd, "id");
   const values = {
     name: required(str(fd, "name"), "nazwa"),
@@ -360,11 +374,13 @@ export async function saveVenue(fd: FormData) {
 
 /** Szybka ocena z listy scen — bez wchodzenia w edycję. */
 export async function setVenueVerdict(id: number, verdict: VenueVerdict | null) {
+  await requireSession();
   await db.update(venues).set({ verdict }).where(eq(venues.id, id));
   refresh();
 }
 
 export async function deleteVenue(id: number) {
+  await requireSession();
   await db.delete(venues).where(eq(venues.id, id));
   done("/venues");
 }
@@ -372,6 +388,7 @@ export async function deleteVenue(id: number) {
 // ── Materiał ────────────────────────────────────────────────────────────
 
 export async function saveBit(fd: FormData) {
+  await requireSession();
   const id = int(fd, "id");
   const values = {
     name: required(str(fd, "name"), "nazwa"),
@@ -389,6 +406,7 @@ export async function saveBit(fd: FormData) {
 }
 
 export async function deleteBit(id: number) {
+  await requireSession();
   await db.delete(bits).where(eq(bits.id, id));
   done("/bits");
 }
@@ -398,6 +416,7 @@ export async function deleteBit(id: number) {
  * minuty i notka (np. premisa). Data = dziś (lokalnie).
  */
 export async function logWriting(fd: FormData) {
+  await requireSession();
   const kind = required(oneOf(WRITING_KINDS, str(fd, "kind")), "rodzaj");
   // Generowanie może od razu założyć nowy bit-draft („Wpisz inne…” → status Vomit).
   const newBit = str(fd, "newBitName");
@@ -420,6 +439,7 @@ export async function logWriting(fd: FormData) {
 
 /** Zapis urządzenia do powiadomień (subskrypcja Web Push z przeglądarki). */
 export async function subscribePush(sub: { endpoint: string; keys: { p256dh: string; auth: string } }) {
+  await requireSession();
   const values = { p256dh: sub.keys.p256dh, auth: sub.keys.auth };
   await db
     .insert(pushSubscriptions)
@@ -428,10 +448,12 @@ export async function subscribePush(sub: { endpoint: string; keys: { p256dh: str
 }
 
 export async function unsubscribePush(endpoint: string) {
+  await requireSession();
   await db.delete(pushSubscriptions).where(eq(pushSubscriptions.endpoint, endpoint));
 }
 
 export async function sendTestPush() {
+  await requireSession();
   const { sendPush } = await import("@/lib/push");
   const n = await sendPush({ title: "SU Manager 🎤", body: "Powiadomienia działają.", url: "/", tag: "test" });
   return n;
@@ -441,12 +463,14 @@ export async function sendTestPush() {
 
 /** Pomysł na szybko — jedno pole, zapis jednym tapem. */
 export async function addIdea(fd: FormData) {
+  await requireSession();
   await db.insert(ideas).values({ text: required(str(fd, "text"), "pomysł") });
   refresh();
 }
 
 /** Pomysł → bit roboczy (Vomit): krótka nazwa z początku, cały tekst w notatkach. */
 export async function ideaToBit(id: number) {
+  await requireSession();
   const [idea] = await db.select().from(ideas).where(eq(ideas.id, id));
   if (!idea) throw new Error("Nie ma takiego pomysłu");
   const name = idea.text.length > 50 ? `${idea.text.slice(0, 47).trimEnd()}…` : idea.text;
@@ -457,6 +481,7 @@ export async function ideaToBit(id: number) {
 
 /** Pomysł jako premisa dzisiejszego treningu puent — loguje trening. */
 export async function ideaAsPremise(id: number) {
+  await requireSession();
   const [idea] = await db.select().from(ideas).where(eq(ideas.id, id));
   if (!idea) throw new Error("Nie ma takiego pomysłu");
   await db.insert(writingSessions).values({ date: nowLocal().slice(0, 10), kind: "punchlines", note: idea.text });
@@ -465,11 +490,13 @@ export async function ideaAsPremise(id: number) {
 }
 
 export async function setIdeaStatus(id: number, status: "new" | "dropped") {
+  await requireSession();
   await db.update(ideas).set({ status }).where(eq(ideas.id, id));
   refresh();
 }
 
 export async function deleteWriting(id: number) {
+  await requireSession();
   await db.delete(writingSessions).where(eq(writingSessions.id, id));
   refresh();
 }
@@ -477,6 +504,7 @@ export async function deleteWriting(id: number) {
 // ── Miasta ──────────────────────────────────────────────────────────────
 
 export async function saveCity(fd: FormData) {
+  await requireSession();
   const id = int(fd, "id");
   const values = {
     name: required(str(fd, "name"), "nazwa"),
@@ -491,6 +519,7 @@ export async function saveCity(fd: FormData) {
 }
 
 export async function deleteCity(id: number) {
+  await requireSession();
   await db.delete(cities).where(eq(cities.id, id));
   done("/cities");
 }
@@ -498,6 +527,7 @@ export async function deleteCity(id: number) {
 // ── Okazje (scraper) ────────────────────────────────────────────────────
 
 export async function dismissEvent(id: number) {
+  await requireSession();
   await db.update(events).set({ dismissed: true }).where(eq(events.id, id));
   updateTag(EVENTS_TAG);
   refresh();
@@ -514,6 +544,7 @@ async function performerContactId(name: string) {
 
 /** „Ukryj komika” — nie pokazuj go w Okazjach, z powodem zapisanym w CRM. */
 export async function hidePerformer(fd: FormData) {
+  await requireSession();
   const name = required(str(fd, "name"), "komik");
   const id = int(fd, "contactId") ?? (await performerContactId(name));
   await db
@@ -525,6 +556,7 @@ export async function hidePerformer(fd: FormData) {
 
 /** Wycisz komika w Okazjach na `days` dni (np. właśnie do niego napisałem). */
 export async function snoozePerformer(fd: FormData) {
+  await requireSession();
   const name = required(str(fd, "name"), "komik");
   const id = int(fd, "contactId") ?? (await performerContactId(name));
   await setContactSnooze(id, isoDate(int(fd, "days") ?? 30));
@@ -532,23 +564,27 @@ export async function snoozePerformer(fd: FormData) {
 
 /** `until` = data, do której wyciszony; data w przeszłości = „pokazuj już teraz”; null = automatycznie. */
 export async function setContactSnooze(id: number, until: string | null) {
+  await requireSession();
   await db.update(contacts).set({ snoozeUntil: until }).where(eq(contacts.id, id));
   refresh();
 }
 
 /** Wycisz kontakt w Okazjach na `days` dni (z karty kontaktu). */
 export async function snoozeContact(id: number, days: number) {
+  await requireSession();
   await setContactSnooze(id, isoDate(days));
 }
 
 /** Przestań pomijać komika w Okazjach. */
 export async function unhideContact(id: number) {
+  await requireSession();
   await db.update(contacts).set({ ignoreInReport: false, ignoreReason: null }).where(eq(contacts.id, id));
   refresh();
 }
 
 /** „Pokaż teraz” — znosi wyciszenie, także automatyczne po wspólnym wieczorze. */
 export async function unsnoozeContact(id: number) {
+  await requireSession();
   await setContactSnooze(id, isoDate(-1));
 }
 
@@ -556,6 +592,7 @@ const isoDate = (daysFromNow: number) => new Date(Date.now() + daysFromNow * 864
 
 /** „Chcę zagrać” — zakłada granie w pipeline (status: zainteresowany) i podpina wydarzenie. */
 export async function eventToGig(id: number) {
+  await requireSession();
   const gigId = await gigFromEvent(id);
   updateTag(EVENTS_TAG);
   done(`/gigs/${gigId}`);
@@ -566,6 +603,7 @@ export async function eventToGig(id: number) {
  * i zostawia mnie na liście, żeby od razu pisać do kolejnych.
  */
 export async function messageFromEvent(fd: FormData) {
+  await requireSession();
   const eventId = required(int(fd, "eventId"), "wydarzenie");
   const channel = required(str(fd, "channel"), "kanał");
   const gigId = int(fd, "gigId") ?? (await gigFromEvent(eventId));
@@ -622,6 +660,7 @@ async function gigFromEvent(id: number) {
  * Od razu przelicza przewidywane terminy.
  */
 export async function markRecurring(eventId: number, choice: string) {
+  await requireSession();
   const [e] = await db.select().from(events).where(eq(events.id, eventId));
   if (!e) throw new Error("Nie ma takiego wydarzenia");
   const key = seriesKey(e);
@@ -651,6 +690,7 @@ export async function markRecurring(eventId: number, choice: string) {
 
 /** Wyłącz / przywróć serię z ekranu „Cykliczne” (po kluczu, bez wydarzenia pod ręką). */
 export async function setSeriesMode(key: string, mode: "off" | "auto", title: string) {
+  await requireSession();
   if (mode === "auto") await db.delete(recurringSeries).where(eq(recurringSeries.key, key));
   else {
     await db
@@ -665,6 +705,7 @@ export async function setSeriesMode(key: string, mode: "off" | "auto", title: st
 
 /** Szybkie przypisanie czasu dojazdu miastu z raportu („~2 h”, „dalej”). */
 export async function setCityTravel(name: string, minutes: number) {
+  await requireSession();
   await db
     .insert(cities)
     .values({ name, travelMinutes: minutes, notes: "szybka ocena z Okazji" })
@@ -676,6 +717,7 @@ export async function setCityTravel(name: string, minutes: number) {
 
 /** Cel liczby grań na miesiąc ("YYYY-MM"). */
 export async function setMonthGoal(month: string, target: number) {
+  await requireSession();
   const value = Math.max(1, Math.min(60, Math.round(target)));
   await db
     .insert(goals)
@@ -685,11 +727,13 @@ export async function setMonthGoal(month: string, target: number) {
 }
 
 export async function saveMonthGoal(fd: FormData) {
+  await requireSession();
   await setMonthGoal(required(str(fd, "month"), "miesiąc"), required(int(fd, "target"), "cel"));
 }
 
 /** Cel materiału: ile minut do kiedy. */
 export async function saveMaterialGoal(fd: FormData) {
+  await requireSession();
   const target = Math.max(1, required(int(fd, "target"), "minuty"));
   const deadline = required(str(fd, "deadline"), "termin");
   await db

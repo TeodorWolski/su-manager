@@ -21,7 +21,8 @@ Zmiana schematu: edytuj `src/db/schema.ts`, potem `pnpm db:generate && pnpm db:m
 | --- | --- |
 | `DATABASE_URL` | `libsql://…turso.io` na produkcji; domyślnie `file:local.db` |
 | `DATABASE_AUTH_TOKEN` | token Turso |
-| `APP_PASSWORD` | hasło basic auth (login dowolny). Bez niego apka jest otwarta |
+| `APP_PASSWORD` | hasło logowania (ekran `/login`; Face ID dodasz po zalogowaniu). Bez niego — lokalnie — apka jest otwarta |
+| `SESSION_SECRET` | opcjonalnie: klucz podpisu sesji (domyślnie wyprowadzany z `APP_PASSWORD`) |
 
 ## Jak to działa
 

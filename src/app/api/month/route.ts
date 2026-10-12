@@ -2,12 +2,14 @@ import { and, gte, lte, notInArray, sql } from "drizzle-orm";
 import type { NextRequest } from "next/server";
 import { cities, db, gigs, venues } from "@/db";
 import { eq } from "drizzle-orm";
+import { currentSession } from "@/lib/auth";
 
 /**
  * Grania do mini kalendarza: /api/month?from=YYYY-MM-DD&to=YYYY-MM-DD (widoczne tygodnie miesiąca).
  * Za basic auth jak cała apka. Bez odrzuconych i odwołanych.
  */
 export async function GET(request: NextRequest) {
+  if (!(await currentSession())) return new Response("Unauthorized", { status: 401 });
   const from = request.nextUrl.searchParams.get("from") ?? "";
   const to = request.nextUrl.searchParams.get("to") ?? "";
   if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {

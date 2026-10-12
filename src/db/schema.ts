@@ -286,6 +286,33 @@ export const recurringSeries = sqliteTable("recurring_series", {
   createdAt: createdAt(),
 });
 
+/**
+ * Sesje logowania (ciasteczko na urządzeniu). W bazie tylko SHA-256 tokenu — wyciek bazy
+ * nie daje dostępu. Usunięcie wiersza = wylogowanie urządzenia.
+ */
+export const sessions = sqliteTable("sessions", {
+  id: text("id").primaryKey(),
+  method: text("method", { enum: ["password", "passkey"] }).notNull(),
+  userAgent: text("user_agent"),
+  createdAt: createdAt(),
+  lastSeenAt: text("last_seen_at").notNull(),
+  expiresAt: text("expires_at").notNull(),
+});
+
+/** Passkeys (Face ID / Touch ID / klucz) do logowania bez hasła — WebAuthn. */
+export const passkeys = sqliteTable("passkeys", {
+  /** ID poświadczenia (base64url). */
+  id: text("id").primaryKey(),
+  /** Klucz publiczny COSE (base64url). */
+  publicKey: text("public_key").notNull(),
+  counter: integer("counter").notNull().default(0),
+  /** JSON z transportami („internal”, „hybrid”…). */
+  transports: text("transports"),
+  name: text("name").notNull(),
+  createdAt: createdAt(),
+  lastUsedAt: text("last_used_at"),
+});
+
 /** Subskrypcje Web Push (telefon, przeglądarka) — jeden wiersz na urządzenie. */
 export const pushSubscriptions = sqliteTable("push_subscriptions", {
   endpoint: text("endpoint").primaryKey(),
