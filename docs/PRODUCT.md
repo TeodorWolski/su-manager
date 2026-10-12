@@ -167,7 +167,7 @@ Basic auth zastąpione, bo w PWA na iOS nie trzymał sesji, a odmowy 401 w tle w
 - Bez `APP_PASSWORD` (lokalnie) logowanie jest wyłączone.
 
 ### Powiadomienia i harmonogram
-- **Web Push** (PWA, `public/sw.js`, `src/lib/push.ts`, włącznik: Więcej → Powiadomienia, tabela `push_subscriptions`): rano grania do ponowienia, wieczorem trening puent (jeśli dziś nie było, z serią) i „jak poszło?” 90 min po starcie grania bez logu (`src/lib/notify.ts`). Każde przypomnienie raz dziennie (`oncePerDay`, tabela `app_state`).
+- **Web Push** (PWA, `public/sw.js`, `src/lib/push.ts`, włącznik: Więcej → Powiadomienia, tabela `push_subscriptions`): rano grania do ponowienia oraz „Napisz” do grań w statusie „zainteresowany” na 14 i 7 dni przed (`WRITE_REMINDER_DAYS`, każdy próg raz na granie, zbiorczo; po „Wysłałem” granie przechodzi na „napisałem” i dalej działa ponawianie), wieczorem trening puent (jeśli dziś nie było, z serią) i „jak poszło?” 90 min po starcie grania bez logu (`src/lib/notify.ts`). Każde przypomnienie raz dziennie (`oncePerDay`, tabela `app_state`).
 - **Wyzwalanie:** zewnętrzny cron (cron-job.org, Europe/Warsaw) — 10:30 scraper + poranny mail (workflow_dispatch przez API GitHuba), niedziela 19:00 podsumowanie, 10:35 / 21:00 `/api/notify/morning|evening` (Bearer `CRON_SECRET`, poza basic auth). Harmonogram GitHuba to zapas (12:00 / niedz. 21:00); maile wychodzą raz dziennie (`morning-mail`, `weekly-mail`), ręcznie można wymusić (`force_mail`). Szczegóły konfiguracji: README.
 
 ## Konwencje w kodzie
