@@ -51,9 +51,9 @@ Ocena grania **nie jest** oceną bitu, bo zależy od publiki, line-upu itd. Bit 
   - podpowiedzi: luźny tydzień („może dodać jedno?” + 2 okazje z wolnych dni), seria ≥4 dni z rzędu, tydzień powyżej 3, refleksja o serii z ostatnich tygodni.
 - **Balans** (w Rytmie): pół na pół grania przed komikiem (opener/support) i open miki; 2+1 w którąś stronę jest OK, ale 3+ przed komikami w tygodniu daje ostrzeżenie (`MAX_OPENERS_PER_WEEK`).
 - **Najgorętsze okazje** (`src/lib/hot.ts`, `components/hot.tsx`):
-  - wydarzenia za 7–21 dni, żeby zdążyć zaklepać miejsce; najlepiej ok. 14 dni przed,
+  - wydarzenia za 7–21 dni, żeby zdążyć zaklepać miejsce; najlepiej ok. 14 dni przed — a dla komika z wyuczonym wyprzedzeniem (patrz „Kiedy pisać do komika”) okno sięga do jego wyprzedzenia + 3 dni i idealny moment to jego wyprzedzenie,
   - odpadają: dni z graniem, tygodnie z 3+ graniami, trzecie granie przed komikiem w tygodniu, terminy robiące serię ≥4 dni,
-  - punkty: znajomy, ostatnie bilety / sold out, luźny tydzień, typ, którego w tygodniu brakuje (balans), bliskość, nowość,
+  - punkty: znajomy, ostatnie bilety / sold out, luźny tydzień, typ, którego w tygodniu brakuje (balans), bliskość, nowość, „jego moment” (własne wyprzedzenie komika, powód „pisz ~X przed”),
   - jeden termin na komika i jeden na dzień, maks. 4, z gotowym „Napisz”.
 - **Do ponowienia** (`src/lib/follow-up.ts`):
   - kiedy: granie „napisałem/czekam” bez odpowiedzi, ok. 1,5 tygodnia (10 dni) przed graniem i min. 2 dni po ostatniej wiadomości; „czekam” dodatkowo już po 5 dniach bez ruchu, nawet gdy granie daleko (`WAITING_FOLLOW_UP_DAYS`),
@@ -91,7 +91,7 @@ Ocena grania **nie jest** oceną bitu, bo zależy od publiki, line-upu itd. Bit 
 
 ### Okazje (`/events`)
 - **Podsumowanie tygodnia** (niedziela 19:00, `src/lib/weekly.ts`, `scripts/weekly.ts`, `.github/workflows/weekly.yml`): zagrane grania z oceną, bity 👍/👎, wysłane wiadomości i wyniki rozmów, przyszły tydzień względem rytmu 2–3 i balansu, do 3 najgorętszych okazji.
-- **Poranny mail** (10:30, `src/scraper/email.ts`): „Do ponowienia”, „Najgorętsze okazje” z gotowym tekstem i nowe terminy z bileterii. Wysyłany, gdy którakolwiek sekcja nie jest pusta.
+- **Poranny mail** (10:30, `src/scraper/email.ts`): „Do ponowienia”, „Najgorętsze okazje” z gotowym tekstem i nowe terminy z bileterii, do tego linijki o pisaniu (seria puent, tydzień, kolejka) i MGM (sprawdzone względem celu, rozpiska, bity gotowe do zaliczenia). Wysyłany, gdy którakolwiek sekcja nie jest pusta.
 - **Źródła:** kupbilecik, evently, Biletyna (`src/scraper/sources/*`). Biletyna: programy z publicznej sitemapy (`/sitemap/sitemap-events.xml`, robots.txt zabrania `/ajax/`), terminy ze schema.org na stronie artysty/programu (do 30 terminów; gdy strona jest pełna, a 30. termin wypada przed horyzontem — dociąga strony miast). „Ostatnie bilety” z `remainingAttendeeCapacity` ≤ 10 (to pula Biletyny, bywa mała przy normalnej sprzedaży).
 - **Duplikaty między serwisami** (`src/lib/dedupe.ts`, `sameShow`): ten sam dzień i miasto, start ±60 min, wspólne nazwisko (słowo spoza ogólnych typu stand-up/festiwal/open mic) albo jeden tytuł zaczyna drugi. Wygrywa serwis wcześniej na liście `SOURCES`; duplikat nie jest zapisywany.
 - **Scraper** (`src/scraper/sources/*`, zewnętrzny cron o 10:30 czasu polskiego, razem z mailem; GitHub o 12:00 jako zapas) zbiera wydarzenia. Klasyfikacja jest w `src/lib/opportunities.ts`.
@@ -150,6 +150,7 @@ Pisze się poza apką (Notion / Docs) — apka liczy regularność, wiąże prac
 
 ### Ludzie (`/contacts`, w zakładce Więcej)
 - **CRM:** rola (komik / organizator / scena), relacja, aliasy (pomagają dopasować nazwiska ze scrapera), notatki.
+- **Kiedy pisać** (karta komika): wyuczone wyprzedzenie z liczbą zgód i „zajętych miejsc” albo informacja, że za mało danych (szczegóły w Okazjach → „Kiedy pisać do komika”).
 - **Historia kontaktu** (`interactions`):
   - kanał to tekst z listy `CHANNELS` w `labels.ts`,
   - „odpisał” to `replied`,
@@ -158,7 +159,8 @@ Pisze się poza apką (Notion / Docs) — apka liczy regularność, wiąże prac
 ### Więcej
 - **Materiał** (`/bits`):
   - statusy: `tested`, `testing`, `editing` („do redakcji”), `vomit`, `rejected` (odrzucony: nie liczy się do celu i nie ma go w logu),
-  - sekcja „Do pracy”: do redakcji oraz w testach i niegrane od 21+ dni.
+  - sekcja „Do pracy”: do redakcji oraz w testach i niegrane od 21+ dni,
+  - karta bitu: baner „może już Sprawdzony?”, gdy bit jest gotowy do zaliczenia (patrz MGM).
 - **Statystyki** (`/stats`): skuteczność pisania (wyniki rozmów, % odpowiedzi wg kanału) i moje oceny wg kontekstu, miesiąca i sceny.
 - **Cele** (`/goals`): grania na miesiąc i MGM (minuty nowego sprawdzonego materiału na miesiąc).
 - **Myśli po graniach:** przeszukiwalne notatki z logów.
@@ -175,7 +177,7 @@ Pisze się poza apką (Notion / Docs) — apka liczy regularność, wiąże prac
 ### Logowanie i bezpieczeństwo (`/login`, Więcej → Bezpieczeństwo)
 Basic auth zastąpione, bo w PWA na iOS nie trzymał sesji, a odmowy 401 w tle wyglądały jak „brak internetu”.
 - **Sesja** (`src/lib/session.ts`): ciasteczko `sum_session` HttpOnly + Secure + SameSite=Lax, rok, odnawiane raz dziennie (proxy). Format `<sid>.<issuedAt>.<hmac>`, klucz HMAC z `SESSION_SECRET` albo `APP_PASSWORD` (zmiana hasła = wylogowanie wszystkich). W tabeli `sessions` tylko SHA-256 z `sid`; ważność sprawdzana w bazie z 60-sekundowym cache.
-- **Proxy** (`src/proxy.ts`): bez sesji strony → `/login?next=…`, reszta → 401 JSON. Poza logowaniem: `/login`, `/calendar/<token>.ics`, `/api/notify` (CRON_SECRET), statyczne pliki, ikony, manifest, `sw.js`.
+- **Proxy** (`src/proxy.ts`): bez sesji strony → `/login?next=…`, reszta → 401 JSON. Poza logowaniem: `/login`, `/calendar/<token>.ics`, `/api/notify` (CRON_SECRET), statyczne pliki, ikony, manifest, `sw.js`, `offline.html`.
 - **Każda akcja serwerowa** zaczyna się od `requireSession()` (`src/lib/auth.ts`) — zgodnie z dokumentacją Next nie polegamy tylko na proxy. Layout bez sesji nie renderuje paska, kalendarza ani bramki oceny.
 - **Hasło:** `APP_PASSWORD`, porównanie stałoczasowe, 5 błędnych prób → 15 min blokady logowania hasłem (`app_state` „login-lock”); passkey działa dalej.
 - **Face ID / passkeys** (`@simplewebauthn`, tabela `passkeys`): dodawanie tylko po zalogowaniu (Bezpieczeństwo; po pierwszym logowaniu hasłem bez passkeya apka tam przenosi), logowanie bez hasła na `/login`. Wyzwanie w ciasteczku HttpOnly na 5 min, `userVerification: required`, RP = domena z nagłówków (produkcja: su-manager.vercel.app).
