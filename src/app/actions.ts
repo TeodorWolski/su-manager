@@ -731,14 +731,18 @@ export async function saveMonthGoal(fd: FormData) {
   await setMonthGoal(required(str(fd, "month"), "miesiąc"), required(int(fd, "target"), "cel"));
 }
 
-/** Cel materiału: ile minut do kiedy. */
-export async function saveMaterialGoal(fd: FormData) {
+/** MGM: cel minut nowego materiału na miesiąc ("YYYY-MM"). */
+export async function setMgmGoal(month: string, target: number) {
   await requireSession();
-  const target = Math.max(1, required(int(fd, "target"), "minuty"));
-  const deadline = required(str(fd, "deadline"), "termin");
+  const value = Math.max(1, Math.min(120, Math.round(target)));
   await db
     .insert(goals)
-    .values({ key: "material", target, deadline })
-    .onConflictDoUpdate({ target: goals.key, set: { target, deadline, updatedAt: sql`(datetime('now'))` } });
+    .values({ key: `mgm:${month}`, target: value })
+    .onConflictDoUpdate({ target: goals.key, set: { target: value, updatedAt: sql`(datetime('now'))` } });
   refresh();
+}
+
+export async function saveMgmGoal(fd: FormData) {
+  await requireSession();
+  await setMgmGoal(required(str(fd, "month"), "miesiąc"), required(int(fd, "target"), "cel"));
 }

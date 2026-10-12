@@ -3,9 +3,10 @@ import Link from "next/link";
 import { addIdea, ideaAsPremise, ideaToBit, setIdeaStatus } from "@/app/actions";
 import { PendingButton } from "@/components/form";
 import { Empty, PageHeader, Pill, Section } from "@/components/ios";
+import { MgmCard } from "@/components/goals";
 import { WritingCard } from "@/components/writing";
 import { BIT_STATUS_LABEL, BIT_STATUS_TONE, REACTION_EMOJI } from "@/lib/labels";
-import { getWriting } from "@/lib/planning";
+import { getMgm, getWriting } from "@/lib/planning";
 import { listBitsInProgress, listIdeas } from "@/lib/queries";
 import { fmtDate } from "@/lib/time";
 
@@ -14,7 +15,7 @@ import { fmtDate } from "@/lib/time";
  * Teksty żyją w Notion / Docs — tu regularność, powiązanie z bitami i raport do Claude.
  */
 export default async function WritingPage() {
-  const [w, ideas, inProgress] = await Promise.all([getWriting(), listIdeas(), listBitsInProgress()]);
+  const [w, ideas, inProgress, mgm] = await Promise.all([getWriting(), listIdeas(), listBitsInProgress(), getMgm()]);
   const queued = new Set(w.queue.map((q) => q.bitId));
   return (
     <>
@@ -35,6 +36,10 @@ export default async function WritingPage() {
           Zapisz
         </PendingButton>
       </form>
+
+      <div className="mb-7">
+        <MgmCard mgm={mgm} />
+      </div>
 
       <WritingCard w={w} link={{ href: "/writing/history", label: "Historia" }} />
 

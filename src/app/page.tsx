@@ -1,7 +1,7 @@
 import { Plus } from "lucide-react";
 import Link from "next/link";
 import { GigRow } from "@/components/gig-row";
-import { GigGoalCard, MaterialTile, RatingTile } from "@/components/goals";
+import { GigGoalCard, MgmTile, RatingTile } from "@/components/goals";
 import { Empty, PageHeader, Pill, Rating, Row, Section } from "@/components/ios";
 import { Button } from "@/components/ui/button";
 import { FOLLOW_UP_BEFORE_DAYS } from "@/lib/follow-up";
@@ -40,7 +40,7 @@ export default async function Home() {
       <div className="mb-7 space-y-2.5">
         <GigGoalCard goals={goals} />
         <div className="grid grid-cols-2 gap-2.5">
-          <MaterialTile goals={goals} />
+          <MgmTile mgm={goals.mgm} />
           <RatingTile avg={month.avg} count={month.count} />
         </div>
       </div>

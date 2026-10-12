@@ -85,6 +85,9 @@ function writingSection(wr: Weekly["writing"]) {
   const regular = [
     `Trening puent: <b>${wr.punchDays}/7 dni</b> · seria ${plural(wr.streak, "dzień", "dni", "dni")}${wr.best > wr.streak ? ` (rekord ${wr.best})` : ""}`,
     `Generowanie: <b>${wr.generate}/${wr.targets.generate}</b> · redakcja: <b>${wr.edit}/${wr.targets.edit}</b>`,
+    `MGM (${wr.mgm.month.slice(5, 7)}.${wr.mgm.month.slice(0, 4)}): <b>${wr.mgm.total}/${wr.mgm.target} min</b> nowego materiału — ${wr.mgm.tested} min sprawdzonego, ${wr.mgm.untested} min niesprawdzonego${
+      wr.mgm.total >= wr.mgm.target ? " · 🏆 cel zdobyty" : wr.mgm.total >= wr.mgm.pace ? " · w tempie" : ` · za tempem o ${Math.ceil(wr.mgm.pace - wr.mgm.total)} min`
+    }${wr.mgm.streak > 1 ? ` · seria ${plural(wr.mgm.streak, "miesiąc", "miesiące", "miesięcy")}` : ""}`,
   ].join("<br>");
   const parts = [regular];
   if (wr.fixed.length) parts.push(`🎯 Poprawki, które siadły: <b>${esc(wr.fixed.map((f) => f.name).join(", "))}</b>`);

@@ -4,11 +4,12 @@
  */
 import { and, asc, eq, gte, inArray, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/sqlite-core";
-import { bits, cities, contacts, db, gigBits, gigLogs, gigs, ideas, venues, writingSessions } from "@/db";
+import { bits, cities, contacts, db, gigBits, gigLogs, gigs, goals, ideas, venues, writingSessions } from "@/db";
 import { daysSince, followUpTiming, lastActivity, nextChannel } from "./follow-up";
 import { hotOpportunities, type HotCandidate } from "./hot";
 import { getOpportunities, loadUpcomingEvents, type EventRow } from "./opportunities";
 import { getInsights, type RhythmOpportunity } from "./rhythm";
+import { computeMgm } from "./mgm";
 import { addDays, weekStart } from "./rhythm";
 import { nowLocal } from "./time";
 import { countInWeek, dayStreak, editQueue, fixedBits, WEEKLY_TARGET, weekDots, weekStreak, type BitReaction } from "./writing";
@@ -159,7 +160,7 @@ export type Writing = Awaited<ReturnType<typeof getWriting>>;
  * bity, nad którymi pracowałem, i kolejka do poprawki z notatką z ostatniego grania.
  */
 export async function getWritingDigest(from: string, to: string) {
-  const [sessions, newIdeas, openIdeas, w, lastThoughts] = await Promise.all([
+  const [sessions, newIdeas, openIdeas, w, lastThoughts, mgm] = await Promise.all([
     db
       .select({ date: writingSessions.date, kind: writingSessions.kind, note: writingSessions.note, bitId: writingSessions.bitId, bitName: bits.name })
       .from(writingSessions)
@@ -180,6 +181,7 @@ export async function getWritingDigest(from: string, to: string) {
       .innerJoin(gigLogs, eq(gigLogs.gigId, gigs.id))
       .leftJoin(venues, eq(venues.id, gigs.venueId))
       .orderBy(asc(gigs.startsAt)),
+    getMgm(),
   ]);
   const days = new Set(sessions.filter((s) => s.kind === "punchlines").map((s) => s.date)).size;
   const count = (k: string) => sessions.filter((s) => s.kind === k).length;
@@ -200,7 +202,18 @@ export async function getWritingDigest(from: string, to: string) {
     worked: [...worked.entries()].map(([name, kinds]) => ({ name, kinds: [...kinds] })),
     queue: w.queue.map((q) => ({ ...q, last: lastByBit.get(q.bitId) ?? null })),
     fixed: w.fixed.filter((f) => f.date.slice(0, 10) >= from && f.date.slice(0, 10) <= to),
+    mgm,
   };
 }
 
 export type WritingDigest = Awaited<ReturnType<typeof getWritingDigest>>;
+
+/** MGM: minuty materiału napisanego w miesiącu (nowe bity), cel miesięczny, historia i seria. */
+export async function getMgm() {
+  const [rows, goalRows] = await Promise.all([
+    db.select({ createdAt: bits.createdAt, status: bits.status, lengthMin: bits.lengthMin }).from(bits),
+    db.select({ key: goals.key, target: goals.target }).from(goals).where(sql`${goals.key} like 'mgm:%'`),
+  ]);
+  const targets = new Map(goalRows.map((g) => [g.key.slice(4), g.target]));
+  return computeMgm(rows, targets, nowLocal().slice(0, 10));
+}

@@ -1,6 +1,7 @@
 import type { Hot } from "@/lib/hot";
 import { AVAILABILITY_LABEL, CHANNEL_SHORT, RELATION_LABEL } from "@/lib/labels";
 import { pitchMessage } from "@/lib/messages";
+import type { Mgm } from "@/lib/mgm";
 import type { FollowUp, Writing } from "@/lib/planning";
 import { groupByPerformer, type Opportunity, type OpportunityGroup } from "@/lib/opportunities";
 import { plural } from "@/lib/text";
@@ -89,7 +90,7 @@ function hotSection(items: Hot[]) {
 }
 
 /** Jedna–dwie linijki o pisaniu: seria treningu puent, tydzień, co czeka na poprawkę po scenie. */
-function writingSection(w: Writing | undefined) {
+function writingSection(w: Writing | undefined, mgm: Mgm | undefined) {
   if (!w) return "";
   const p = w.punchlines;
   const streak = p.streak > 0 ? `seria ${plural(p.streak, "dzień", "dni", "dni")} — dziś też premisa + 10 puent` : "dziś premisa + 10 puent";
@@ -100,12 +101,13 @@ function writingSection(w: Writing | undefined) {
         .map((q) => `<b>${esc(q.name)}</b> ${q.reaction < 0 ? "👎" : "😐"}`)
         .join(", ")}`
     : "";
-  return `<p style="margin:16px 0 0;padding:10px 12px;background:#f2f5f3;border-radius:8px;font-size:14px">✍️ ${streak}<br>${muted(week)}${queue}</p>`;
+  const mgmLine = mgm ? `<br>${muted(`MGM: <b>${mgm.total}/${mgm.target} min</b> nowego materiału w tym miesiącu (${mgm.tested} min sprawdzonego)`)}` : "";
+  return `<p style="margin:16px 0 0;padding:10px 12px;background:#f2f5f3;border-radius:8px;font-size:14px">✍️ ${streak}<br>${muted(week)}${mgmLine}${queue}</p>`;
 }
 
-export type Digest = { fresh: Opportunity[]; followUps: FollowUp[]; hot: Hot[]; writing?: Writing };
+export type Digest = { fresh: Opportunity[]; followUps: FollowUp[]; hot: Hot[]; writing?: Writing; mgm?: Mgm };
 
-export function renderReport({ fresh: items, followUps, hot, writing }: Digest) {
+export function renderReport({ fresh: items, followUps, hot, writing, mgm }: Digest) {
   const friends = groupByPerformer(items.filter((o) => o.tab === "friends"));
   const openMic = groupByPerformer(items.filter((o) => o.tab === "openMic"));
   const inRange = groupByPerformer(items.filter((o) => o.tab === "inRange"));
@@ -122,7 +124,7 @@ export function renderReport({ fresh: items, followUps, hot, writing }: Digest) 
   const html = `<div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:600px;color:#1c2a23">
     <h2 style="margin:0 0 4px">SU Manager · dzień dobry</h2>
     <p style="margin:0;color:#5b6b63"><a href="${APP_URL}" style="color:#13824a">Otwórz aplikację</a></p>
-    ${writingSection(writing)}
+    ${writingSection(writing, mgm)}
     ${followUpSection(followUps)}
     ${hotSection(hot)}
     ${friends.length || openMic.length || inRange.length ? `<h2 style="margin:28px 0 0;font-size:17px">Nowe terminy w bileteriach</h2>` : ""}

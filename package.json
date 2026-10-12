@@ -15,7 +15,7 @@
     "scrape": "tsx scripts/scrape.ts",
     "backup": "tsx scripts/backup.ts",
     "weekly": "tsx scripts/weekly.ts",
-    "test": "tsx --test tests/*.test.ts"
+    "test": "tsx --test tests/*.test.ts tests/*.test.mts"
   },
   "dependencies": {
     "@libsql/client": "^0.18.0",

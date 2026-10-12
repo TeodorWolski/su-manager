@@ -15,7 +15,7 @@ import { oncePerDay } from "@/lib/app-state";
 import { dedupeKey, getOpportunities } from "@/lib/opportunities";
 import { RECURRING_SOURCE } from "@/lib/recurring";
 import { syncRecurring } from "@/lib/recurring-sync";
-import { getFollowUps, getPlanning, getWriting } from "@/lib/planning";
+import { getFollowUps, getMgm, getPlanning, getWriting } from "@/lib/planning";
 import { sendReport } from "@/scraper/email";
 import { healthIssues } from "@/scraper/health";
 import { fetchHtml } from "@/scraper/http";
@@ -133,9 +133,9 @@ async function main() {
     log("poranny mail już dziś wysłany — tylko aktualizacja wydarzeń");
   } else {
     const fresh = newIds.size ? (await getOpportunities(newIds)).filter((o) => !o.myGigId && o.tab !== "muted") : [];
-    const [followUps, { hot }, writing] = await Promise.all([getFollowUps(), getPlanning(), getWriting()]);
+    const [followUps, { hot }, writing, mgm] = await Promise.all([getFollowUps(), getPlanning(), getWriting(), getMgm()]);
     log(`mail: ${fresh.length} nowych okazji, ${followUps.length} do ponowienia, ${hot.length} gorących`);
-    await sendReport({ fresh, followUps, hot, writing }, log);
+    await sendReport({ fresh, followUps, hot, writing, mgm }, log);
   }
 
   // Padnięty parser = czerwony build w Actions, żeby GitHub dał znać mailem.

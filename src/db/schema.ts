@@ -338,7 +338,7 @@ export const hiddenTitles = sqliteTable("hidden_titles", {
 });
 
 /**
- * Cele. Klucze: "gigs:YYYY-MM" — liczba grań w miesiącu; "material" — minuty materiału do `deadline`.
+ * Cele. Klucze: "gigs:YYYY-MM" — liczba grań w miesiącu; "mgm:YYYY-MM" — minuty nowego materiału w miesiącu (MGM).
  * Brak wiersza = wartość domyślna (patrz src/lib/goals.ts), więc nic nie jest na sztywno.
  */
 export const goals = sqliteTable("goals", {

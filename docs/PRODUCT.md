@@ -44,7 +44,7 @@ Ocena grania **nie jest** oceną bitu, bo zależy od publiki, line-upu itd. Bit 
 ## Funkcje (ekrany)
 
 ### Dziś (`/`)
-- **Cel miesiąca:** liczba grań, domyślnie 10 („super target”), tempo i seria miesięcy. Obok kafelki: materiał i średnia ocena w miesiącu.
+- **Cel miesiąca:** liczba grań, domyślnie 10 („super target”), tempo i seria miesięcy. Obok kafelki: MGM (materiał napisany w miesiącu) i średnia ocena w miesiącu.
 - **Rytm** (`src/lib/rhythm.ts`, `components/rhythm.tsx`):
   - cel to 2–3 grania tygodniowo, równomiernie,
   - słupki: 4 tygodnie wstecz, bieżący i 3 naprzód,
@@ -120,6 +120,12 @@ Ocena grania **nie jest** oceną bitu, bo zależy od publiki, line-upu itd. Bit 
   - open mic: „Siemanko, macie może wolny slot na [d.MM]?”,
   - „Wysłałem przez…” zakłada granie jako `contacted` i zostawia na liście.
 
+### MGM — material generated per month (`src/lib/mgm.ts`, dane `getMgm` w `planning.ts`)
+- **Co liczy:** minuty bitów **założonych** w danym miesiącu (`bits.createdAt` po czasie warszawskim, długość `lengthMin`), z podziałem: **sprawdzone** (status „Sprawdzony”) i **niesprawdzone** (w testach / do redakcji / vomit). Odrzucone się nie liczą; bity bez długości są liczone jako bity, a karta podpowiada, żeby uzupełnić długość.
+- **Cel miesięczny** jak przy graniach: klucz `goals` „mgm:YYYY-MM”, domyślnie `DEFAULT_MGM_MIN` (5 min), szybki wybór 3/5/8/10 albo pole w Celach. Tempo (`pace`), seria miesięcy z osiągniętym celem, historia 6 miesięcy.
+- **Zastąpił** dawny „cel materiału X min do terminu”.
+- **Widać:** kafelek na Dziś, pełna karta w Celach i w zakładce Pisanie, linijka w porannym mailu, wiersz w sekcji „✍️ Pisanie” niedzielnego podsumowania.
+
 ### Pisanie (`/writing`, zakładka na dolnym pasku)
 Pisze się poza apką (Notion / Docs) — apka liczy regularność, wiąże pracę z bitami i składa raport. Logika: `src/lib/writing.ts`, dane: `getWriting` (`planning.ts`), karta: `components/writing.tsx`.
 - **Pomysł na szybko:** jedno pole na górze (tabela `ideas`). Z pomysłu: „Premisa” (loguje dzisiejszy trening puent z tą premisą), „→ bit” (bit roboczy Vomit, cały tekst w notatkach), ✕ (odrzucony).
@@ -144,7 +150,7 @@ Pisze się poza apką (Notion / Docs) — apka liczy regularność, wiąże prac
   - statusy: `tested`, `testing`, `editing` („do redakcji”), `vomit`, `rejected` (odrzucony: nie liczy się do celu i nie ma go w logu),
   - sekcja „Do pracy”: do redakcji oraz w testach i niegrane od 21+ dni.
 - **Statystyki** (`/stats`): skuteczność pisania (wyniki rozmów, % odpowiedzi wg kanału) i moje oceny wg kontekstu, miesiąca i sceny.
-- **Cele** (`/goals`): grania na miesiąc i minuty materiału do terminu.
+- **Cele** (`/goals`): grania na miesiąc i MGM (minuty nowego materiału na miesiąc).
 - **Myśli po graniach:** przeszukiwalne notatki z logów.
 - **Sceny:** werdykt, ocena miejsca, czas dojazdu.
 - **Miasta:** czas dojazdu z Warszawy, nocleg, priorytet.
@@ -178,7 +184,7 @@ Basic auth zastąpione, bo w PWA na iOS nie trzymał sesji, a odmowy 401 w tle w
 - **Etykiety, tony i listy kanałów** są w `src/lib/labels.ts`. Enumy statusów są w `src/db/schema.ts` (`*_STATUSES`). Enumy drizzle na kolumnach `text` nie tworzą CHECK w SQLite, więc nowa wartość nie wymaga migracji.
 - **Progi i stałe** są nazwane i opisane przy definicji (`FOLLOW_UP_BEFORE_DAYS`, `WEEK_MIN/MAX`, `STREAK_WARN`, `COOLDOWN_DAYS`, `MAX_TRAVEL_MIN`, `REVIEW_DELAY_MIN`…).
 - **UI:** komponenty iOS-owe z `src/components/ios.tsx` (`Section`, `Row`, `Pill`, `Stat`) i `form.tsx` (`FieldRow`, `PendingButton`). Kolory statusów to tokeny `--st-*` w `globals.css`, akcent limonka `#E4F323`. Wspierany jest tryb jasny i ciemny.
-- **Testy:** `pnpm test` (`node:test` przez `tsx`, `tests/*.test.ts`), dane w `tests/fixtures/` (odświeżane `scripts/update-fixtures.ts`). Nowy parser = nowy test na przyciętej stronie + oczekiwane wartości. Kontrola zdrowia przebiegu: `src/scraper/health.ts`.
+- **Testy:** `pnpm test` (`node:test` przez `tsx`, `tests/*.test.ts` i `*.test.mts` — te drugie, np. powiadomienia, stawiają tymczasową bazę z migracjami), dane w `tests/fixtures/` (odświeżane `scripts/update-fixtures.ts`). Nowy parser = nowy test na przyciętej stronie + oczekiwane wartości. Kontrola zdrowia przebiegu: `src/scraper/health.ts`.
 - **Next.js 16** z breaking changes: przed pisaniem kodu czytaj `node_modules/next/dist/docs/` (patrz `AGENTS.md`).
 
 ## Baza i wdrożenia

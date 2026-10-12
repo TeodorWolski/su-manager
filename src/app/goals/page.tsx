@@ -1,14 +1,14 @@
 import { Check, Flame, Trophy } from "lucide-react";
-import { saveMaterialGoal, saveMonthGoal } from "@/app/actions";
-import { FieldRow, NumberInput, SubmitButton, TextInput } from "@/components/form";
-import { GigGoalCard, GigPips, MaterialGoalCard, monthName } from "@/components/goals";
+import { saveMgmGoal, saveMonthGoal } from "@/app/actions";
+import { NumberInput, SubmitButton } from "@/components/form";
+import { GigGoalCard, GigPips, MgmCard, monthName } from "@/components/goals";
 import { Empty, PageHeader, Section } from "@/components/ios";
 import { DEFAULT_MONTHLY_GIGS, getGoals } from "@/lib/goals";
 import { plural } from "@/lib/text";
 
 export default async function GoalsPage() {
   const goals = await getGoals();
-  const { month, history, streak, best, material } = goals;
+  const { month, history, streak, best, mgm } = goals;
 
   return (
     <>
@@ -32,24 +32,24 @@ export default async function GoalsPage() {
       </div>
 
       <div className="mb-7 space-y-3">
-        <MaterialGoalCard goals={goals} />
-        <form action={saveMaterialGoal}>
-          <Section footer="Liczy się sprawdzony materiał (status bitu „Sprawdzony” i jego długość). Domyślnie 15 min do końca roku.">
-            <FieldRow label="Cel (min)">
-              <NumberInput name="target" min={1} defaultValue={material.target} />
-            </FieldRow>
-            <FieldRow label="Do kiedy">
-              <TextInput name="deadline" type="date" required defaultValue={material.deadline} />
-            </FieldRow>
-            <div className="px-4 py-2.5">
-              <SubmitButton className="h-10">Zapisz cel materiału</SubmitButton>
-            </div>
-          </Section>
+        <MgmCard mgm={mgm} />
+        <form action={saveMgmGoal} className="bg-card border-border flex items-center gap-3 rounded-[14px] border px-4 py-2">
+          <input type="hidden" name="month" value={mgm.month} />
+          <label className="flex flex-1 items-center gap-3">
+            <span className="text-[16px]">
+              MGM na {monthName(mgm.month)} (min)
+            </span>
+            <NumberInput name="target" min={1} max={120} defaultValue={mgm.target} className="w-16" />
+          </label>
+          <SubmitButton className="h-9 w-auto px-4 text-[15px]">Zapisz</SubmitButton>
         </form>
+        <p className="text-muted-foreground px-4 text-[13px]">
+          MGM = minuty bitów założonych w miesiącu (długość z bitu); zielone — status „Sprawdzony”, reszta — niesprawdzone. Odrzucone się nie liczą.
+        </p>
       </div>
 
       <Section
-        title="Poprzednie miesiące"
+        title="Grania — poprzednie miesiące"
         footer={
           <span className="flex flex-wrap gap-x-3">
             {streak > 0 && (
