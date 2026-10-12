@@ -50,7 +50,7 @@ export default async function GigPage({ params }: PageProps<"/gigs/[id]">) {
   const lastMessage = data.messages.at(-1);
   const since = lastActivity({ statusChangedAt: gig.statusChangedAt, createdAt: gig.createdAt, lastMessageAt: lastMessage?.date ?? null });
   const quiet = daysSince(since, nowLocal());
-  const timing = followUpTiming(gig.startsAt, since, nowLocal().slice(0, 10));
+  const timing = followUpTiming(gig.startsAt, since, nowLocal().slice(0, 10), gig.status);
   const next = nextChannel(used);
 
   return (
@@ -119,7 +119,7 @@ export default async function GigPage({ params }: PageProps<"/gigs/[id]">) {
             lastMessage && (!lastMessage.replied || gig.status === "waiting")
               ? timing.due
                 ? `Cisza od ${quiet} dni, a granie już niedługo — ${next ? `ponów na: ${next}` : "pisałeś już wszędzie"}.`
-                : `Napisane ${quiet === 0 ? "dziś" : `${quiet} dni temu`} — przypomnę ${fmtDate(timing.remindOn)}, ok. ${FOLLOW_UP_BEFORE_DAYS} dni przed graniem.`
+                : `Napisane ${quiet === 0 ? "dziś" : `${quiet} dni temu`} — przypomnę ${fmtDate(timing.remindOn)}${gig.status === "waiting" ? "" : `, ok. ${FOLLOW_UP_BEFORE_DAYS} dni przed graniem`}.`
               : undefined
           }
         >

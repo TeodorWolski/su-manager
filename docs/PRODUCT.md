@@ -56,7 +56,7 @@ Ocena grania **nie jest** oceną bitu, bo zależy od publiki, line-upu itd. Bit 
   - punkty: znajomy, ostatnie bilety / sold out, luźny tydzień, typ, którego w tygodniu brakuje (balans), bliskość, nowość,
   - jeden termin na komika i jeden na dzień, maks. 4, z gotowym „Napisz”.
 - **Do ponowienia** (`src/lib/follow-up.ts`):
-  - kiedy: granie „napisałem/czekam” bez odpowiedzi, ok. 1,5 tygodnia (10 dni) przed graniem i min. 2 dni po ostatniej wiadomości,
+  - kiedy: granie „napisałem/czekam” bez odpowiedzi, ok. 1,5 tygodnia (10 dni) przed graniem i min. 2 dni po ostatniej wiadomości; „czekam” dodatkowo już po 5 dniach bez ruchu, nawet gdy granie daleko (`WAITING_FOLLOW_UP_DAYS`),
   - pokazuje, gdzie już pisałem, i podpowiada kolejny kanał: Instagram → FB prywatny → FB fanpage,
   - ponowienie zwykle idzie innym komunikatorem niż pierwsza wiadomość.
 - **Pisanie na Dziś:** karta z treningiem puent i tygodniem generowania / redakcji (ta sama co w zakładce Pisanie, szczegóły niżej).

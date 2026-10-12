@@ -53,7 +53,7 @@ export async function getFollowUps() {
         quietDays: daysSince(since, today),
         daysLeft: daysSince(today, g.startsAt),
         next: nextChannel(used),
-        due: followUpTiming(g.startsAt, since, today).due,
+        due: followUpTiming(g.startsAt, since, today, g.status).due,
       };
     })
     .filter((g) => g.due);
