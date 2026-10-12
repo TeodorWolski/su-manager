@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>SU Manager — bez zasięgu</title>
+<!--
+  Strona, którą service worker (public/sw.js) pokazuje, gdy apka nie może się połączyć.
+  Czysty HTML/JS — działa bez Next i bez sieci. Dane: localStorage „su-offline-data” (odkłada OfflineSync),
+  log trafia do kolejki „su-log-queue” w tym samym formacie co src/lib/offline-log.ts.
+-->
+<style>
+  :root { --bg:#f4f3ef; --card:#fff; --fg:#1b1b19; --muted:#77756e; --line:#e4e2dc; --accent:#E4F323; --accent-fg:#1b1b19; --ok:#3c8a4e; color-scheme: light dark; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#131312; --card:#1e1e1c; --fg:#f2f1ec; --muted:#9b998f; --line:#2c2c29; --ok:#6cc27f; } }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.4 -apple-system, BlinkMacSystemFont, "Instrument Sans", system-ui, sans-serif; }
+  main { max-width:32rem; margin:0 auto; padding:max(1.25rem, env(safe-area-inset-top)) 16px max(2rem, env(safe-area-inset-bottom)); }
+  h1 { font-size:26px; line-height:1.15; margin:.25rem 0 .25rem; letter-spacing:-.02em; }
+  .muted { color:var(--muted); font-size:14px; }
+  .label { color:var(--muted); font-size:12.5px; font-weight:500; margin:1.4rem 4px .4rem; }
+  .card { background:var(--card); border-radius:16px; padding:12px 14px; }
+  .banner { background:color-mix(in oklab, var(--accent) 22%, var(--card)); border-radius:12px; padding:10px 12px; font-size:14px; margin-top:12px; }
+  .grid5 { display:grid; grid-template-columns:repeat(5,1fr); gap:8px; }
+  .grid5 button { aspect-ratio:1; border:0; border-radius:16px; font-size:24px; font-weight:700; background:var(--card); color:var(--muted); }
+  .grid5.sm button { aspect-ratio:auto; height:44px; font-size:18px; border-radius:12px; }
+  .grid5 button.on { background:var(--accent); color:var(--accent-fg); }
+  .hint { text-align:center; color:var(--muted); font-size:14px; height:20px; margin-top:6px; }
+  textarea, input, select { width:100%; font:inherit; font-size:16px; color:var(--fg); background:transparent; border:0; outline:none; }
+  textarea { min-height:9rem; resize:vertical; }
+  .row { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 0; border-bottom:1px solid var(--line); }
+  .row:last-child { border-bottom:0; }
+  .row input { width:5rem; text-align:right; }
+  .chips { display:flex; flex-wrap:wrap; gap:8px; }
+  .chip { border:0; border-radius:999px; padding:8px 14px; font-size:15px; background:var(--card); color:var(--fg); }
+  .chip.on { background:var(--accent); color:var(--accent-fg); }
+  .react { display:flex; align-items:center; gap:6px; padding:6px 0; border-bottom:1px solid var(--line); }
+  .react:last-child { border-bottom:0; }
+  .react span { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .react button { width:36px; height:36px; border:0; border-radius:8px; font-size:18px; background:transparent; filter:grayscale(1); opacity:.4; }
+  .react button.on { filter:none; opacity:1; background:color-mix(in oklab, var(--accent) 25%, transparent); }
+  .save { position:sticky; bottom:0; padding:10px 0 max(1rem, env(safe-area-inset-bottom)); background:var(--bg); margin-top:1.5rem; }
+  .save button { width:100%; height:48px; border:0; border-radius:12px; font-size:17px; font-weight:600; background:var(--fg); color:var(--bg); }
+  .save button:disabled { opacity:.4; }
+  .link { background:none; border:0; color:var(--muted); text-decoration:underline; font:inherit; font-size:14px; padding:12px 0; }
+</style>
+</head>
+<body>
+<main id="app"></main>
+<script>
+(() => {
+  const QUEUE_KEY = "su-log-queue", DATA_KEY = "su-offline-data";
+  const RATING_HINT = ["", "Zabiłem się", "Słabo", "OK", "Dobrze", "Rozwaliłem"];
+  const VENUE_HINT = ["", "Dramat", "Słabo", "OK", "Dobre", "Świetne"];
+  const REACTIONS = [[1, "👍"], [0, "😐"], [-1, "👎"]];
+  const read = (k, f) => { try { return JSON.parse(localStorage.getItem(k)) ?? f; } catch { return f; } };
+  const data = read(DATA_KEY, { gigs: [], bits: [] });
+  const queue = () => read(QUEUE_KEY, []);
+  const app = document.getElementById("app");
+  const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+  const fmt = (iso) => `${iso.slice(8, 10)}.${iso.slice(5, 7)}${iso.length > 10 ? " " + iso.slice(11, 16) : ""}`;
+
+  // Wróciła sieć → do apki; tam OfflineSync wyśle kolejkę.
+  addEventListener("online", () => location.replace("/"));
+
+  // Domyślnie granie, które ostatnio się zaczęło (albo pierwsze).
+  const now = new Date().toLocaleString("sv-SE", { timeZone: "Europe/Warsaw" }).replace(" ", "T").slice(0, 16);
+  const started = data.gigs.filter((g) => g.startsAt <= now);
+  const state = { gigId: (started.at(-1) ?? data.gigs[0])?.id, rating: 0, venue: 0, bits: new Set(), reactions: {} };
+
+  function render() {
+    const gig = data.gigs.find((g) => g.id === state.gigId);
+    const waiting = queue();
+    let html = `<div class="muted">📴 Bez zasięgu</div><h1>Jak wypadło granie?</h1>`;
+    if (waiting.length)
+      html += `<div class="banner">Czeka na wysłanie: ${waiting.map((q) => esc(q.title)).join(", ")}. Wyślę, jak wróci sieć — otwórz wtedy apkę.</div>`;
+    if (!gig) {
+      html += `<p class="muted" style="margin-top:1rem">Nie mam w telefonie dzisiejszych grań do oceny — apka odkłada je przy każdym otwarciu z zasięgiem.</p>
+        <button class="link" id="retry">Spróbuj połączyć jeszcze raz</button>`;
+      app.innerHTML = html;
+      document.getElementById("retry").onclick = () => location.replace("/");
+      return;
+    }
+    if (data.gigs.length > 1)
+      html += `<div class="label">Granie</div><div class="card"><select id="gig">${data.gigs
+        .map((g) => `<option value="${g.id}" ${g.id === gig.id ? "selected" : ""}>${esc(g.title)} · ${fmt(g.startsAt)}</option>`)
+        .join("")}</select></div>`;
+    else html += `<p class="muted">${esc(gig.title)} · ${fmt(gig.startsAt)}${gig.place ? " · " + esc(gig.place) : ""}</p>`;
+
+    const picker = (key, hints, sm) =>
+      `<div class="grid5 ${sm ? "sm" : ""}">${[1, 2, 3, 4, 5]
+        .map((n) => `<button type="button" data-${key}="${n}" class="${state[key] === n ? "on" : ""}">${n}</button>`)
+        .join("")}</div><div class="hint">${hints[state[key]]}</div>`;
+    html += `<div class="label">Jak mi poszło</div>${picker("rating", RATING_HINT)}
+      <div class="label">Myśli na gorąco</div><div class="card"><textarea id="thoughts" placeholder="Co zadziałało, co nie, co zmienić, kto był na sali…">${esc(state.thoughts)}</textarea></div>
+      <div class="label">Miejsce · sala, publika, organizacja</div>${picker("venue", VENUE_HINT, true)}
+      <div class="label">Liczby</div><div class="card">
+        <label class="row">Frekwencja<input id="attendance" inputmode="numeric" placeholder="osób" value="${esc(state.attendance)}"></label>
+        <label class="row">Zagrane min<input id="minutesPlayed" inputmode="numeric" placeholder="min" value="${esc(state.minutesPlayed)}"></label>
+        <label class="row">Dostępne min<input id="minutesAvailable" inputmode="numeric" placeholder="min" value="${esc(state.minutesAvailable)}"></label>
+      </div>`;
+    if (data.bits.length) {
+      html += `<div class="label">Zagrane bity</div><div class="chips">${data.bits
+        .map((b) => `<button type="button" class="chip ${state.bits.has(b.id) ? "on" : ""}" data-bit="${b.id}">${esc(b.name)}</button>`)
+        .join("")}</div>`;
+      const picked = data.bits.filter((b) => state.bits.has(b.id));
+      if (picked.length)
+        html += `<div class="card" style="margin-top:12px">${picked
+          .map((b) => `<div class="react"><span>${esc(b.name)}</span>${REACTIONS.map(
+            ([v, e]) => `<button type="button" data-react="${b.id}:${v}" class="${state.reactions[b.id] === v ? "on" : ""}">${e}</button>`,
+          ).join("")}</div>`)
+          .join("")}</div>`;
+    }
+    html += `<div class="save"><button id="save" ${state.rating ? "" : "disabled"}>${state.rating ? "Zapisz w telefonie" : "Oceń, jak Ci poszło (1–5)"}</button></div>`;
+    app.innerHTML = html;
+    bind();
+  }
+
+  // Pola tekstowe trzymamy w stanie, żeby przerysowanie ich nie czyściło.
+  const keep = () => {
+    for (const id of ["thoughts", "attendance", "minutesPlayed", "minutesAvailable"]) {
+      const el = document.getElementById(id);
+      if (el) state[id] = el.value;
+    }
+  };
+
+  function bind() {
+    document.getElementById("gig")?.addEventListener("change", (e) => { keep(); state.gigId = Number(e.target.value); render(); });
+    app.querySelectorAll("[data-rating]").forEach((b) => (b.onclick = () => { keep(); state.rating = Number(b.dataset.rating); render(); }));
+    app.querySelectorAll("[data-venue]").forEach((b) => (b.onclick = () => { keep(); const n = Number(b.dataset.venue); state.venue = state.venue === n ? 0 : n; render(); }));
+    app.querySelectorAll("[data-bit]").forEach((b) => (b.onclick = () => {
+      keep(); const id = Number(b.dataset.bit);
+      state.bits.has(id) ? state.bits.delete(id) : state.bits.add(id); render();
+    }));
+    app.querySelectorAll("[data-react]").forEach((b) => (b.onclick = () => {
+      keep(); const [id, v] = b.dataset.react.split(":").map(Number);
+      state.reactions[id] = state.reactions[id] === v ? null : v; render();
+    }));
+    document.getElementById("save").onclick = save;
+  }
+
+  function save() {
+    keep();
+    const gig = data.gigs.find((g) => g.id === state.gigId);
+    const num = (v) => String(v ?? "").replace(/\D/g, "");
+    // Te same pola co formularz logu w apce (saveLog) — kontekst i „przed kim” bez zmian z danych grania.
+    const entries = [
+      ["gigId", String(gig.id)], ["rating", String(state.rating)], ["venueRating", state.venue ? String(state.venue) : ""],
+      ["context", gig.context ?? ""], ["headlinerId", gig.headlinerId != null ? String(gig.headlinerId) : ""],
+      ["thoughts", state.thoughts ?? ""], ["attendance", num(state.attendance)],
+      ["minutesPlayed", num(state.minutesPlayed)], ["minutesAvailable", num(state.minutesAvailable)],
+    ];
+    for (const id of state.bits) {
+      entries.push(["bits", String(id)]);
+      entries.push([`reaction-${id}`, state.reactions[id] == null ? "" : String(state.reactions[id])]);
+    }
+    const next = queue().filter((q) => q.gigId !== gig.id);
+    next.push({ gigId: gig.id, title: gig.title, savedAt: new Date().toISOString(), entries });
+    try { localStorage.setItem(QUEUE_KEY, JSON.stringify(next)); } catch { alert("Nie udało się zapisać w telefonie."); return; }
+    app.innerHTML = `<div class="muted">📴 Bez zasięgu</div><h1>Zapisane w telefonie ✓</h1>
+      <p>Log „${esc(gig.title)}” wyślę sam, jak wróci sieć — wystarczy wtedy otworzyć apkę.</p>
+      <button class="link" id="retry">Spróbuj połączyć teraz</button>`;
+    document.getElementById("retry").onclick = () => location.replace("/");
+  }
+
+  render();
+})();
+</script>
+</body>
+</html>

@@ -1,14 +1,15 @@
 import { ExternalLink } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { deleteBit } from "@/app/actions";
-import { ConfirmButton } from "@/components/form";
+import { deleteBit, markBitTested } from "@/app/actions";
+import { ConfirmButton, PendingButton } from "@/components/form";
 import { GigRow } from "@/components/gig-row";
 import { Empty, PageHeader, Pill, Section, Stat } from "@/components/ios";
 import { Button } from "@/components/ui/button";
+import { readyBits, READY_THUMBS } from "@/lib/bit-ready";
 import { BIT_STATUS_LABEL, BIT_STATUS_TONE, REACTIONS } from "@/lib/labels";
 import { getBit } from "@/lib/queries";
-import { fmtDate } from "@/lib/time";
+import { fmtDate, nowLocal } from "@/lib/time";
 import { WRITING_LABEL } from "@/lib/writing";
 
 export default async function BitPage({ params }: PageProps<"/bits/[id]">) {
@@ -18,6 +19,11 @@ export default async function BitPage({ params }: PageProps<"/bits/[id]">) {
   const { bit, gigs } = data;
   const rated = gigs.filter((g) => g.rating != null);
   const count = (r: number) => gigs.filter((g) => g.reaction === r).length;
+  const [ready] = readyBits(
+    [bit],
+    gigs.map((g) => ({ bitId: bit.id, gigId: g.id, startsAt: g.startsAt, reaction: g.reaction })),
+    nowLocal().slice(0, 7),
+  );
 
   return (
     <>
@@ -43,6 +49,19 @@ export default async function BitPage({ params }: PageProps<"/bits/[id]">) {
           value={gigs.some((g) => g.reaction != null) ? REACTIONS.map((r) => `${r.emoji} ${count(r.value)}`).join("  ") : "—"}
         />
       </div>
+      {ready && (
+        <div className="bg-st-ok/10 border-st-ok/30 mb-7 flex items-center gap-3 rounded-[14px] border px-4 py-3 has-[[data-pending]]:opacity-50">
+          <p className="min-w-0 flex-1 text-[14px] leading-snug">
+            Siada na scenie ({ready.thumbs}× 👍, min. {READY_THUMBS}) — może już <b className="font-semibold">Sprawdzony</b>?
+            {ready.thisMonth && bit.lengthMin ? ` +${bit.lengthMin} min do MGM.` : ""}
+          </p>
+          <form action={markBitTested.bind(null, bit.id)}>
+            <PendingButton className="bg-primary text-primary-foreground h-9 rounded-lg px-3 text-[14px] font-semibold active:scale-95">
+              Sprawdzony
+            </PendingButton>
+          </form>
+        </div>
+      )}
       {bit.docUrl && (
         <a href={bit.docUrl} target="_blank" rel="noreferrer" className="bg-card border-border text-primary mb-7 flex h-12 items-center justify-center gap-2 rounded-[14px] border text-[16px] font-medium">
           Otwórz tekst <ExternalLink className="size-4" />

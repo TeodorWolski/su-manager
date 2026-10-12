@@ -35,8 +35,9 @@ export function ReviewGate({
         <LogForm
           key={gig.id}
           gigId={gig.id}
+          title={gig.title}
           options={options}
-          defaults={{ context: gig.context }}
+          defaults={{ context: gig.context, headlinerId: gig.headlinerId }}
           returnTo="/"
         />
 

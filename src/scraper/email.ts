@@ -1,6 +1,7 @@
 import type { Hot } from "@/lib/hot";
 import { AVAILABILITY_LABEL, CHANNEL_SHORT, RELATION_LABEL } from "@/lib/labels";
 import { pitchMessage } from "@/lib/messages";
+import type { ReadyBit } from "@/lib/bit-ready";
 import type { Mgm } from "@/lib/mgm";
 import type { FollowUp, Writing } from "@/lib/planning";
 import { groupByPerformer, type Opportunity, type OpportunityGroup } from "@/lib/opportunities";
@@ -90,7 +91,7 @@ function hotSection(items: Hot[]) {
 }
 
 /** Jedna–dwie linijki o pisaniu: seria treningu puent, tydzień, co czeka na poprawkę po scenie. */
-function writingSection(w: Writing | undefined, mgm: Mgm | undefined) {
+function writingSection(w: Writing | undefined, mgm: (Mgm & { ready?: ReadyBit[] }) | undefined) {
   if (!w) return "";
   const p = w.punchlines;
   const streak = p.streak > 0 ? `seria ${plural(p.streak, "dzień", "dni", "dni")} — dziś też premisa + 10 puent` : "dziś premisa + 10 puent";
@@ -102,7 +103,9 @@ function writingSection(w: Writing | undefined, mgm: Mgm | undefined) {
         .join(", ")}`
     : "";
   const mgmLine = mgm
-    ? `<br>${muted(`MGM: <b>${mgm.tested}/${mgm.target} min sprawdzonego</b> w tym miesiącu · niesprawdzone ${mgm.untested} min · razem ${mgm.total} min`)}`
+    ? `<br>${muted(`MGM: <b>${mgm.tested}/${mgm.target} min sprawdzonego</b> w tym miesiącu · niesprawdzone ${mgm.untested} min · razem ${mgm.total} min`)}${
+        mgm.ready?.length ? `<br>${muted(`Gotowe do zaliczenia (siadają na scenie): ${mgm.ready.map((b) => esc(b.name)).join(", ")} — przestaw na Sprawdzony.`)}` : ""
+      }`
     : "";
   return `<p style="margin:16px 0 0;padding:10px 12px;background:#f2f5f3;border-radius:8px;font-size:14px">✍️ ${streak}<br>${muted(week)}${mgmLine}${queue}</p>`;
 }

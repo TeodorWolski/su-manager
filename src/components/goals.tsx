@@ -2,7 +2,8 @@ import { format, parseISO } from "date-fns";
 import { pl } from "date-fns/locale";
 import { ChevronRight, Flame, Trophy } from "lucide-react";
 import Link from "next/link";
-import { setMgmGoal, setMonthGoal } from "@/app/actions";
+import { markBitTested, setMgmGoal, setMonthGoal } from "@/app/actions";
+import type { ReadyBit } from "@/lib/bit-ready";
 import { DEFAULT_MONTHLY_GIGS, type GoalsOverview } from "@/lib/goals";
 import { DEFAULT_MGM_MIN, type Mgm } from "@/lib/mgm";
 import { plural } from "@/lib/text";
@@ -137,7 +138,7 @@ export function GigGoalCard({ goals, link = true }: { goals: GoalsOverview; link
 }
 
 /** Mały kafelek (Dziś): MGM — materiał napisany w tym miesiącu wobec celu. */
-export function MgmTile({ mgm: m }: { mgm: Mgm }) {
+export function MgmTile({ mgm: m }: { mgm: Mgm & { ready?: ReadyBit[] } }) {
   return (
     <Link href="/writing" className="bg-card border-border hover:bg-muted/40 block rounded-[14px] border p-3.5 transition-colors">
       <div className="text-muted-foreground text-[11.5px]">
@@ -149,6 +150,11 @@ export function MgmTile({ mgm: m }: { mgm: Mgm }) {
       <div className="bg-foreground/8 mt-2 h-1 overflow-hidden rounded-full" aria-hidden>
         <div className="bg-st-ok h-full rounded-full" style={{ width: `${Math.min(100, (m.tested / m.target) * 100)}%` }} />
       </div>
+      {!!m.ready?.length && (
+        <div className="text-st-ok mt-1.5 text-[11.5px] font-medium">
+          {plural(m.ready.length, "bit gotowy", "bity gotowe", "bitów gotowych")} do zaliczenia
+        </div>
+      )}
     </Link>
   );
 }
@@ -170,7 +176,7 @@ const MGM_QUICK = [3, 5, 8, 10];
  * Pełna karta MGM (Cele, Pisanie): minuty nowego materiału w miesiącu — sprawdzone (status
  * „Sprawdzony”) i niesprawdzone — wobec celu miesięcznego, tempo, seria i historia miesięcy.
  */
-export function MgmCard({ mgm: m }: { mgm: Mgm }) {
+export function MgmCard({ mgm: m }: { mgm: Mgm & { ready?: ReadyBit[] } }) {
   // Do celu liczy się tylko sprawdzony; niesprawdzony i suma — w rozpisce pod paskiem.
   const pct = Math.min(100, (m.tested / m.target) * 100);
   const missing = Math.max(0, m.target - m.tested);
@@ -233,6 +239,8 @@ export function MgmCard({ mgm: m }: { mgm: Mgm }) {
         </p>
       )}
 
+      {!!m.ready?.length && <ReadyList ready={m.ready} month={m.month} />}
+
       {!m.isSet && (
         <div className="border-border/70 mt-3.5 border-t pt-3">
           <div className="text-[13px]">
@@ -275,6 +283,35 @@ export function MgmCard({ mgm: m }: { mgm: Mgm }) {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+/** „Gotowe do zaliczenia” — bity, które na scenie już siadają, a nie mają statusu Sprawdzony. */
+function ReadyList({ ready, month }: { ready: ReadyBit[]; month: string }) {
+  const gain = ready.filter((b) => b.thisMonth).reduce((s, b) => s + (b.lengthMin ?? 0), 0);
+  return (
+    <div className="border-border/70 mt-3.5 border-t pt-3">
+      <div className="flex items-baseline justify-between text-[13px]">
+        <span className="font-semibold">Gotowe do zaliczenia</span>
+        {gain > 0 && <span className="text-st-ok font-semibold">+{gain} min do celu</span>}
+      </div>
+      {ready.map((b) => (
+        <div key={b.id} className="mt-2 flex items-center gap-2 has-[[data-pending]]:opacity-50">
+          <Link href={`/bits/${b.id}`} className="min-w-0 flex-1">
+            <div className="truncate text-[15px]">{b.name}</div>
+            <div className="text-muted-foreground truncate text-[12px]">
+              {b.thumbs}× 👍{b.lengthMin ? ` · ${b.lengthMin} min` : " · bez długości"}
+              {b.thisMonth ? ` · liczy się w ${monthIn(month)}` : " · założony wcześniej"}
+            </div>
+          </Link>
+          <form action={markBitTested.bind(null, b.id)}>
+            <PendingButton className="bg-primary text-primary-foreground h-8 rounded-lg px-3 text-[13px] font-semibold active:scale-95">
+              Sprawdzony
+            </PendingButton>
+          </form>
+        </div>
+      ))}
     </div>
   );
 }

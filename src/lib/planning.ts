@@ -10,6 +10,7 @@ import { hotOpportunities, type HotCandidate } from "./hot";
 import { getOpportunities, loadUpcomingEvents, type EventRow } from "./opportunities";
 import { getInsights, type RhythmOpportunity } from "./rhythm";
 import { loadLeadTimes } from "./lead-data";
+import { readyBits } from "./bit-ready";
 import { computeMgm } from "./mgm";
 import { addDays, weekStart } from "./rhythm";
 import { nowLocal } from "./time";
@@ -213,10 +214,15 @@ export type WritingDigest = Awaited<ReturnType<typeof getWritingDigest>>;
 
 /** MGM: minuty materiału napisanego w miesiącu (nowe bity), cel miesięczny, historia i seria. */
 export async function getMgm() {
-  const [rows, goalRows] = await Promise.all([
-    db.select({ createdAt: bits.createdAt, status: bits.status, lengthMin: bits.lengthMin }).from(bits),
+  const [rows, goalRows, plays] = await Promise.all([
+    db.select({ id: bits.id, name: bits.name, createdAt: bits.createdAt, status: bits.status, lengthMin: bits.lengthMin }).from(bits),
     db.select({ key: goals.key, target: goals.target }).from(goals).where(sql`${goals.key} like 'mgm:%'`),
+    db
+      .select({ bitId: gigBits.bitId, gigId: gigBits.gigId, startsAt: gigs.startsAt, reaction: gigBits.reaction })
+      .from(gigBits)
+      .innerJoin(gigs, eq(gigBits.gigId, gigs.id)),
   ]);
   const targets = new Map(goalRows.map((g) => [g.key.slice(4), g.target]));
-  return computeMgm(rows, targets, nowLocal().slice(0, 10));
+  const today = nowLocal().slice(0, 10);
+  return { ...computeMgm(rows, targets, today), ready: readyBits(rows, plays, today.slice(0, 7)) };
 }

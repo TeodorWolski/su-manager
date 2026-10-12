@@ -30,6 +30,6 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   // Bez logowania: /login (strona i jej akcje), /calendar/<token>.ics (tajny token), /api/notify
-  // (CRON_SECRET), statyczne pliki, ikony, manifest i sw.js — przeglądarka pobiera je w tle.
-  matcher: ["/((?!login|_next/static|_next/image|favicon.ico|manifest.webmanifest|icon|apple-icon|calendar/|api/notify|sw.js).*)"],
+  // (CRON_SECRET), statyczne pliki, ikony, manifest, sw.js i offline.html — przeglądarka pobiera je w tle.
+  matcher: ["/((?!login|_next/static|_next/image|favicon.ico|manifest.webmanifest|icon|apple-icon|calendar/|api/notify|sw.js|offline.html).*)"],
 };

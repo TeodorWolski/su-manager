@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { saveLog } from "@/app/actions";
 import type { GigContext } from "@/db/schema";
 import { GIG_CONTEXT_LABEL, REACTIONS } from "@/lib/labels";
+import { isNetworkError, queuedLogs, queueLog } from "@/lib/offline-log";
 import type { FormOptions } from "@/lib/queries";
 import { cn } from "@/lib/utils";
 import { FieldRow, NumberInput, SelectOrNew, SubmitButton, TextArea } from "./form";
@@ -66,17 +67,44 @@ export type LogDefaults = {
   reactions?: Record<number, number | null>;
 };
 
+const subscribeQueue = (cb: () => void) => {
+  window.addEventListener("su-log-queue", cb);
+  window.addEventListener("storage", cb);
+  return () => {
+    window.removeEventListener("su-log-queue", cb);
+    window.removeEventListener("storage", cb);
+  };
+};
+
 export function LogForm({
   gigId,
+  title,
   options,
   defaults = {},
   returnTo,
 }: {
   gigId: number;
+  /** Do kolejki offline („czeka na wysłanie: …”). */
+  title: string;
   options: Pick<FormOptions, "bits" | "contacts">;
   defaults?: LogDefaults;
   returnTo?: string;
 }) {
+  // Bez zasięgu (piwnica klubu) log ląduje w telefonie i OfflineSync wyśle go, gdy sieć wróci.
+  const queued = useSyncExternalStore(
+    subscribeQueue,
+    () => queuedLogs().some((q) => q.gigId === gigId),
+    () => false,
+  );
+  async function submit(fd: FormData) {
+    if (!navigator.onLine) return queueLog(fd, title);
+    try {
+      await saveLog(fd);
+    } catch (e) {
+      if (!isNetworkError(e)) throw e;
+      queueLog(fd, title);
+    }
+  }
   const [rating, setRating] = useState(defaults.rating ?? 0);
   const [venueRating, setVenueRating] = useState(defaults.venueRating ?? 0);
   const [context, setContext] = useState<GigContext | "">(defaults.context ?? "");
@@ -98,7 +126,7 @@ export function LogForm({
     .reduce((sum, b) => sum + (b.lengthMin ?? 0), 0);
 
   return (
-    <form action={saveLog} className="space-y-6">
+    <form action={submit} className="space-y-6">
       <input type="hidden" name="gigId" value={gigId} />
       <input type="hidden" name="rating" value={rating || ""} />
       <input type="hidden" name="venueRating" value={venueRating || ""} />
@@ -241,10 +269,15 @@ export function LogForm({
       </div>
 
       <div className="bg-background/80 sticky bottom-0 -mx-4 px-4 pt-2 pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur-xl">
+        {queued && (
+          <p className="bg-st-wai/15 mb-2 rounded-xl px-3 py-2 text-[14px] leading-snug">
+            📴 Brak zasięgu — log zapisany w telefonie. Wyślę go sam, jak wróci sieć (możesz zamknąć apkę).
+          </p>
+        )}
         {rating === 0 ? (
           <div className="text-muted-foreground flex h-12 items-center justify-center text-[15px]">Oceń, jak Ci poszło (1–5)</div>
         ) : (
-          <SubmitButton>Zapisz</SubmitButton>
+          <SubmitButton>{queued ? "Zapisz ponownie" : "Zapisz"}</SubmitButton>
         )}
       </div>
     </form>

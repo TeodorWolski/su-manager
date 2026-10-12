@@ -18,6 +18,7 @@ export default async function GigLogPage({ params }: PageProps<"/gigs/[id]/log">
       />
       <LogForm
         gigId={gig.id}
+        title={gig.title}
         options={options}
         defaults={{
           ...log,

@@ -53,6 +53,7 @@ const gigListSelect = {
   venueId: gigs.venueId,
   venueName: venues.name,
   cityName: sql<string | null>`coalesce(${cities.name}, (select c.name from cities c where c.id = ${venues.cityId}))`,
+  headlinerId: gigs.headlinerId,
   headlinerName: headliner.name,
   rating: gigLogs.rating,
   venueRating: gigLogs.venueRating,
@@ -111,6 +112,45 @@ export async function getPendingReviews() {
     )
     .orderBy(asc(gigs.startsAt));
 }
+
+/**
+ * Dane do logu bez zasięgu (offline.html): potwierdzone grania od wczoraj do jutra bez logu
+ * i bity do wyboru. Layout odkłada je w telefonie przy każdym otwarciu apki.
+ */
+export async function getOfflineLogData() {
+  const today = nowLocal().slice(0, 10);
+  const day = (n: number) => new Date(Date.parse(today) + n * 864e5).toISOString().slice(0, 10);
+  const list = await gigListQuery()
+    .where(
+      and(
+        eq(gigs.status, "confirmed"),
+        eq(gigs.skipReview, false),
+        isNull(gigLogs.gigId),
+        gte(gigs.startsAt, day(-1)),
+        lt(gigs.startsAt, day(2)),
+      ),
+    )
+    .orderBy(asc(gigs.startsAt));
+  if (!list.length) return { gigs: [], bits: [] };
+  const allBits = await db
+    .select({ id: bits.id, name: bits.name, lengthMin: bits.lengthMin })
+    .from(bits)
+    .where(ne(bits.status, "rejected"))
+    .orderBy(asc(bits.name));
+  return {
+    gigs: list.map((g) => ({
+      id: g.id,
+      title: g.title,
+      startsAt: g.startsAt,
+      place: [g.venueName, g.cityName].filter(Boolean).join(", "),
+      context: g.context,
+      headlinerId: g.headlinerId,
+    })),
+    bits: allBits,
+  };
+}
+
+export type OfflineLogData = Awaited<ReturnType<typeof getOfflineLogData>>;
 
 export async function getGig(id: number) {
   // Równolegle — każde zapytanie to osobny round-trip do Turso.

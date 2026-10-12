@@ -2,11 +2,12 @@ import type { Metadata, Viewport } from "next";
 import { Instrument_Sans } from "next/font/google";
 import { connection } from "next/server";
 import { MiniCalendar } from "@/components/mini-calendar";
+import { OfflineSync } from "@/components/offline-sync";
 import { ReviewGate } from "@/components/review-gate";
 import { TabBar } from "@/components/tab-bar";
 import { ThemeProvider } from "@/components/theme";
 import { currentSession } from "@/lib/auth";
-import { getFormOptions, getPendingReviews } from "@/lib/queries";
+import { getFormOptions, getOfflineLogData, getPendingReviews } from "@/lib/queries";
 import "./globals.css";
 
 const instrument = Instrument_Sans({
@@ -34,7 +35,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   await connection();
   // Bez sesji (ekran logowania): sama treść — żadnych danych w pasku, kalendarzu ani bramce oceny.
   const authed = !!(await currentSession());
-  const pending = authed ? await getPendingReviews() : [];
+  const [pending, offline] = authed ? await Promise.all([getPendingReviews(), getOfflineLogData()]) : [[], null];
   const options = pending.length ? await getFormOptions() : null;
 
   return (
@@ -46,6 +47,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
             {children}
           </main>
           {authed && <MiniCalendar />}
+          {offline && <OfflineSync data={offline} />}
           {pending[0] && options && (
             <ReviewGate gig={pending[0]} remaining={pending.length} options={options} />
           )}

@@ -247,6 +247,23 @@ export async function deleteGig(id: number) {
 
 export async function saveLog(fd: FormData) {
   await requireSession();
+  const gigId = await writeLog(fd);
+  done(str(fd, "returnTo") ?? `/gigs/${gigId}`);
+}
+
+/**
+ * Log zapisany w telefonie bez zasięgu (log-form / offline.html) i wysłany, gdy sieć wróci.
+ * Bez przekierowania — wysyła go w tle OfflineSync. Zapis jest idempotentny (upsert), więc
+ * powtórka po zerwanym połączeniu nic nie psuje.
+ */
+export async function syncQueuedLog(fd: FormData) {
+  await requireSession();
+  await writeLog(fd);
+  refresh();
+  return true;
+}
+
+async function writeLog(fd: FormData) {
   const gigId = required(int(fd, "gigId"), "granie");
   const rating = required(int(fd, "rating"), "ocena");
   const venueRating = int(fd, "venueRating");
@@ -282,7 +299,7 @@ export async function saveLog(fd: FormData) {
       }),
     );
   }
-  done(str(fd, "returnTo") ?? `/gigs/${gigId}`);
+  return gigId;
 }
 
 /** Ucieczka z bramki oceny, gdy granie się nie odbyło. */
@@ -405,6 +422,13 @@ export async function saveBit(fd: FormData) {
   done(`/bits/${row.id}`);
 }
 
+/** „Gotowy do zaliczenia” → Sprawdzony jednym tapem (podpowiedź z MGM / karty bitu). */
+export async function markBitTested(id: number) {
+  await requireSession();
+  await db.update(bits).set({ status: "tested" }).where(eq(bits.id, id));
+  refresh();
+}
+
 export async function deleteBit(id: number) {
   await requireSession();
   await db.delete(bits).where(eq(bits.id, id));
@@ -445,6 +469,13 @@ export async function subscribePush(sub: { endpoint: string; keys: { p256dh: str
     .insert(pushSubscriptions)
     .values({ endpoint: sub.endpoint, ...values })
     .onConflictDoUpdate({ target: pushSubscriptions.endpoint, set: values });
+}
+
+/** Czy serwer zna to urządzenie — jeśli nie (martwa subskrypcja usunięta przy wysyłce), OfflineSync zapisze nową. */
+export async function pushKnown(endpoint: string) {
+  await requireSession();
+  const [row] = await db.select({ e: pushSubscriptions.endpoint }).from(pushSubscriptions).where(eq(pushSubscriptions.endpoint, endpoint));
+  return !!row;
 }
 
 export async function unsubscribePush(endpoint: string) {

@@ -77,6 +77,11 @@ Ocena grania **nie jest** oceną bitu, bo zależy od publiki, line-upu itd. Bit 
     
     Relację nadpisuje tylko „miękką” (bez historii wspólnych grań). Powrót do statusu z pipeline'u kasuje wynik.
 - **Bramka oceny** (`components/review-gate.tsx`): 90 min po starcie potwierdzonego grania, ale nie przed 20:00, cała apka jest zasłonięta formularzem logu. Ucieczka: „nie zagrałem” (status `cancelled`). Grania importowane wstecz mają `skipReview`.
+- **Log bez zasięgu** (piwnica klubu; `src/lib/offline-log.ts`, `components/offline-sync.tsx`, `public/offline.html`):
+  - formularz logu przy braku sieci odkłada log w telefonie (localStorage `su-log-queue`, jeden wpis na granie) zamiast się wysypać,
+  - gdy apka w ogóle się nie otwiera, service worker pokazuje `offline.html` — czysty HTML/JS (bez Next), log z oceną, myślami, miejscem, liczbami i bitami z reakcjami; grania (od wczoraj do jutra, potwierdzone, bez logu) i bity apka odkłada przy każdym otwarciu (`getOfflineLogData`),
+  - `OfflineSync` wysyła kolejkę akcją `syncQueuedLog` przy otwarciu apki, powrocie sieci i powrocie do apki; zapis to upsert, więc powtórka nic nie psuje; przy błędzie log zostaje w telefonie,
+  - SW nie cache'uje stron apki — dane zawsze z sieci, offline tylko `offline.html` (odświeżana przy otwarciu apki).
 - **Log:**
   - ocena występu, „myśli na gorąco” (najważniejsze pole), ocena miejsca,
   - frekwencja, minuty zagrane/dostępne, kontekst,
@@ -127,6 +132,7 @@ Ocena grania **nie jest** oceną bitu, bo zależy od publiki, line-upu itd. Bit 
 ### MGM — material generated per month (`src/lib/mgm.ts`, dane `getMgm` w `planning.ts`)
 - **Co liczy:** minuty bitów **założonych** w danym miesiącu (`bits.createdAt` po czasie warszawskim, długość `lengthMin`), z podziałem: **sprawdzone** (status „Sprawdzony”) i **niesprawdzone** (w testach / do redakcji / vomit). Odrzucone się nie liczą; bity bez długości są liczone jako bity, a karta podpowiada, żeby uzupełnić długość.
 - **Cel miesięczny** jak przy graniach: klucz `goals` „mgm:YYYY-MM”, domyślnie `DEFAULT_MGM_MIN` (5 min), szybki wybór 3/5/8/10 albo pole w Celach. **Do celu, tempa (`pace`), serii i historii (6 miesięcy) liczy się tylko sprawdzony materiał.** Niesprawdzony i suma są w rozpisce pod paskiem (sprawdzone · niesprawdzone · razem) i w mailach.
+- **Gotowe do zaliczenia** (`src/lib/bit-ready.ts`): bit niesprawdzony z min. 3× 👍 z różnych grań (`READY_THUMBS`) i bez 👎 w ostatnich 2 ocenionych (`READY_RECENT`) — na karcie MGM lista z przyciskiem „Sprawdzony” (`markBitTested`) i „+X min do celu” (minuty liczą się w miesiącu założenia bitu), kafelek na Dziś, baner na karcie bitu, linijka w porannym mailu. Tylko podpowiedź, status zmieniam sam.
 - **Zastąpił** dawny „cel materiału X min do terminu”.
 - **Widać:** kafelek na Dziś, pełna karta w Celach i w zakładce Pisanie, linijka w porannym mailu, wiersz w sekcji „✍️ Pisanie” niedzielnego podsumowania.
 
@@ -177,7 +183,7 @@ Basic auth zastąpione, bo w PWA na iOS nie trzymał sesji, a odmowy 401 w tle w
 - Bez `APP_PASSWORD` (lokalnie) logowanie jest wyłączone.
 
 ### Powiadomienia i harmonogram
-- **Web Push** (PWA, `public/sw.js`, `src/lib/push.ts`, włącznik: Więcej → Powiadomienia, tabela `push_subscriptions`): rano grania do ponowienia oraz „Napisz” do grań w statusie „zainteresowany” z wyprzedzeniem dla komika i drugi raz w połowie tego czasu (domyślnie 14 i 7 dni, `writeReminderDays`, patrz „Kiedy pisać”; każdy próg raz na granie, zbiorczo; po „Wysłałem” granie przechodzi na „napisałem” i dalej działa ponawianie), wieczorem trening puent (jeśli dziś nie było, z serią) i „jak poszło?” 90 min po starcie grania bez logu (`src/lib/notify.ts`). Każde przypomnienie raz dziennie (`oncePerDay`, tabela `app_state`).
+- **Web Push** (PWA, `public/sw.js`, `src/lib/push.ts`, włącznik: Więcej → Powiadomienia, tabela `push_subscriptions`): rano grania do ponowienia oraz „Napisz” do grań w statusie „zainteresowany” z wyprzedzeniem dla komika i drugi raz w połowie tego czasu (domyślnie 14 i 7 dni, `writeReminderDays`, patrz „Kiedy pisać”; każdy próg raz na granie, zbiorczo; po „Wysłałem” granie przechodzi na „napisałem” i dalej działa ponawianie), wieczorem trening puent (jeśli dziś nie było, z serią) i „jak poszło?” 90 min po starcie grania bez logu (`src/lib/notify.ts`). Każde przypomnienie raz dziennie (`oncePerDay`, tabela `app_state`). Bez żadnego zapisanego urządzenia `/api/notify` nic nie liczy ani nie odhacza (inaczej przypomnienia by przepadły). `OfflineSync` przy otwarciu apki sprawdza (`pushKnown`), czy serwer zna subskrypcję tego telefonu — jeśli iOS ją unieważnił i została usunięta, zapisuje nową (zgoda już jest).
 - **Wyzwalanie:** zewnętrzny cron (cron-job.org, Europe/Warsaw) — 10:30 scraper + poranny mail (workflow_dispatch przez API GitHuba), niedziela 19:00 podsumowanie, 10:35 / 21:00 `/api/notify/morning|evening` (Bearer `CRON_SECRET`, poza basic auth). Harmonogram GitHuba to zapas (12:00 / niedz. 21:00); maile wychodzą raz dziennie (`morning-mail`, `weekly-mail`), ręcznie można wymusić (`force_mail`). Szczegóły konfiguracji: README.
 
 ## Konwencje w kodzie
