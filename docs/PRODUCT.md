@@ -44,7 +44,7 @@ Ocena grania **nie jest** oceną bitu, bo zależy od publiki, line-upu itd. Bit 
 ## Funkcje (ekrany)
 
 ### Dziś (`/`)
-- **Cel miesiąca:** liczba grań, domyślnie 10 („super target”), tempo i seria miesięcy. Obok kafelki: MGM (materiał napisany w miesiącu) i średnia ocena w miesiącu.
+- **Cel miesiąca:** liczba grań, domyślnie 10 („super target”), tempo i seria miesięcy. Obok kafelki: MGM (sprawdzony materiał napisany w miesiącu) i średnia ocena w miesiącu.
 - **Rytm** (`src/lib/rhythm.ts`, `components/rhythm.tsx`):
   - cel to 2–3 grania tygodniowo, równomiernie,
   - słupki: 4 tygodnie wstecz, bieżący i 3 naprzód,
@@ -122,7 +122,7 @@ Ocena grania **nie jest** oceną bitu, bo zależy od publiki, line-upu itd. Bit 
 
 ### MGM — material generated per month (`src/lib/mgm.ts`, dane `getMgm` w `planning.ts`)
 - **Co liczy:** minuty bitów **założonych** w danym miesiącu (`bits.createdAt` po czasie warszawskim, długość `lengthMin`), z podziałem: **sprawdzone** (status „Sprawdzony”) i **niesprawdzone** (w testach / do redakcji / vomit). Odrzucone się nie liczą; bity bez długości są liczone jako bity, a karta podpowiada, żeby uzupełnić długość.
-- **Cel miesięczny** jak przy graniach: klucz `goals` „mgm:YYYY-MM”, domyślnie `DEFAULT_MGM_MIN` (5 min), szybki wybór 3/5/8/10 albo pole w Celach. Tempo (`pace`), seria miesięcy z osiągniętym celem, historia 6 miesięcy.
+- **Cel miesięczny** jak przy graniach: klucz `goals` „mgm:YYYY-MM”, domyślnie `DEFAULT_MGM_MIN` (5 min), szybki wybór 3/5/8/10 albo pole w Celach. **Do celu, tempa (`pace`), serii i historii (6 miesięcy) liczy się tylko sprawdzony materiał.** Niesprawdzony i suma są w rozpisce pod paskiem (sprawdzone · niesprawdzone · razem) i w mailach.
 - **Zastąpił** dawny „cel materiału X min do terminu”.
 - **Widać:** kafelek na Dziś, pełna karta w Celach i w zakładce Pisanie, linijka w porannym mailu, wiersz w sekcji „✍️ Pisanie” niedzielnego podsumowania.
 
@@ -150,7 +150,7 @@ Pisze się poza apką (Notion / Docs) — apka liczy regularność, wiąże prac
   - statusy: `tested`, `testing`, `editing` („do redakcji”), `vomit`, `rejected` (odrzucony: nie liczy się do celu i nie ma go w logu),
   - sekcja „Do pracy”: do redakcji oraz w testach i niegrane od 21+ dni.
 - **Statystyki** (`/stats`): skuteczność pisania (wyniki rozmów, % odpowiedzi wg kanału) i moje oceny wg kontekstu, miesiąca i sceny.
-- **Cele** (`/goals`): grania na miesiąc i MGM (minuty nowego materiału na miesiąc).
+- **Cele** (`/goals`): grania na miesiąc i MGM (minuty nowego sprawdzonego materiału na miesiąc).
 - **Myśli po graniach:** przeszukiwalne notatki z logów.
 - **Sceny:** werdykt, ocena miejsca, czas dojazdu.
 - **Miasta:** czas dojazdu z Warszawy, nocleg, priorytet.

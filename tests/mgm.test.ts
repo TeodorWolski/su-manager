@@ -21,11 +21,17 @@ describe("MGM — materiał napisany w miesiącu", () => {
     );
   });
 
-  test("cel z ustawień, historia i seria miesięcy", () => {
-    const m = computeMgm(bits, new Map([["2026-10", 4], ["2026-09", 5], ["2026-08", 2]]), "2026-10-15");
-    assert.equal(m.target, 4);
-    assert.deepEqual(m.history.map((h) => [h.month, h.total, h.hit]), [["2026-09", 6, true], ["2026-08", 1, false]]);
-    assert.equal(m.streak, 2, "październik (5 ≥ 4) + wrzesień (6 ≥ 5), sierpień przerywa");
+  test("do celu liczy się tylko sprawdzony: historia i seria miesięcy", () => {
+    const m = computeMgm(bits, new Map([["2026-10", 3], ["2026-09", 5], ["2026-08", 1]]), "2026-10-15");
+    assert.equal(m.target, 3);
+    assert.deepEqual(m.history.map((h) => [h.month, h.tested, h.hit]), [["2026-09", 6, true], ["2026-08", 0, false]]);
+    assert.equal(m.streak, 2, "październik (3 sprawdzone ≥ 3) + wrzesień (6 ≥ 5); sierpień 1 min niesprawdzonego nie liczy się");
+  });
+
+  test("niesprawdzony nie zalicza celu", () => {
+    const m = computeMgm([b("2026-10-02 10:00:00", "testing", 10)], new Map([["2026-10", 5]]), "2026-10-15");
+    assert.equal(m.total, 10);
+    assert.equal(m.streak, 0);
   });
 
   test("miesiąc po czasie warszawskim, nie UTC", () => {

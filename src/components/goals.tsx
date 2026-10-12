@@ -138,18 +138,16 @@ export function GigGoalCard({ goals, link = true }: { goals: GoalsOverview; link
 
 /** Mały kafelek (Dziś): MGM — materiał napisany w tym miesiącu wobec celu. */
 export function MgmTile({ mgm: m }: { mgm: Mgm }) {
-  const pct = (v: number) => Math.min(100, (v / m.target) * 100);
   return (
     <Link href="/writing" className="bg-card border-border hover:bg-muted/40 block rounded-[14px] border p-3.5 transition-colors">
       <div className="text-muted-foreground text-[11.5px]">
-        Materiał · <span className="capitalize">{monthName(m.month)}</span>
+        Materiał sprawdzony · <span className="capitalize">{monthName(m.month)}</span>
       </div>
       <div className="mt-1 text-[20px] font-semibold tracking-[-0.02em]">
-        {m.total} <span className="text-muted-foreground text-[14px] font-medium">/ {m.target} min</span>
+        {m.tested} <span className="text-muted-foreground text-[14px] font-medium">/ {m.target} min</span>
       </div>
-      <div className="bg-foreground/8 mt-2 flex h-1 overflow-hidden rounded-full" aria-hidden>
-        <div className="bg-st-ok h-full" style={{ width: `${pct(m.tested)}%` }} />
-        <div className="bg-st-wai/60 h-full" style={{ width: `${Math.min(100 - pct(m.tested), pct(m.untested))}%` }} />
+      <div className="bg-foreground/8 mt-2 h-1 overflow-hidden rounded-full" aria-hidden>
+        <div className="bg-st-ok h-full rounded-full" style={{ width: `${Math.min(100, (m.tested / m.target) * 100)}%` }} />
       </div>
     </Link>
   );
@@ -173,23 +171,20 @@ const MGM_QUICK = [3, 5, 8, 10];
  * „Sprawdzony”) i niesprawdzone — wobec celu miesięcznego, tempo, seria i historia miesięcy.
  */
 export function MgmCard({ mgm: m }: { mgm: Mgm }) {
-  const pct = (v: number) => Math.min(100, (v / m.target) * 100);
-  const testedPct = pct(m.tested);
-  const untestedPct = Math.min(100 - testedPct, pct(m.untested));
-  const missing = Math.max(0, m.target - m.total);
+  // Do celu liczy się tylko sprawdzony; niesprawdzony i suma — w rozpisce pod paskiem.
+  const pct = Math.min(100, (m.tested / m.target) * 100);
+  const missing = Math.max(0, m.target - m.tested);
   const status =
     missing === 0
       ? "cel zdobyty"
-      : m.total >= m.pace
-        ? `przed tempem · brakuje ${missing} min`
-        : `za tempem o ${Math.ceil(m.pace - m.total)} min`;
+      : m.tested >= m.pace
+        ? `w tempie · brakuje ${missing} min`
+        : `za tempem o ${Math.ceil(m.pace - m.tested)} min`;
 
   return (
     <div className="bg-card border-border rounded-[14px] border p-4">
       <div className="text-muted-foreground flex items-center justify-between text-[12px]">
-        <span>
-          MGM · materiał napisany w {monthIn(m.month)}
-        </span>
+        <span>MGM · sprawdzony materiał w {monthIn(m.month)}</span>
         {m.streak > 0 && (
           <span className="flex items-center gap-1">
             <Flame className="size-3.5" /> seria {plural(m.streak, "miesiąc", "miesiące", "miesięcy")}
@@ -197,28 +192,40 @@ export function MgmCard({ mgm: m }: { mgm: Mgm }) {
         )}
       </div>
       <div className="mt-1.5 flex items-baseline gap-2">
-        <span className="text-[40px] leading-none font-semibold tracking-[-0.04em]">{m.total}</span>
+        <span className="text-[40px] leading-none font-semibold tracking-[-0.04em]">{m.tested}</span>
         <span className="text-muted-foreground text-[16px] font-medium">/ {m.target} min</span>
-        <span className="text-muted-foreground ml-auto text-[12px]">{plural(m.bits, "nowy bit", "nowe bity", "nowych bitów")}</span>
-      </div>
-
-      <div
-        className="bg-foreground/8 mt-3.5 flex h-2 overflow-hidden rounded-[2px]"
-        role="img"
-        aria-label={`${m.tested} min sprawdzonego i ${m.untested} min niesprawdzonego z celu ${m.target} min`}
-      >
-        <span className="bg-st-ok h-full" style={{ width: `${testedPct}%` }} title={`sprawdzone: ${m.tested} min`} />
-        {untestedPct > 0 && (
-          <span className="bg-st-wai/60 border-card h-full border-l-2" style={{ width: `${untestedPct}%` }} title={`niesprawdzone: ${m.untested} min`} />
-        )}
-      </div>
-      <div className="text-muted-foreground mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px]">
-        <span className="flex items-center gap-1.5"><span className="bg-st-ok size-2 rounded-[2px]" />sprawdzone {m.tested} min</span>
-        <span className="flex items-center gap-1.5"><span className="bg-st-wai/60 size-2 rounded-[2px]" />niesprawdzone {m.untested} min</span>
-        <b className={cn("ml-auto font-semibold", missing === 0 ? "text-st-ok flex items-center gap-1" : "text-foreground")}>
+        <b className={cn("ml-auto text-[12.5px] font-semibold", missing === 0 ? "text-st-ok flex items-center gap-1" : "text-foreground")}>
           {missing === 0 && <Trophy className="size-3.5" />}
           {status}
         </b>
+      </div>
+
+      <div
+        className="bg-foreground/8 mt-3.5 h-2 overflow-hidden rounded-[2px]"
+        role="img"
+        aria-label={`${m.tested} min sprawdzonego z celu ${m.target} min`}
+      >
+        <div className="bg-st-ok h-full" style={{ width: `${pct}%` }} />
+      </div>
+
+      {/* Rozpiska miesiąca */}
+      <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+        <div className="bg-muted/60 rounded-lg py-2">
+          <div className="text-[17px] font-semibold tabular-nums">{m.tested} min</div>
+          <div className="text-muted-foreground flex items-center justify-center gap-1 text-[11.5px]">
+            <span className="bg-st-ok size-2 rounded-[2px]" /> sprawdzone
+          </div>
+        </div>
+        <div className="bg-muted/60 rounded-lg py-2">
+          <div className="text-[17px] font-semibold tabular-nums">{m.untested} min</div>
+          <div className="text-muted-foreground flex items-center justify-center gap-1 text-[11.5px]">
+            <span className="bg-st-wai/60 size-2 rounded-[2px]" /> niesprawdzone
+          </div>
+        </div>
+        <div className="bg-muted/60 rounded-lg py-2">
+          <div className="text-[17px] font-semibold tabular-nums">{m.total} min</div>
+          <div className="text-muted-foreground text-[11.5px]">razem · {plural(m.bits, "bit", "bity", "bitów")}</div>
+        </div>
       </div>
       {m.noLength > 0 && (
         <p className="text-muted-foreground mt-2 text-[12px]">
@@ -229,8 +236,7 @@ export function MgmCard({ mgm: m }: { mgm: Mgm }) {
       {!m.isSet && (
         <div className="border-border/70 mt-3.5 border-t pt-3">
           <div className="text-[13px]">
-            Ile minut nowego materiału w {monthIn(m.month)}?{" "}
-            <span className="text-muted-foreground">Domyślnie {DEFAULT_MGM_MIN}.</span>
+            Ile minut sprawdzonego materiału w {monthIn(m.month)}? <span className="text-muted-foreground">Domyślnie {DEFAULT_MGM_MIN}.</span>
           </div>
           <div className="mt-2 grid grid-cols-4 gap-1.5">
             {MGM_QUICK.map((n) => (
@@ -250,16 +256,19 @@ export function MgmCard({ mgm: m }: { mgm: Mgm }) {
       )}
 
       {m.history.length > 0 && (
-        <div className="border-border/70 mt-3.5 flex items-end gap-2 border-t pt-3" aria-label="Poprzednie miesiące">
+        <div className="border-border/70 mt-3.5 flex items-end gap-2 border-t pt-3" aria-label="Poprzednie miesiące (sprawdzony materiał)">
           {[...m.history].reverse().map((h) => (
-            <div key={h.month} className="flex min-w-0 flex-1 flex-col items-center gap-1" title={`${monthName(h.month, "LLLL yyyy")}: ${h.total}/${h.target} min`}>
+            <div
+              key={h.month}
+              className="flex min-w-0 flex-1 flex-col items-center gap-1"
+              title={`${monthName(h.month, "LLLL yyyy")}: ${h.tested}/${h.target} min sprawdzonego, razem ${h.total} min`}
+            >
               <span className={cn("text-[11px] tabular-nums", h.hit ? "text-st-ok font-semibold" : "text-muted-foreground")}>
-                {h.total}
+                {h.tested}
                 {h.hit && " ✓"}
               </span>
-              <div className="bg-foreground/8 flex h-1.5 w-full overflow-hidden rounded-full">
+              <div className="bg-foreground/8 h-1.5 w-full overflow-hidden rounded-full">
                 <div className="bg-st-ok h-full" style={{ width: `${Math.min(100, (h.tested / h.target) * 100)}%` }} />
-                <div className="bg-st-wai/60 h-full" style={{ width: `${Math.min(100, ((h.total - h.tested) / h.target) * 100)}%` }} />
               </div>
               <span className="text-muted-foreground text-[10px] capitalize">{monthName(h.month, "LLL")}</span>
             </div>

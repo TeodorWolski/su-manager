@@ -101,7 +101,9 @@ function writingSection(w: Writing | undefined, mgm: Mgm | undefined) {
         .map((q) => `<b>${esc(q.name)}</b> ${q.reaction < 0 ? "👎" : "😐"}`)
         .join(", ")}`
     : "";
-  const mgmLine = mgm ? `<br>${muted(`MGM: <b>${mgm.total}/${mgm.target} min</b> nowego materiału w tym miesiącu (${mgm.tested} min sprawdzonego)`)}` : "";
+  const mgmLine = mgm
+    ? `<br>${muted(`MGM: <b>${mgm.tested}/${mgm.target} min sprawdzonego</b> w tym miesiącu · niesprawdzone ${mgm.untested} min · razem ${mgm.total} min`)}`
+    : "";
   return `<p style="margin:16px 0 0;padding:10px 12px;background:#f2f5f3;border-radius:8px;font-size:14px">✍️ ${streak}<br>${muted(week)}${mgmLine}${queue}</p>`;
 }
 

@@ -37,14 +37,14 @@ export default async function GoalsPage() {
           <input type="hidden" name="month" value={mgm.month} />
           <label className="flex flex-1 items-center gap-3">
             <span className="text-[16px]">
-              MGM na {monthName(mgm.month)} (min)
+              MGM na {monthName(mgm.month)} (min sprawdzonego)
             </span>
             <NumberInput name="target" min={1} max={120} defaultValue={mgm.target} className="w-16" />
           </label>
           <SubmitButton className="h-9 w-auto px-4 text-[15px]">Zapisz</SubmitButton>
         </form>
         <p className="text-muted-foreground px-4 text-[13px]">
-          MGM = minuty bitów założonych w miesiącu (długość z bitu); zielone — status „Sprawdzony”, reszta — niesprawdzone. Odrzucone się nie liczą.
+          MGM = minuty bitów założonych w miesiącu (długość z bitu). Do celu liczy się tylko sprawdzony (status „Sprawdzony”); niesprawdzony i suma są w rozpisce. Odrzucone się nie liczą.
         </p>
       </div>
 

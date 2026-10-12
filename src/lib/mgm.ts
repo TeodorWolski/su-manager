@@ -1,11 +1,12 @@
 /**
  * MGM — material generated per month: minuty bitów założonych w danym miesiącu (długość z bitu),
  * z podziałem na sprawdzone (status „Sprawdzony”) i niesprawdzone (w testach / do redakcji / vomit).
- * Odrzucone się nie liczą. Cel miesięczny jak przy graniach (klucz goals „mgm:YYYY-MM”).
+ * Do celu miesięcznego (klucz goals „mgm:YYYY-MM”), tempa i serii liczy się TYLKO sprawdzony;
+ * niesprawdzony i suma są w rozpisce. Odrzucone się nie liczą.
  * Czysta logika — dane: getMgm w planning.ts.
  */
 
-/** Domyślny cel, dopóki nie ustawię innego na dany miesiąc (minuty nowego materiału). */
+/** Domyślny cel, dopóki nie ustawię innego na dany miesiąc (minuty nowego sprawdzonego materiału). */
 export const DEFAULT_MGM_MIN = 5;
 export const MGM_HISTORY_MONTHS = 6;
 export const mgmKey = (month: string) => `mgm:${month}`;
@@ -43,10 +44,10 @@ export function computeMgm(bits: MgmBit[], targets: Map<string, number>, today: 
   const history: { month: string; total: number; tested: number; target: number; hit: boolean }[] = [];
   for (let m = prevMonth(month); m >= first && history.length < MGM_HISTORY_MONTHS; m = prevMonth(m)) {
     const s = monthStats(bits, m);
-    history.push({ month: m, total: s.total, tested: s.tested, target: targetFor(m), hit: s.total >= targetFor(m) });
+    history.push({ month: m, total: s.total, tested: s.tested, target: targetFor(m), hit: s.tested >= targetFor(m) });
   }
-  // Seria: kolejne miesiące wstecz z celem (+ bieżący, jeśli już osiągnięty).
-  let streak = cur.total >= targetFor(month) ? 1 : 0;
+  // Seria: kolejne miesiące wstecz z celem — liczy się sprawdzony (+ bieżący, jeśli już osiągnięty).
+  let streak = cur.tested >= targetFor(month) ? 1 : 0;
   for (const h of history) {
     if (!h.hit) break;
     streak++;
@@ -57,7 +58,7 @@ export function computeMgm(bits: MgmBit[], targets: Map<string, number>, today: 
     ...cur,
     target: targetFor(month),
     isSet: targets.has(month),
-    /** Ile „powinno” być na dziś przy równym tempie. */
+    /** Ile sprawdzonego „powinno” być na dziś przy równym tempie. */
     pace: (targetFor(month) * day) / daysInMonth(month),
     daysLeft: daysInMonth(month) - day,
     history,
