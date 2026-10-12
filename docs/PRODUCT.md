@@ -150,6 +150,12 @@ Pisze się poza apką (Notion / Docs) — apka liczy regularność, wiąże prac
 - **Miasta:** czas dojazdu z Warszawy, nocleg, priorytet.
 - **Kalendarz:** feed `.ics` z potwierdzonymi graniami pod tajnym tokenem (`/calendar/<token>.ics`).
 
+### Mini kalendarz (każda podstrona)
+- Pływający przycisk w prawym dolnym rogu (`components/mini-calendar.tsx`, w `layout.tsx`); otwarty / zamknięty pamiętany w `localStorage` (`useSyncExternalStore`).
+- Miesiąc od poniedziałku, numery tygodni ISO, Σ grań w tygodniu względem rytmu 2–3 (zielone w normie, ochra >3).
+- **Kolor = typ grania** (tokeny `--ctx-*` w `globals.css`, paleta sprawdzona walidatorem w obu motywach): open mic niebieski, przed kimś pomarańczowy, support turkusowy, headline żółty, inne szare. **Pełne kółko = potwierdzone, obwódka = w toku**; kropka = drugie granie tego dnia. Legenda zawsze widoczna (jasny turkus/żółty mają <3:1 wobec białego — podpisy są wymagane).
+- Tap w dzień: lista grań z typem słownie i linkami; wolny dzień — „Co gra tego dnia?” (wyszukiwarka Okazji z datą). Dane: `/api/month?from=&to=` (bez odrzuconych i odwołanych).
+
 ### Powiadomienia i harmonogram
 - **Web Push** (PWA, `public/sw.js`, `src/lib/push.ts`, włącznik: Więcej → Powiadomienia, tabela `push_subscriptions`): rano grania do ponowienia, wieczorem trening puent (jeśli dziś nie było, z serią) i „jak poszło?” 90 min po starcie grania bez logu (`src/lib/notify.ts`). Każde przypomnienie raz dziennie (`oncePerDay`, tabela `app_state`).
 - **Wyzwalanie:** zewnętrzny cron (cron-job.org, Europe/Warsaw) — 10:30 scraper + poranny mail (workflow_dispatch przez API GitHuba), niedziela 19:00 podsumowanie, 10:35 / 21:00 `/api/notify/morning|evening` (Bearer `CRON_SECRET`, poza basic auth). Harmonogram GitHuba to zapas (12:00 / niedz. 21:00); maile wychodzą raz dziennie (`morning-mail`, `weekly-mail`), ręcznie można wymusić (`force_mail`). Szczegóły konfiguracji: README.

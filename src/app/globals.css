@@ -22,6 +22,10 @@
   --color-st-ok: var(--st-ok);
   --color-st-rej: var(--st-rej);
   --color-st-can: var(--st-can);
+  --color-ctx-openmic: var(--ctx-openmic);
+  --color-ctx-opener: var(--ctx-opener);
+  --color-ctx-support: var(--ctx-support);
+  --color-ctx-headline: var(--ctx-headline);
   --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
   --font-heading: var(--font-sans);
   --color-sidebar-ring: var(--sidebar-ring);
@@ -101,6 +105,14 @@
   --st-ok: oklch(0.52 0.08 145);
   --st-rej: oklch(0.55 0.13 35);
   --st-can: oklch(0.7 0.01 95);
+  /*
+   * Typ grania w mini kalendarzu (kategorie, stała kolejność; sprawdzone walidatorem palety na
+   * jasnej i ciemnej karcie): open mic / przed kimś / support / headline. Inne = szary.
+   */
+  --ctx-openmic: #2a78d6;
+  --ctx-opener: #eb6834;
+  --ctx-support: #1baf7a;
+  --ctx-headline: #eda100;
   --chart-1: oklch(0.52 0.08 145);
   --chart-2: #e4f323;
   --chart-3: oklch(0.54 0.07 245);
@@ -150,6 +162,10 @@
   --st-ok: oklch(0.72 0.1 145);
   --st-rej: oklch(0.68 0.13 35);
   --st-can: oklch(0.5 0.01 95);
+  --ctx-openmic: #3987e5;
+  --ctx-opener: #d95926;
+  --ctx-support: #199e70;
+  --ctx-headline: #c98500;
   --chart-1: oklch(0.72 0.1 145);
   --chart-2: #e4f323;
   --chart-3: oklch(0.7 0.07 245);

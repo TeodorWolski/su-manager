@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Instrument_Sans } from "next/font/google";
 import { connection } from "next/server";
+import { MiniCalendar } from "@/components/mini-calendar";
 import { ReviewGate } from "@/components/review-gate";
 import { TabBar } from "@/components/tab-bar";
 import { ThemeProvider } from "@/components/theme";
@@ -41,6 +42,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
           <main className="mx-auto max-w-2xl px-4 pt-[env(safe-area-inset-top)] pb-28 md:pt-14 md:pb-16">
             {children}
           </main>
+          <MiniCalendar />
           {pending[0] && options && (
             <ReviewGate gig={pending[0]} remaining={pending.length} options={options} />
           )}
