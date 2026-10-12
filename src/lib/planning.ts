@@ -9,6 +9,7 @@ import { daysSince, followUpTiming, lastActivity, nextChannel } from "./follow-u
 import { hotOpportunities, type HotCandidate } from "./hot";
 import { getOpportunities, loadUpcomingEvents, type EventRow } from "./opportunities";
 import { getInsights, type RhythmOpportunity } from "./rhythm";
+import { loadLeadTimes } from "./lead-data";
 import { computeMgm } from "./mgm";
 import { addDays, weekStart } from "./rhythm";
 import { nowLocal } from "./time";
@@ -69,12 +70,13 @@ export type FollowUp = Awaited<ReturnType<typeof getFollowUps>>[number];
 export async function getPlanning(loadEvents: (today: string) => Promise<EventRow[]> = loadUpcomingEvents) {
   const today = nowLocal().slice(0, 10);
   const from = new Date(Date.parse(today) - 35 * 864e5).toISOString().slice(0, 10);
-  const [rows, opportunities] = await Promise.all([
+  const [rows, opportunities, leads] = await Promise.all([
     db
       .select({ id: gigs.id, title: gigs.title, startsAt: gigs.startsAt, status: gigs.status, context: gigs.context })
       .from(gigs)
       .where(and(gte(gigs.startsAt, from), inArray(gigs.status, ["confirmed", "interested", "contacted", "waiting"]))),
     getOpportunities(undefined, loadEvents),
+    loadLeadTimes(),
   ]);
   // Najpierw znajomi, potem open miki, potem reszta w zasięgu; bez wyciszonych i tych, gdzie już mam granie.
   const order = { friends: 0, openMic: 1, inRange: 2 } as Record<string, number>;
@@ -102,6 +104,7 @@ export async function getPlanning(loadEvents: (today: string) => Promise<EventRo
     isNew: o.isNew,
     performer: o.performer,
     friend: o.tab === "friends" ? (o.matches[0]?.name ?? null) : null,
+    lead: leads.leadFor(o.performer.contactId, o.isOpenMic ? "open_mic" : "opener"),
   }));
   return { ...getInsights(rows, ideas, today), hot: hotOpportunities(rows, candidates, today) };
 }

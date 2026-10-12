@@ -31,6 +31,7 @@ import {
 import { loadUpcomingEventsCached } from "@/lib/events-cache";
 import { findPlace, placeName } from "@/lib/geo";
 import { pitchMessage } from "@/lib/messages";
+import { leadLabel } from "@/lib/lead-time";
 import { INTERVAL_LABEL, RECURRING_SOURCE } from "@/lib/recurring";
 import { parseDays, ROUTE_CORRIDORS, ROUTE_MAX_DAYS } from "@/lib/route";
 import { parseDateQuery } from "@/lib/time";
@@ -207,6 +208,7 @@ function GroupCard({ g }: { g: OpportunityGroup }) {
               {m.lastPlayedTogether && (
                 <span className="text-muted-foreground whitespace-nowrap">wspólny wieczór {fmtDate(m.lastPlayedTogether)}</span>
               )}
+              {m.leadDays && <span className="text-muted-foreground whitespace-nowrap">pisz {leadLabel(m.leadDays)} przed</span>}
               {m.lastMessageAt && (
                 <span className="text-muted-foreground whitespace-nowrap">
                   pisałeś {fmtDate(m.lastMessageAt)}

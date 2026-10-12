@@ -47,7 +47,7 @@ describe("poranne powiadomienia", () => {
     assert.equal(n.url, `/gigs/${waitingId}`);
   });
 
-  test("„zainteresowany”: 14 i 7 dni przed, zbiorczo; za 20 dni — nie; raz na próg", async () => {
+  test("„zainteresowany” (domyślne wyprzedzenie): 14 i 7 dni przed, zbiorczo; za 20 dni — nie; raz na próg", async () => {
     const [{ id: contactId }] = await db.insert(contacts).values({ name: "Rafał Testowy", role: "comedian" }).returning({ id: contacts.id });
     await db.insert(gigs).values([
       { title: "TEST za 10 dni", startsAt: `${day(10)}T19:00`, status: "interested", headlinerId: contactId },
@@ -65,6 +65,27 @@ describe("poranne powiadomienia", () => {
 
     const second = (await notifications("morning")).find((x) => x.tag === "write");
     assert.equal(second, undefined, "ten sam dzień — bez powtórki");
+  });
+
+  test("„zainteresowany”: komik z wyuczonym wyprzedzeniem (3 tyg.) — przypomnienie już za 20 dni", async () => {
+    const [{ id: early }] = await db.insert(contacts).values({ name: "Kasia Wcześniejsza", role: "comedian" }).returning({ id: contacts.id });
+    // Dwie zgody, gdy pisałem 21 dni przed — własne wyprzedzenie 21 dni.
+    for (const back of [60, 120]) {
+      const [{ id }] = await db
+        .insert(gigs)
+        .values({ title: "TEST stare", startsAt: `${day(-back)}T20:00`, status: "confirmed", outcome: "agreed", headlinerId: early, skipReview: true })
+        .returning({ id: gigs.id });
+      await db.insert(interactions).values({ gigId: id, contactId: early, date: day(-back - 21), channel: "Instagram" });
+    }
+    await db.insert(gigs).values([
+      { title: "TEST Kasia za 20 dni", startsAt: `${day(20)}T20:00`, status: "interested", headlinerId: early },
+      { title: "TEST inny za 19 dni", startsAt: `${day(19)}T20:00`, status: "interested" },
+    ]);
+    const n = (await notifications("morning")).find((x) => x.tag === "write");
+    assert.ok(n, "jest „napisz”");
+    assert.match(n.title, /^Napisz: 1 granie/, "przy 20 dniach to pierwszy próg, nie ostatni dzwonek");
+    assert.match(n.body, /Kasia Wcześniejsza/);
+    assert.doesNotMatch(n.body, /inny za 19 dni/, "bez danych — dalej 14 dni");
   });
 });
 

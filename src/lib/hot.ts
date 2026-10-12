@@ -1,3 +1,4 @@
+import { leadLabel } from "./lead-time";
 import {
   addDays,
   gigKind,
@@ -34,6 +35,11 @@ export type HotCandidate = {
   performer: { key: string; name: string; contactId: number | null };
   /** Kontakt z CRM, jeśli to znajomy (do szablonu wiadomości i etykiety). */
   friend: string | null;
+  /**
+   * Wyprzedzenie dla tego komika / typu (src/lib/lead-time.ts). `personal` = wyuczone z rozmów z nim;
+   * wtedy okno i idealny moment liczymy pod niego (np. pisze line-up 3 tyg. wcześniej).
+   */
+  lead?: { days: number; personal: boolean };
 };
 
 export type Hot = HotCandidate & { score: number; reasons: string[] };
@@ -42,7 +48,6 @@ const day = (iso: string) => iso.slice(0, 10);
 
 export function hotOpportunities(gigs: RhythmGig[], candidates: HotCandidate[], today: string): Hot[] {
   const from = addDays(today, HOT_FROM_DAYS);
-  const to = addDays(today, HOT_TO_DAYS);
   const active = gigs.filter((g) => g.status === "confirmed" || (PENDING.includes(g.status) && day(g.startsAt) >= today));
   const busy = new Set(active.map((g) => day(g.startsAt)));
   const inWeek = (date: string) => {
@@ -61,6 +66,9 @@ export function hotOpportunities(gigs: RhythmGig[], candidates: HotCandidate[], 
   const scored: Hot[] = [];
   for (const c of candidates) {
     const d = day(c.startsAt);
+    // Okno: 7–21 dni, a dla komika z dłuższym wyprzedzeniem — do jego wyprzedzenia (+3 dni zapasu).
+    const ideal = c.lead?.days ?? 14;
+    const to = addDays(today, Math.max(HOT_TO_DAYS, ideal + 3));
     if (d < from || d > to || busy.has(d)) continue;
     const week = inWeek(d);
     const openers = week.filter((g) => gigKind(g.context) === "opener").length;
@@ -94,8 +102,15 @@ export function hotOpportunities(gigs: RhythmGig[], candidates: HotCandidate[], 
     // Bliskość tylko w punktacji — czas dojazdu i tak widać w opisie.
     if (c.travelMinutes != null && c.travelMinutes <= 60) score += 1;
     if (c.isNew) score += 0.5;
-    // Najlepiej ok. 2 tygodnie przed — wtedy jeszcze jest miejsce w line-upie.
-    score -= Math.abs((Date.parse(d) - Date.parse(today)) / 864e5 - 14) * 0.05;
+    // Najlepiej w „jego” momencie (wyprzedzenie komika; domyślnie ok. 2 tygodnie przed).
+    score -= Math.abs((Date.parse(d) - Date.parse(today)) / 864e5 - ideal) * 0.05;
+    if (c.lead?.personal) {
+      const left = (Date.parse(d) - Date.parse(today)) / 864e5;
+      if (left <= ideal + 3 && left >= ideal - 7) {
+        score += 1;
+        reasons.push(`pisz ${leadLabel(c.lead.days)} przed`);
+      }
+    }
     scored.push({ ...c, score, reasons });
   }
 

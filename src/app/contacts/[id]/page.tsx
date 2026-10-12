@@ -16,12 +16,16 @@ import { Button } from "@/components/ui/button";
 import { CHANNELS, IGNORE_REASON_LABEL, RELATION_LABEL, RELATION_TONE, ROLE_LABEL } from "@/lib/labels";
 import { ACTIVE_GIG, COOLDOWN_DAYS, muteState } from "@/lib/opportunities";
 import { getContact } from "@/lib/queries";
+import { loadLeadTimes } from "@/lib/lead-data";
+import { leadLabel, PERSONAL_MIN } from "@/lib/lead-time";
+import { plural } from "@/lib/text";
 import { fmtDate, nowLocal } from "@/lib/time";
 
 export default async function ContactPage({ params }: PageProps<"/contacts/[id]">) {
   const { id } = await params;
-  const data = await getContact(Number(id));
+  const [data, leads] = await Promise.all([getContact(Number(id)), loadLeadTimes()]);
   if (!data) notFound();
+  const lead = leads.leadFor(data.contact.id, "opener");
   const { contact, history } = data;
   const today = nowLocal().slice(0, 10);
   const lastPlayedTogether =
@@ -113,6 +117,30 @@ export default async function ContactPage({ params }: PageProps<"/contacts/[id]"
               <form action={setContactSnooze.bind(null, contact.id, null)}>
                 <PendingButton className="text-muted-foreground h-9 text-[15px]">Automatycznie</PendingButton>
               </form>
+            )}
+          </div>
+        </Section>
+      )}
+
+      {contact.role === "comedian" && (
+        <Section
+          title="Kiedy pisać"
+          footer="Liczone z rozmów z wynikiem: przy „zgodził się” — ile dni przed graniem napisałeś; „ktoś zajął miejsce” — że to było za późno. Z tego przypomnienia „napisz” i Najgorętsze okazje."
+        >
+          <div className="px-4 py-3 text-[15px]">
+            {lead.personal ? (
+              <>
+                Pisz <b className="font-semibold">{leadLabel(lead.days)}</b> przed graniem
+                <span className="text-muted-foreground">
+                  {" "}
+                  · {plural(lead.agreed, "zgoda", "zgody", "zgód")}
+                  {lead.taken > 0 && `, ${lead.taken}× ktoś zajął miejsce`}
+                </span>
+              </>
+            ) : (
+              <span className="text-muted-foreground">
+                Za mało rozmów z wynikiem (min. {PERSONAL_MIN}) — przypominam {leadLabel(lead.days)} przed, jak przy innych komikach.
+              </span>
             )}
           </div>
         </Section>

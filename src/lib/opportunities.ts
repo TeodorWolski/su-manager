@@ -7,6 +7,7 @@ import { cities, contacts, db, events, gigs, hiddenTitles, venues, type City, ty
 import { alongRoute, coords, distanceKm } from "./geo";
 import { describe as describeSeries, RECURRING_SOURCE, seriesKey } from "./recurring";
 import { loadSeries } from "./recurring-sync";
+import { loadLeadTimes } from "./lead-data";
 import { planRoute, routeDays } from "./route";
 import { matchContacts, matchesQuery } from "./match";
 import { isWantedLanguage, performerKey, performerName } from "./performer";
@@ -30,6 +31,8 @@ export type MatchedContact = Pick<Contact, "id" | "name" | "relation" | "ignoreI
   lastMessageAt: string | null;
   lastMessageChannel: string | null;
   lastMessageReplied: boolean | null;
+  /** Wyprzedzenie wyuczone z rozmów z nim (null = za mało danych). */
+  leadDays: number | null;
   /** Do kiedy wyciszony w Okazjach (data), null = widoczny. */
   mutedUntil: string | null;
   muteReason: MuteReason | null;
@@ -120,7 +123,7 @@ const nextGigSql = (column: string) =>
 async function loadContext() {
   const now = nowLocal();
   const today = now.slice(0, 10);
-  const [allCities, people, never, hidden, myGigs, recurring] = await Promise.all([
+  const [allCities, people, never, hidden, myGigs, recurring, leads] = await Promise.all([
     db.select().from(cities),
     db
       .select({
@@ -161,12 +164,13 @@ async function loadContext() {
       .from(gigs)
       .where(and(gte(gigs.startsAt, today), sql`${gigs.status} not in ('rejected', 'cancelled')`)),
     loadSeries(),
+    loadLeadTimes(),
   ]);
   return {
     citiesByName: new Map(allCities.map((c) => [normalize(c.name), c])),
     people: people.map((p) => {
       const m = muteState(p, today);
-      return { ...p, mutedUntil: m?.until ?? null, muteReason: m?.reason ?? null };
+      return { ...p, mutedUntil: m?.until ?? null, muteReason: m?.reason ?? null, leadDays: leads.byContact.get(p.id)?.days ?? null };
     }),
     blacklist: new Set(never.map((v) => `${normalize(v.name)}|${normalize(v.cityName ?? "")}`)),
     hidden: new Set(hidden.map((h) => h.t)),

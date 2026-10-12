@@ -106,6 +106,10 @@ Ocena grania **nie jest** oceną bitu, bo zależy od publiki, line-upu itd. Bit 
   - ręcznie przy wydarzeniu „Cykliczne?” (co tydzień / 2 / 4 tygodnie / co miesiąc / nie jest cykliczne / wykrywaj sam) — tabela `recurring_series` trzyma tylko moje decyzje (`manual` / `off`), wykryte liczone na bieżąco,
   - przewidywane terminy na 8 tygodni naprzód, tylko **po** ostatnim znanym terminie, zapisane jako wydarzenia ze źródłem `cykliczne` — dzięki temu działają w Okazjach, Najgorętszych, Rytmie, Trasie i wyszukiwarce bez zmian; na karcie etykieta „przewidywane”, nie trafiają do maila jako nowe,
   - prawdziwy termin z bileterii wygrywa: przewidywany jest usuwany przy synchronizacji (po każdym przebiegu scrapera i po mojej decyzji), a granie założone z przewidywanego przechodzi na prawdziwe wydarzenie.
+- **Kiedy pisać do komika** (`src/lib/lead-time.ts`, dane `loadLeadTimes` w `lead-data.ts`): wyprzedzenie uczone z rozmów z wynikiem — dni między pierwszą wiadomością przy graniu a graniem:
+  - „Zgodził się” → mediana takich wyprzedzeń, „Ktoś zajął miejsce” → było za późno (min. o 3 dni więcej); odmowa / ghosting / „nie robi open miców” nic nie mówią o czasie,
+  - własne od 2 takich rozmów z komikiem (`PERSONAL_MIN`), inaczej ogólne (osobno open miki i grania przed komikiem, od 5 rozmów — `GLOBAL_MIN`), a bez danych 14 dni; zakres 5–42 dni,
+  - używają tego: przypomnienia „Napisz” (push), Najgorętsze okazje (okno i idealny moment pod komika, powód „pisz ~3 tyg. przed”), karta w Okazjach („pisz ~X przed”, tylko własne) i sekcja „Kiedy pisać” na karcie komika.
 - **Historia przy komiku:** na karcie widać „pisałeś 12.09 (IG) · bez odpowiedzi / odpisał” z ostatniej interakcji w CRM, żeby nie pytać za często.
 - **Grupowanie:** jedna karta na komika; najbliższy termin główny, reszta jako „Inne terminy”.
 - **Wyciszanie komika:**
@@ -173,7 +177,7 @@ Basic auth zastąpione, bo w PWA na iOS nie trzymał sesji, a odmowy 401 w tle w
 - Bez `APP_PASSWORD` (lokalnie) logowanie jest wyłączone.
 
 ### Powiadomienia i harmonogram
-- **Web Push** (PWA, `public/sw.js`, `src/lib/push.ts`, włącznik: Więcej → Powiadomienia, tabela `push_subscriptions`): rano grania do ponowienia oraz „Napisz” do grań w statusie „zainteresowany” na 14 i 7 dni przed (`WRITE_REMINDER_DAYS`, każdy próg raz na granie, zbiorczo; po „Wysłałem” granie przechodzi na „napisałem” i dalej działa ponawianie), wieczorem trening puent (jeśli dziś nie było, z serią) i „jak poszło?” 90 min po starcie grania bez logu (`src/lib/notify.ts`). Każde przypomnienie raz dziennie (`oncePerDay`, tabela `app_state`).
+- **Web Push** (PWA, `public/sw.js`, `src/lib/push.ts`, włącznik: Więcej → Powiadomienia, tabela `push_subscriptions`): rano grania do ponowienia oraz „Napisz” do grań w statusie „zainteresowany” z wyprzedzeniem dla komika i drugi raz w połowie tego czasu (domyślnie 14 i 7 dni, `writeReminderDays`, patrz „Kiedy pisać”; każdy próg raz na granie, zbiorczo; po „Wysłałem” granie przechodzi na „napisałem” i dalej działa ponawianie), wieczorem trening puent (jeśli dziś nie było, z serią) i „jak poszło?” 90 min po starcie grania bez logu (`src/lib/notify.ts`). Każde przypomnienie raz dziennie (`oncePerDay`, tabela `app_state`).
 - **Wyzwalanie:** zewnętrzny cron (cron-job.org, Europe/Warsaw) — 10:30 scraper + poranny mail (workflow_dispatch przez API GitHuba), niedziela 19:00 podsumowanie, 10:35 / 21:00 `/api/notify/morning|evening` (Bearer `CRON_SECRET`, poza basic auth). Harmonogram GitHuba to zapas (12:00 / niedz. 21:00); maile wychodzą raz dziennie (`morning-mail`, `weekly-mail`), ręcznie można wymusić (`force_mail`). Szczegóły konfiguracji: README.
 
 ## Konwencje w kodzie
