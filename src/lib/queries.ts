@@ -438,10 +438,16 @@ export async function listCalendarGigs() {
 export const getRhythm = () => getPlanning(loadUpcomingEventsCached);
 
 /** Statystyki: skuteczność pisania (wyniki rozmów, kanały) i jak mi idzie (oceny wg kontekstu, sceny, miesiąca). */
-/** Wszystkie zagrane występy (potwierdzone, już po starcie) — do licznika w Statystykach i w Więcej. */
+/** Licznik zagranych występów (potwierdzone, już po starcie) — w Statystykach i w Więcej. */
 export async function getGigTotals() {
-  const played = await gigListQuery().where(and(eq(gigs.status, "confirmed"), lt(startExpr, nowLocal())));
-  return gigTotals(played, nowLocal().slice(0, 10));
+  return gigTotals(await getPlayedGigs(), nowLocal().slice(0, 10));
+}
+
+/** Zagrane występy, najnowsze najpierw (lista z licznika: /stats/played). */
+export async function getPlayedGigs() {
+  return gigListQuery()
+    .where(and(eq(gigs.status, "confirmed"), lt(startExpr, nowLocal())))
+    .orderBy(desc(gigs.startsAt));
 }
 
 export async function getStats() {

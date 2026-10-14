@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { TOTAL_KINDS, type GigTotals, type TotalKind } from "@/lib/gig-totals";
 import { plural } from "@/lib/text";
 
@@ -17,7 +18,7 @@ export function GigTotalsCard({ t }: { t: GigTotals }) {
   return (
     <div className="bg-card border-border mb-7 rounded-[14px] border p-4">
       <div className="text-muted-foreground flex items-baseline justify-between text-[12px]">
-        <span>Występy łącznie</span>
+        <Link href="/stats/played" className="hover:text-foreground">Występy łącznie ›</Link>
         {t.first && <span>od {`${t.first.slice(8, 10)}.${t.first.slice(5, 7)}.${t.first.slice(0, 4)}`}</span>}
       </div>
       <div className="mt-1.5 flex items-baseline gap-2">
@@ -40,7 +41,11 @@ export function GigTotalsCard({ t }: { t: GigTotals }) {
           </div>
           <div className="mt-3 space-y-1.5">
             {kinds.map((k) => (
-              <div key={k} className="flex items-center gap-2 text-[15px]">
+              <Link
+                key={k}
+                href={`/stats/played?k=${k}`}
+                className="hover:bg-muted/50 -mx-2 flex items-center gap-2 rounded-lg px-2 py-0.5 text-[15px] transition-colors"
+              >
                 <span className={`${KIND[k].color} size-2.5 shrink-0 rounded-[3px]`} aria-hidden />
                 <span className="flex-1">
                   {KIND[k].label}
@@ -50,19 +55,21 @@ export function GigTotalsCard({ t }: { t: GigTotals }) {
                 </span>
                 <span className="font-semibold tabular-nums">{t.byKind[k]}</span>
                 <span className="text-muted-foreground w-10 text-right text-[13px] tabular-nums">{pct(t.byKind[k])}%</span>
-              </div>
+              </Link>
             ))}
           </div>
           <div className="border-border/70 mt-3.5 grid grid-cols-3 gap-2 border-t pt-3 text-center">
-            {[
-              [t.cities, plural(t.cities, "miasto", "miasta", "miast")],
-              [t.venues, plural(t.venues, "scena", "sceny", "scen")],
-              [t.headliners, t.headliners === 1 ? "komik, przed którym grałem" : "komików, przed którymi grałem"],
-            ].map(([n, label]) => (
-              <div key={String(label)}>
+            {(
+              [
+                ["cities", t.cities, plural(t.cities, "miasto", "miasta", "miast")],
+                ["venues", t.venues, plural(t.venues, "scena", "sceny", "scen")],
+                ["headliners", t.headliners, t.headliners === 1 ? "komik, przed którym grałem" : "komików, przed którymi grałem"],
+              ] as const
+            ).map(([by, n, label]) => (
+              <Link key={by} href={`/stats/played?by=${by}`} className="hover:bg-muted/50 rounded-lg py-1 transition-colors">
                 <div className="text-[18px] font-semibold tabular-nums">{n}</div>
-                <div className="text-muted-foreground text-[11.5px] leading-tight">{String(label).replace(/^\d+ /, "")}</div>
-              </div>
+                <div className="text-muted-foreground text-[11.5px] leading-tight">{label.replace(/^\d+ /, "")}</div>
+              </Link>
             ))}
           </div>
         </>

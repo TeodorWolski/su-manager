@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { gigTotals, type PlayedGig } from "../src/lib/gig-totals";
+import { gigTotals, playedGroups, totalKind, type PlayedGig } from "../src/lib/gig-totals";
 
 const g = (context: PlayedGig["context"], startsAt: string, extra: Partial<PlayedGig> = {}): PlayedGig => ({
   context,
@@ -39,4 +39,18 @@ test("pusto", () => {
   const t = gigTotals([], "2026-10-15");
   assert.equal(t.total, 0);
   assert.equal(t.first, null);
+});
+
+test("listy z licznika: miasta, sceny, komicy — najczęstsze najpierw", () => {
+  const played = [
+    g("open_mic", "2026-02-10T20:00", { venueId: 1, venueName: "Klub A", cityName: "Warszawa" }),
+    g("opener", "2026-03-01T19:00", { venueId: 2, venueName: "Klub B", cityName: "warszawa", headlinerId: 7, headlinerName: "Kasia" }),
+    g("support", "2026-04-01T19:00", { venueId: 2, venueName: "Klub B", cityName: "Łódź", headlinerId: 7, headlinerName: "Kasia" }),
+    g("open_mic", "2026-05-01T19:00", { headlinerId: 9, headlinerName: "Nie liczy się", cityName: "Łódź" }),
+  ];
+  assert.deepEqual(playedGroups(played, "cities").map((c) => [c.key, c.count]), [["łódź", 2], ["warszawa", 2]]);
+  assert.deepEqual(playedGroups(played, "venues").map((v) => [v.name, v.count, v.last]), [["Klub B", 2, "2026-04-01T19:00"], ["Klub A", 1, "2026-02-10T20:00"]]);
+  assert.deepEqual(playedGroups(played, "headliners").map((h) => [h.key, h.name, h.count]), [["7", "Kasia", 2]]);
+  assert.equal(totalKind(null), "other");
+  assert.equal(totalKind("support"), "support");
 });
