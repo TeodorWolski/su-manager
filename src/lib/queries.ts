@@ -17,6 +17,7 @@ import {
   type GigStatus,
 } from "@/db";
 import { loadUpcomingEventsCached } from "./events-cache";
+import { gigTotals } from "./gig-totals";
 import { getFollowUps, getPlanning } from "./planning";
 import { DEFAULT_START_TIME, nowLocal } from "./time";
 import { normalize } from "./text";
@@ -437,6 +438,12 @@ export async function listCalendarGigs() {
 export const getRhythm = () => getPlanning(loadUpcomingEventsCached);
 
 /** Statystyki: skuteczność pisania (wyniki rozmów, kanały) i jak mi idzie (oceny wg kontekstu, sceny, miesiąca). */
+/** Wszystkie zagrane występy (potwierdzone, już po starcie) — do licznika w Statystykach i w Więcej. */
+export async function getGigTotals() {
+  const played = await gigListQuery().where(and(eq(gigs.status, "confirmed"), lt(startExpr, nowLocal())));
+  return gigTotals(played, nowLocal().slice(0, 10));
+}
+
 export async function getStats() {
   const [outcomes, channels, byContext, byVenue, byMonth] = await Promise.all([
     db

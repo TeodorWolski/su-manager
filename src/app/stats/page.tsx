@@ -2,7 +2,8 @@ import Link from "next/link";
 import { Empty, PageHeader, Section, Stat } from "@/components/ios";
 import type { GigContext, GigOutcome } from "@/db/schema";
 import { GIG_CONTEXT_LABEL, GIG_OUTCOME_LABEL } from "@/lib/labels";
-import { getStats } from "@/lib/queries";
+import { GigTotalsCard } from "@/components/gig-totals";
+import { getGigTotals, getStats } from "@/lib/queries";
 import { plural } from "@/lib/text";
 import { monthName } from "@/components/goals";
 
@@ -34,7 +35,7 @@ function BarRow({ label, share, value, sub, href }: { label: React.ReactNode; sh
 }
 
 export default async function StatsPage() {
-  const s = await getStats();
+  const [s, totals] = await Promise.all([getStats(), getGigTotals()]);
   const decided = s.outcomes.reduce((sum, o) => sum + Number(o.n), 0);
   const count = (o: GigOutcome) => Number(s.outcomes.find((x) => x.outcome === o)?.n ?? 0);
   const maxOutcome = Math.max(1, ...s.outcomes.map((o) => Number(o.n)));
@@ -43,6 +44,8 @@ export default async function StatsPage() {
   return (
     <>
       <PageHeader title="Statystyki" back={{ href: "/more", label: "Więcej" }} />
+
+      <GigTotalsCard t={totals} />
 
       <Section title="Pisanie do komików" footer="Wyniki zapisujesz na karcie grania („Jak się skończyło?”).">
         {decided ? (

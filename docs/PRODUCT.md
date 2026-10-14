@@ -161,7 +161,7 @@ Pisze się poza apką (Notion / Docs) — apka liczy regularność, wiąże prac
   - statusy: `tested`, `testing`, `editing` („do redakcji”), `vomit`, `rejected` (odrzucony: nie liczy się do celu i nie ma go w logu),
   - sekcja „Do pracy”: do redakcji oraz w testach i niegrane od 21+ dni,
   - karta bitu: baner „może już Sprawdzony?”, gdy bit jest gotowy do zaliczenia (patrz MGM).
-- **Statystyki** (`/stats`): skuteczność pisania (wyniki rozmów, % odpowiedzi wg kanału) i moje oceny wg kontekstu, miesiąca i sceny.
+- **Statystyki** (`/stats`): na górze licznik występów od początku (`src/lib/gig-totals.ts`, `getGigTotals`, karta `components/gig-totals.tsx`) — zagrane = potwierdzone i już po starcie; łącznie, w tym roku, podział na typ w kolorach mini kalendarza (open mic / przed kimś / support / headline / inne + ile bez typu), liczba miast, scen i komików, przed którymi grałem; liczba występów też przy „Statystyki” w Więcej. Niżej skuteczność pisania (wyniki rozmów, % odpowiedzi wg kanału) i moje oceny wg kontekstu, miesiąca i sceny.
 - **Cele** (`/goals`): grania na miesiąc i MGM (minuty nowego sprawdzonego materiału na miesiąc).
 - **Myśli po graniach:** przeszukiwalne notatki z logów.
 - **Sceny:** werdykt, ocena miejsca, czas dojazdu.
