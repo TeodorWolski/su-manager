@@ -146,9 +146,9 @@ export async function sendReport(digest: Digest, log: (m: string) => void) {
   const { subject, html, worthSending } = renderReport(digest);
   if (!worthSending) {
     log("nic do ponowienia, brak gorących i nowych okazji — bez maila");
-    return;
+    return false;
   }
-  await sendMail(subject, html, log);
+  return sendMail(subject, html, log);
 }
 
 /** Wysyłka przez Resend (bez SDK). Bez klucza — tylko log, żeby lokalnie dało się testować. */
@@ -157,7 +157,7 @@ export async function sendMail(subject: string, html: string, log: (m: string) =
   const to = process.env.REPORT_EMAIL;
   if (!key || !to) {
     log(`[mail pominięty — brak RESEND_API_KEY/REPORT_EMAIL] ${subject}`);
-    return;
+    return false;
   }
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
@@ -166,4 +166,5 @@ export async function sendMail(subject: string, html: string, log: (m: string) =
   });
   if (!res.ok) throw new Error(`Resend ${res.status}: ${await res.text()}`);
   log(`mail wysłany: ${subject}`);
+  return true;
 }

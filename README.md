@@ -45,11 +45,12 @@ GitHubowy harmonogram potrafi spóźnić się o kilka godzin, więc godziny trzy
 | --- | --- | --- |
 | codziennie 10:30 | `POST https://api.github.com/repos/TeodorWolski/su-manager/actions/workflows/scrape.yml/dispatches`, body `{"ref":"main"}` | `Authorization: Bearer <token GitHub>`, `Accept: application/vnd.github+json` |
 | niedziela 19:00 | to samo dla `weekly.yml` | jw. |
-| codziennie 10:35 | `GET https://su-manager.vercel.app/api/notify/morning` | `Authorization: Bearer <CRON_SECRET>` |
+| codziennie 10:35 | `GET https://su-manager.vercel.app/api/notify/morning` — poranne pushe **i poranny mail** | `Authorization: Bearer <CRON_SECRET>` |
 | codziennie 21:00 | `GET https://su-manager.vercel.app/api/notify/evening` | jw. |
 
 - **Token GitHub:** fine-grained, tylko repo `su-manager`, uprawnienie *Actions: Read and write*.
 - **Powiadomienia (Web Push):** zmienne w Vercelu (Production): `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `CRON_SECRET` — wartości z `.env.local` (wygenerowane `web-push`). Publiczny klucz wchodzi w build, więc ustaw je **przed** deployem. Włączenie na telefonie: Więcej → Powiadomienia (iPhone: najpierw „Do ekranu początkowego”).
+- **Poranny mail** idzie z Vercela (`/api/notify/morning`, `src/lib/morning-mail.ts`), więc nie zależy od GitHuba. Zmienne w Vercelu (Production): `RESEND_API_KEY`, `REPORT_EMAIL`. Bez nich Vercel maila nie wysyła i nic nie odhacza — wtedy wyśle go zapasowo scraper na GitHubie. „Nowe terminy” w mailu = dodane od poprzedniego maila, więc scraper może przejść o dowolnej porze.
 - Ręcznie z Actions: „Run workflow” z opcją „wyślij mail mimo to”, gdy chcesz drugi mail tego samego dnia.
 
 ## Testy scraperów

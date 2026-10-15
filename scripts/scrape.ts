@@ -2,7 +2,7 @@
  * Codzienny przebieg scrapera (GitHub Actions, patrz .github/workflows/scrape.yml).
  * 1. zbiera wydarzenia ze wszystkich serwisów (błąd jednego nie blokuje reszty),
  * 2. zapisuje nowe / odświeża znane (deduplikacja po tytuł+data+miejsce),
- * 3. wysyła poranny mail: do ponowienia + najgorętsze okazje + nowe okazje (jeśli cokolwiek z tego jest).
+ * 3. zapasowo wysyła poranny mail (główny idzie z Vercela o 10:35, src/lib/morning-mail.ts).
  *    Pierwszy przebieg tylko zasila bazę.
  *
  * Lokalnie: pnpm scrape   (bez RESEND_API_KEY mail jest tylko logowany)
@@ -11,12 +11,10 @@ import "dotenv/config";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { db, events, gigs } from "@/db";
 import { sameShow, showBucket } from "@/lib/dedupe";
-import { oncePerDay } from "@/lib/app-state";
-import { dedupeKey, getOpportunities } from "@/lib/opportunities";
+import { dedupeKey } from "@/lib/opportunities";
+import { sendMorningMail } from "@/lib/morning-mail";
 import { RECURRING_SOURCE } from "@/lib/recurring";
 import { syncRecurring } from "@/lib/recurring-sync";
-import { getFollowUps, getMgm, getPlanning, getWriting } from "@/lib/planning";
-import { sendReport } from "@/scraper/email";
 import { healthIssues } from "@/scraper/health";
 import { fetchHtml } from "@/scraper/http";
 import { SOURCES } from "@/scraper/sources";
@@ -106,7 +104,7 @@ async function main() {
     }
   }
 
-  const newIds = new Set<number>();
+  const newIds = new Set<number>(); // tylko do logu — mail liczy nowe od poprzedniego maila
   for (const part of chunk(toInsert, 100)) {
     const rows = await db.insert(events).values(part).onConflictDoNothing().returning({ id: events.id });
     rows.forEach((r) => newIds.add(r.id));
@@ -125,17 +123,12 @@ async function main() {
     `zapisano: ${newIds.size} nowych, ${seenIds.length} odświeżonych, ${toInsert.length - newIds.size + crossDupes} duplikatów (${crossDupes} między serwisami); w bazie ${total[0].n}`,
   );
 
-  // Główny (zewnętrzny cron 10:30) i zapasowy (GitHub 12:00) przebieg — mail tylko raz dziennie.
-  const today = new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Warsaw" });
+  // Poranny mail wysyła Vercel (/api/notify/morning, 10:35); tu tylko zapas, gdyby tamten nie poszedł.
+  // Raz dziennie i „nowe od poprzedniego maila” — patrz src/lib/morning-mail.ts.
   if (firstRun) {
     log("pierwszy przebieg — tylko zasilam bazę, bez maila");
-  } else if (!(await oncePerDay("morning-mail", today, process.env.FORCE_MAIL === "true"))) {
-    log("poranny mail już dziś wysłany — tylko aktualizacja wydarzeń");
   } else {
-    const fresh = newIds.size ? (await getOpportunities(newIds)).filter((o) => !o.myGigId && o.tab !== "muted") : [];
-    const [followUps, { hot }, writing, mgm] = await Promise.all([getFollowUps(), getPlanning(), getWriting(), getMgm()]);
-    log(`mail: ${fresh.length} nowych okazji, ${followUps.length} do ponowienia, ${hot.length} gorących`);
-    await sendReport({ fresh, followUps, hot, writing, mgm }, log);
+    await sendMorningMail({ force: process.env.FORCE_MAIL === "true", log });
   }
 
   // Padnięty parser = czerwony build w Actions, żeby GitHub dał znać mailem.
