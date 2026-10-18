@@ -4,6 +4,7 @@
  */
 import { and, eq, gte, sql } from "drizzle-orm";
 import { cities, contacts, db, events, gigs, hiddenTitles, venues, type City, type Contact, type Event } from "@/db";
+import { myGigForEvent } from "./dedupe";
 import { alongRoute, coords, distanceKm } from "./geo";
 import { describe as describeSeries, RECURRING_SOURCE, seriesKey } from "./recurring";
 import { loadSeries } from "./recurring-sync";
@@ -50,8 +51,10 @@ export type Opportunity = {
   matches: MatchedContact[];
   isNew: boolean;
   isOpenMic: boolean;
-  /** Moje granie tego dnia z tym headlinerem albo w tym mieście (dodane ręcznie lub wcześniej z Okazji). */
+  /** Moje granie na TO wydarzenie (założone z niego albo ten sam występ / komik o tej porze — myGigForEvent). */
   myGigId: number | null;
+  /** Inne moje grania tego dnia (w toku albo potwierdzone) — „masz już tego dnia…”, ale można dodać kolejne. */
+  dayGigs: { id: number; title: string; startsAt: string }[];
   /** Kto występuje: kontakt z CRM albo nazwa wyciągnięta z tytułu. Klucz grupuje terminy jednego komika. */
   performer: { key: string; name: string; contactId: number | null };
   tab: Tab;
@@ -224,12 +227,12 @@ function classify(e: EventRow, ctx: Ctx, newSince: string, force = false): Oppor
     tab = openMic ? "openMic" : "inRange";
   }
 
-  const day = e.startsAt.slice(0, 10);
-  const myGig = ctx.myGigs.find(
-    (g) =>
-      g.startsAt.slice(0, 10) === day &&
-      (all.some((m) => m.id === g.headlinerId) || (!!g.cityName && normalize(g.cityName) === normalize(e.cityName ?? ""))),
+  const { mine, others } = myGigForEvent(
+    ctx.myGigs,
+    e,
+    all.map((m) => m.id),
   );
+  const myGigId = e.gigId ?? mine?.id ?? null;
   const lead = matches.find((m) => !m.mutedUntil) ?? matches[0];
   return {
     event: e,
@@ -238,7 +241,8 @@ function classify(e: EventRow, ctx: Ctx, newSince: string, force = false): Oppor
     matches,
     isNew: e.firstSeenAt >= newSince,
     isOpenMic: openMic,
-    myGigId: e.gigId ?? myGig?.id ?? null,
+    myGigId,
+    dayGigs: others.filter((g) => g.id !== myGigId).map(({ id, title, startsAt }) => ({ id, title, startsAt })),
     performer: lead
       ? { key: `c${lead.id}`, name: lead.name, contactId: lead.id }
       : { key: performerKey(e.title), name: performerName(e.title), contactId: null },

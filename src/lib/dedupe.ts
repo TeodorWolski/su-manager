@@ -42,3 +42,24 @@ export function sameShow(a: Show, b: Show) {
   const city = new Set(placeKey(a.cityName).split(" "));
   return [...words(a)].some((w) => wb.has(w) && !city.has(w));
 }
+
+export type DayGig = { id: number; title: string; startsAt: string; headlinerId: number | null; cityName: string | null };
+
+/**
+ * Które z moich grań to TO wydarzenie, a które to po prostu inne granie tego samego dnia.
+ * Moje = przed tym samym komikiem (start ±60 min — ten sam komik potrafi grać dwa razy jednego wieczoru)
+ * albo ten sam występ wg sameShow. Samo „ten sam dzień i miasto” to za mało — inaczej drugie granie
+ * tego dnia dało się tylko otworzyć jako „Twoje granie” zamiast dodać.
+ */
+export function myGigForEvent(myGigs: DayGig[], e: Show, contactIds: number[]) {
+  const sameDay = myGigs.filter((g) => g.startsAt.slice(0, 10) === e.startsAt.slice(0, 10));
+  const close = (g: DayGig) => {
+    const [mg, me] = [minutes(g.startsAt), minutes(e.startsAt)];
+    return mg == null || me == null || Math.abs(mg - me) <= 60;
+  };
+  const mine =
+    sameDay.find((g) => g.headlinerId != null && contactIds.includes(g.headlinerId) && close(g)) ??
+    sameDay.find((g) => sameShow({ title: g.title, startsAt: g.startsAt, cityName: g.cityName }, e)) ??
+    null;
+  return { mine, others: sameDay.filter((g) => g !== mine) };
+}

@@ -124,6 +124,7 @@ Ocena grania **nie jest** oceną bitu, bo zależy od publiki, line-upu itd. Bit 
   - 30 dni po wspólnym wieczorze (`COOLDOWN_DAYS`).
 - **Pomijanie komika:** z powodem `not_interested` / `no_openers` / `other`.
 - **„Chcę zagrać”** zakłada granie w statusie `interested`.
+- **„Twoje granie →”** tylko przy wydarzeniu, które naprawdę jest moim graniem (`myGigForEvent` w `dedupe.ts`): założone z niego, ten sam występ wg `sameShow` albo ten sam komik ±60 min. Inne moje granie tego dnia nie blokuje — karta pokazuje „Masz już tego dnia: …” (link), a „Chcę zagrać” / „Napisz” działają normalnie (drugie granie jednego wieczoru jest OK). W mini kalendarzu przy zajętym dniu jest „Co jeszcze gra tego dnia?”.
 - **„Napisz”** (`src/lib/messages.ts`) daje szablon do skopiowania:
   - komik: „Siemanko, masz może miejsce na open-mic’a [d.MM] w [mieście]? 😄” (miasto w miejscowniku ze słownika, fallback mianownik),
   - open mic: „Siemanko, macie może wolny slot na [d.MM]?”,

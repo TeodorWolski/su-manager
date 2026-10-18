@@ -94,6 +94,25 @@ function GigButton({ o, small }: { o: Opportunity; small?: boolean }) {
   );
 }
 
+/** Inne moje grania tego dnia — informacja, nie blokada (drugie granie jednego wieczoru jest OK). */
+function DayGigs({ o }: { o: Opportunity }) {
+  if (o.myGigId || !o.dayGigs.length) return null;
+  return (
+    <div className="text-muted-foreground mt-1.5 text-[13px]">
+      Masz już tego dnia:{" "}
+      {o.dayGigs.map((d, i) => (
+        <span key={d.id}>
+          {i > 0 && ", "}
+          <Link href={`/gigs/${d.id}`} className="text-foreground font-medium hover:underline">
+            {d.title}
+            {d.startsAt.length > 10 && ` · ${d.startsAt.slice(11, 16)}`}
+          </Link>
+        </span>
+      ))}
+    </div>
+  );
+}
+
 /** „Napisz ▾”: gotowa wiadomość; „Wysłałem przez …” zakłada granie w statusie „napisałem”. */
 function WriteMenu({ g }: { g: OpportunityGroup }) {
   const o = g.primary;
@@ -221,6 +240,8 @@ function GroupCard({ g }: { g: OpportunityGroup }) {
         </div>
       )}
 
+      <DayGigs o={o} />
+
       <div className="mt-2.5 flex flex-wrap gap-2">
         <GigButton o={o} />
         <WriteMenu g={g} />
@@ -243,6 +264,7 @@ function GroupCard({ g }: { g: OpportunityGroup }) {
                   className="text-muted-foreground min-w-0 flex-1 text-[13px] hover:underline"
                 >
                   {where(x)}
+                  {!x.myGigId && x.dayGigs.length > 0 && <span className="text-st-wai"> · masz już granie tego dnia</span>}
                   {x.event.availability && (
                     <span className={x.event.availability === "sold_out" ? "text-st-rej" : "text-st-wai"}>
                       {" "}

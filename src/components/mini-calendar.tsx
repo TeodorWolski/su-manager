@@ -240,7 +240,8 @@ export function MiniCalendar() {
             <div className="border-border/70 mt-2 border-t pt-2">
               <div className="text-muted-foreground mb-1 px-1 text-[12px] first-letter:uppercase">{format(parseISO(selected), "EEEE, d MMMM", { locale: pl })}</div>
               {dayGigs.length ? (
-                dayGigs.map((g) => (
+                <>
+                  {dayGigs.map((g) => (
                   <Link key={g.id} href={`/gigs/${g.id}`} className="hover:bg-muted flex items-center gap-2 rounded-lg px-1 py-1.5 text-[14px]">
                     <span
                       className={cn(
@@ -257,7 +258,12 @@ export function MiniCalendar() {
                       </span>
                     </span>
                   </Link>
-                ))
+                  ))}
+                  {/* Drugie granie jednego wieczoru jest OK — można poszukać kolejnego. */}
+                  <Link href={`/events?q=${selected.slice(8, 10)}.${selected.slice(5, 7)}`} className="text-primary block px-1 py-1 text-[13px]">
+                    Co jeszcze gra tego dnia?
+                  </Link>
+                </>
               ) : (
                 <div className="text-muted-foreground px-1 py-1 text-[13px]">
                   Wolne.{" "}
