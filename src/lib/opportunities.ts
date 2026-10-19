@@ -3,7 +3,7 @@
  * i dopasowane do kontaktów z CRM. Bez "server-only" — używa go też skrypt crona.
  */
 import { and, eq, gte, sql } from "drizzle-orm";
-import { cities, contacts, db, events, gigs, hiddenTitles, venues, type City, type Contact, type Event } from "@/db";
+import { cities, contacts, db, events, gigs, hiddenTitles, supports, venues, type City, type Contact, type Event } from "@/db";
 import { myGigForEvent } from "./dedupe";
 import { alongRoute, coords, distanceKm } from "./geo";
 import { describe as describeSeries, RECURRING_SOURCE, seriesKey } from "./recurring";
@@ -34,6 +34,8 @@ export type MatchedContact = Pick<Contact, "id" | "name" | "relation" | "ignoreI
   lastMessageReplied: boolean | null;
   /** Wyprzedzenie wyuczone z rozmów z nim (null = za mało danych). */
   leadDays: number | null;
+  /** Aktualni supporci (do dużych headlinerów pisze się przez nich). */
+  supports: { id: number; name: string }[];
   /** Do kiedy wyciszony w Okazjach (data), null = widoczny. */
   mutedUntil: string | null;
   muteReason: MuteReason | null;
@@ -123,10 +125,13 @@ const nextGigSql = (column: string) =>
         or exists (select 1 from gig_contacts gc where gc.gig_id = g.id and gc.contact_id = contacts.id))
     order by g.starts_at limit 1`);
 
+/** Wiadomość „do niego”: wprost albo przy graniu przed nim (np. przez supportu). */
+const toHim = sql.raw("(i.contact_id = contacts.id or i.gig_id in (select g2.id from gigs g2 where g2.headliner_id = contacts.id))");
+
 async function loadContext() {
   const now = nowLocal();
   const today = now.slice(0, 10);
-  const [allCities, people, never, hidden, myGigs, recurring, leads] = await Promise.all([
+  const [allCities, people, never, hidden, myGigs, recurring, leads, supportRows] = await Promise.all([
     db.select().from(cities),
     db
       .select({
@@ -142,9 +147,9 @@ async function loadContext() {
             and (g.headliner_id = contacts.id
               or exists (select 1 from gig_contacts gc where gc.gig_id = g.id and gc.contact_id = contacts.id)))`,
         nextGig: sql<string | null>`(${nextGigSql("g.starts_at")})`,
-        lastMessageAt: sql<string | null>`(select max(i.date) from interactions i where i.contact_id = contacts.id)`,
-        lastMessageChannel: sql<string | null>`(select i.channel from interactions i where i.contact_id = contacts.id order by i.date desc, i.id desc limit 1)`,
-        lastMessageReplied: sql<boolean | null>`(select i.replied from interactions i where i.contact_id = contacts.id order by i.date desc, i.id desc limit 1)`,
+        lastMessageAt: sql<string | null>`(select max(i.date) from interactions i where ${toHim})`,
+        lastMessageChannel: sql<string | null>`(select i.channel from interactions i where ${toHim} order by i.date desc, i.id desc limit 1)`,
+        lastMessageReplied: sql<boolean | null>`(select i.replied from interactions i where ${toHim} order by i.date desc, i.id desc limit 1)`,
         nextGigCreatedAt: sql<string | null>`(${nextGigSql("g.created_at")})`,
       })
       .from(contacts),
@@ -168,12 +173,26 @@ async function loadContext() {
       .where(and(gte(gigs.startsAt, today), sql`${gigs.status} not in ('rejected', 'cancelled')`)),
     loadSeries(),
     loadLeadTimes(),
+    db
+      .select({ headlinerId: supports.headlinerId, id: contacts.id, name: contacts.name })
+      .from(supports)
+      .innerJoin(contacts, eq(contacts.id, supports.supportId))
+      .where(eq(supports.active, true))
+      .orderBy(sql`${supports.lastSeen} desc`),
   ]);
+  const supportsOf = new Map<number, { id: number; name: string }[]>();
+  for (const r of supportRows) supportsOf.set(r.headlinerId, [...(supportsOf.get(r.headlinerId) ?? []), { id: r.id, name: r.name }]);
   return {
     citiesByName: new Map(allCities.map((c) => [normalize(c.name), c])),
     people: people.map((p) => {
       const m = muteState(p, today);
-      return { ...p, mutedUntil: m?.until ?? null, muteReason: m?.reason ?? null, leadDays: leads.byContact.get(p.id)?.days ?? null };
+      return {
+        ...p,
+        mutedUntil: m?.until ?? null,
+        muteReason: m?.reason ?? null,
+        leadDays: leads.byContact.get(p.id)?.days ?? null,
+        supports: supportsOf.get(p.id) ?? [],
+      };
     }),
     blacklist: new Set(never.map((v) => `${normalize(v.name)}|${normalize(v.cityName ?? "")}`)),
     hidden: new Set(hidden.map((h) => h.t)),

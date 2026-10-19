@@ -80,6 +80,29 @@ export const interactions = sqliteTable("interactions", {
   createdAt: createdAt(),
 });
 
+/**
+ * Kto robi support u kogo — do dużych headlinerów na open mica pisze się często przez supportu
+ * (on pyta headlinera). Supporty się zmieniają i bywa ich kilku: `active` = aktualny,
+ * `lastSeen` = kiedy ostatnio potwierdzony (pisałem do niego w tej roli / dopisany ręcznie).
+ */
+export const supports = sqliteTable(
+  "supports",
+  {
+    id: id(),
+    headlinerId: integer("headliner_id")
+      .notNull()
+      .references(() => contacts.id, { onDelete: "cascade" }),
+    supportId: integer("support_id")
+      .notNull()
+      .references(() => contacts.id, { onDelete: "cascade" }),
+    active: integer("active", { mode: "boolean" }).notNull().default(true),
+    lastSeen: text("last_seen"),
+    note: text("note"),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("supports_pair").on(t.headlinerId, t.supportId)],
+);
+
 /** Ogólna ocena miejsca, 5 stopni od najgorszej. "never" = czarna lista. */
 export const VENUE_VERDICTS = ["never", "weak", "meh", "good", "great"] as const;
 

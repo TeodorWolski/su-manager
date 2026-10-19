@@ -66,7 +66,8 @@ export function Select({
 }
 
 /** Wartość opcji „wpisz inne” — serwer widzi ją jako brak id i bierze tekst z pola `newName`. */
-const NEW = "__new__";
+/** Wartość „＋ Wpisz inne…” — jako `defaultValue` otwiera od razu pole tekstowe (np. gdy lista jest pusta). */
+export const NEW = "__new__";
 
 /**
  * Select z bazy + „＋ Wpisz inne…”, gdy wartości nie ma na liście: pojawia się pole tekstowe

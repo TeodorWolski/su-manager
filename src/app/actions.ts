@@ -29,6 +29,7 @@ import {
   interactions,
   RECURRENCE_INTERVALS,
   recurringSeries,
+  supports,
   WRITING_KINDS,
   writingSessions,
   ideas,
@@ -177,6 +178,58 @@ export async function logGigMessage(gigId: number, fd: FormData) {
   refresh();
 }
 
+// ── Supporty ────────────────────────────────────────────────────────────
+
+/** Para headliner → support: dopisuje albo odświeża („aktualny”, ostatnio potwierdzony dziś). */
+async function touchSupport(headlinerId: number, supportId: number) {
+  if (headlinerId === supportId) return;
+  const values = { active: true, lastSeen: nowLocal().slice(0, 10) };
+  await db
+    .insert(supports)
+    .values({ headlinerId, supportId, ...values })
+    .onConflictDoUpdate({ target: [supports.headlinerId, supports.supportId], set: values });
+}
+
+/** Support z formularza: wybrany z listy (`supportId`) albo wpisany (`supportName` → kontakt, fuzzy jak w scraperze). */
+async function supportFromForm(fd: FormData) {
+  const name = str(fd, "supportName");
+  return name ? performerContactId(name) : required(int(fd, "supportId"), "support");
+}
+
+/**
+ * „Napisałem do supportu” przy graniu przed headlinerem: wiadomość idzie do supportu (on pyta headlinera),
+ * granie dalej jest przed headlinerem, a para trafia do bazy supportów.
+ */
+export async function logSupportMessage(gigId: number, fd: FormData) {
+  await requireSession();
+  const [gig] = await db.select({ headlinerId: gigs.headlinerId }).from(gigs).where(eq(gigs.id, gigId));
+  if (!gig?.headlinerId) throw new Error("Najpierw ustaw, przed kim jest granie");
+  const supportId = await supportFromForm(fd);
+  await touchSupport(gig.headlinerId, supportId);
+  await recordGigMessage(gigId, required(str(fd, "channel"), "kanał"), supportId);
+  refresh();
+}
+
+/** Ręcznie na karcie headlinera: „ten robi u niego support”. */
+export async function addSupport(headlinerId: number, fd: FormData) {
+  await requireSession();
+  await touchSupport(headlinerId, await supportFromForm(fd));
+  refresh();
+}
+
+/** Supporty się zmieniają — „już nie robi” zostawia historię, ale nie podpowiada go więcej. */
+export async function setSupportActive(id: number, active: boolean) {
+  await requireSession();
+  await db.update(supports).set({ active }).where(eq(supports.id, id));
+  refresh();
+}
+
+export async function deleteSupport(id: number) {
+  await requireSession();
+  await db.delete(supports).where(eq(supports.id, id));
+  refresh();
+}
+
 /** Relacje, które odpowiedź komika może nadpisać (bez kasowania historii wspólnych grań). */
 const SOFT_RELATIONS = ["none", "want_to_play", "no_reply", "agreed", "declined"];
 
@@ -192,7 +245,7 @@ const SOFT_RELATIONS = ["none", "want_to_play", "no_reply", "agreed", "declined"
 export async function replyToGig(gigId: number, outcome: GigOutcome | "wait") {
   await requireSession();
   const [last] = await db
-    .select({ id: interactions.id })
+    .select({ id: interactions.id, contactId: interactions.contactId })
     .from(interactions)
     .where(eq(interactions.gigId, gigId))
     .orderBy(desc(interactions.date), desc(interactions.id))
@@ -211,6 +264,8 @@ export async function replyToGig(gigId: number, outcome: GigOutcome | "wait") {
 
   const contactId = gig?.headlinerId;
   if (!contactId || outcome === "wait" || outcome === "slot_taken") return refresh();
+  // Pisałem przez supportu i to on milczy — headliner nic nie wie, więc go nie wyciszam ani nie zmieniam relacji.
+  if (outcome === "ghosted" && last?.contactId && last.contactId !== contactId) return refresh();
   if (outcome === "no_openers") {
     await db.update(contacts).set({ ignoreInReport: true, ignoreReason: "no_openers" }).where(eq(contacts.id, contactId));
     return refresh();
@@ -646,7 +701,10 @@ export async function messageFromEvent(fd: FormData) {
   if (contactId && gig && !gig.headlinerId && gig.context !== "open_mic") {
     await db.update(gigs).set({ headlinerId: contactId }).where(eq(gigs.id, gigId));
   }
-  await recordGigMessage(gigId, channel, contactId);
+  // Przez supportu: wiadomość do niego, granie dalej przed headlinerem.
+  const supportId = int(fd, "supportId");
+  if (supportId && contactId) await touchSupport(contactId, supportId);
+  await recordGigMessage(gigId, channel, supportId ?? contactId);
   updateTag(EVENTS_TAG);
   refresh();
 }

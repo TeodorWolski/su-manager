@@ -1,6 +1,6 @@
 import { ChevronDown, ExternalLink, MapPin, Navigation, Repeat, Search, X } from "lucide-react";
 import Link from "next/link";
-import { PendingButton } from "@/components/form";
+import { PendingButton, Select } from "@/components/form";
 import {
   eventToGig,
   hidePerformer,
@@ -30,7 +30,7 @@ import {
 } from "@/lib/opportunities";
 import { loadUpcomingEventsCached } from "@/lib/events-cache";
 import { findPlace, placeName } from "@/lib/geo";
-import { pitchMessage } from "@/lib/messages";
+import { pitchMessage, supportMessage } from "@/lib/messages";
 import { leadLabel } from "@/lib/lead-time";
 import { INTERVAL_LABEL, RECURRING_SOURCE } from "@/lib/recurring";
 import { parseDays, ROUTE_CORRIDORS, ROUTE_MAX_DAYS } from "@/lib/route";
@@ -116,6 +116,7 @@ function DayGigs({ o }: { o: Opportunity }) {
 /** „Napisz ▾”: gotowa wiadomość; „Wysłałem przez …” zakłada granie w statusie „napisałem”. */
 function WriteMenu({ g }: { g: OpportunityGroup }) {
   const o = g.primary;
+  const supports = g.matches.find((m) => m.id === g.performer.contactId)?.supports ?? [];
   return (
     <details className="group/write open:basis-full">
       <summary className="bg-secondary text-secondary-foreground flex h-9 w-fit cursor-pointer list-none items-center gap-1 rounded-lg px-3 text-[14px] [&::-webkit-details-marker]:hidden">
@@ -127,6 +128,18 @@ function WriteMenu({ g }: { g: OpportunityGroup }) {
           action={messageFromEvent}
           hidden={{ eventId: o.event.id, gigId: o.myGigId, contactId: g.performer.contactId, name: g.performer.name }}
         />
+        {supports.length > 0 && !o.isOpenMic && (
+          <div className="border-border/70 mt-2 border-t pt-2">
+            <div className="text-muted-foreground mb-1.5 px-1 text-[12.5px]">Albo przez supportu — on zapyta headlinera:</div>
+            <MessageComposer
+              message={supportMessage({ startsAt: o.event.startsAt, cityName: o.event.cityName, headlinerName: g.performer.name })}
+              action={messageFromEvent}
+              hidden={{ eventId: o.event.id, gigId: o.myGigId, contactId: g.performer.contactId, name: g.performer.name }}
+            >
+              <Select name="supportId" required defaultValue={supports[0].id} options={supports.map((x) => ({ value: x.id, label: x.name }))} />
+            </MessageComposer>
+          </div>
+        )}
       </div>
     </details>
   );
@@ -228,6 +241,9 @@ function GroupCard({ g }: { g: OpportunityGroup }) {
                 <span className="text-muted-foreground whitespace-nowrap">wspólny wieczór {fmtDate(m.lastPlayedTogether)}</span>
               )}
               {m.leadDays && <span className="text-muted-foreground whitespace-nowrap">pisz {leadLabel(m.leadDays)} przed</span>}
+              {m.supports.length > 0 && (
+                <span className="text-muted-foreground whitespace-nowrap">support: {m.supports.map((x) => x.name).join(", ")}</span>
+              )}
               {m.lastMessageAt && (
                 <span className="text-muted-foreground whitespace-nowrap">
                   pisałeś {fmtDate(m.lastMessageAt)}

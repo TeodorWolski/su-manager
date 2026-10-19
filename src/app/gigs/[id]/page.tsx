@@ -1,8 +1,8 @@
 import { Check, ExternalLink } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { deleteGig, deleteGigMessage, logGigMessage, replyToGig, setGigStatus } from "@/app/actions";
-import { ConfirmButton, PendingButton } from "@/components/form";
+import { deleteGig, deleteGigMessage, logGigMessage, logSupportMessage, replyToGig, setGigStatus } from "@/app/actions";
+import { ConfirmButton, NEW, PendingButton, SelectOrNew } from "@/components/form";
 import { PageHeader, Pill, Row, Section, Stat } from "@/components/ios";
 import { MessageComposer } from "@/components/message-composer";
 import { Button } from "@/components/ui/button";
@@ -16,7 +16,7 @@ import {
   REACTION_EMOJI,
 } from "@/lib/labels";
 import type { GigOutcome } from "@/db/schema";
-import { pitchMessage } from "@/lib/messages";
+import { pitchMessage, supportMessage } from "@/lib/messages";
 import { getGig, type GigStatus } from "@/lib/queries";
 import { effectiveStart, fmtDate, fmtDateTime, nowLocal } from "@/lib/time";
 import { cn } from "@/lib/utils";
@@ -48,6 +48,9 @@ export default async function GigPage({ params }: PageProps<"/gigs/[id]">) {
   const asking = !log && (["interested", "contacted", "waiting"] as GigStatus[]).includes(gig.status);
   const used = [...new Set(data.messages.map((m) => m.channel))];
   const lastMessage = data.messages.at(-1);
+  const activeSupports = data.supports.filter((x) => x.active);
+  // Ostatnio pisałem przez supportu → blok „Napisz do supportu” od razu otwarty.
+  const viaSupport = !!lastMessage?.contactId && lastMessage.contactId !== data.gig.headlinerId;
   const since = lastActivity({ statusChangedAt: gig.statusChangedAt, createdAt: gig.createdAt, lastMessageAt: lastMessage?.date ?? null });
   const quiet = daysSince(since, nowLocal());
   const timing = followUpTiming(gig.startsAt, since, nowLocal().slice(0, 10), gig.status);
@@ -127,6 +130,12 @@ export default async function GigPage({ params }: PageProps<"/gigs/[id]">) {
             <div key={m.id} className="border-border/70 flex items-center gap-3 border-b px-4 py-2.5">
               <div className="min-w-0 flex-1 text-[15px]">
                 {m.channel} <span className="text-muted-foreground text-[13px]">· {fmtDate(m.date)}</span>
+                {m.contactId && m.contactId !== gig.headlinerId && m.contactName && (
+                  <span className="text-muted-foreground text-[13px]">
+                    {" "}
+                    · do supportu: <Link href={`/contacts/${m.contactId}`} className="text-foreground">{m.contactName}</Link>
+                  </span>
+                )}
               </div>
               {m.replied && <Pill tone="success">odpisał</Pill>}
               <form action={deleteGigMessage.bind(null, m.id)}>
@@ -144,6 +153,34 @@ export default async function GigPage({ params }: PageProps<"/gigs/[id]">) {
               next={lastMessage ? next : "Instagram"}
             />
           </div>
+          {gig.headlinerId && gig.context !== "open_mic" && (
+            <details className="group/support border-t" open={viaSupport}>
+              <summary className="text-primary flex cursor-pointer list-none items-center justify-between px-4 py-2.5 text-[15px] [&::-webkit-details-marker]:hidden">
+                Napisz do supportu
+                <span className="text-muted-foreground text-[13px]">
+                  {activeSupports.length ? activeSupports.map((x) => x.name).join(", ") : "on zapyta headlinera"}
+                </span>
+              </summary>
+              <div className="p-2 pt-0">
+                <MessageComposer
+                  message={supportMessage({ startsAt: gig.startsAt, cityName: data.cityName, headlinerName: data.headlinerName })}
+                  action={logSupportMessage.bind(null, gig.id)}
+                >
+                  <label className="bg-card flex items-center gap-2 rounded-lg px-3 py-1.5 text-[14px]">
+                    <span className="text-muted-foreground shrink-0">Support</span>
+                    <SelectOrNew
+                      key={data.supports.length}
+                      name="supportId"
+                      newName="supportName"
+                      newPlaceholder="imię i nazwisko supportu"
+                      defaultValue={data.supports[0]?.contactId ?? NEW}
+                      options={data.supports.map((x) => ({ value: x.contactId, label: x.active ? x.name : `${x.name} (dawniej)` }))}
+                    />
+                  </label>
+                </MessageComposer>
+              </div>
+            </details>
+          )}
           {lastMessage && (!lastMessage.replied || gig.status === "waiting") && (
             <div className="border-t">
               <div className="text-muted-foreground px-4 pt-2.5 text-[13px]">Jak się skończyło?</div>

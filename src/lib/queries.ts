@@ -11,6 +11,7 @@ import {
   gigLogs,
   gigs,
   interactions,
+  supports,
   venues,
   writingSessions,
   ideas,
@@ -170,13 +171,52 @@ export async function getGig(id: number) {
       .innerJoin(contacts, eq(gigContacts.contactId, contacts.id))
       .where(eq(gigContacts.gigId, id)),
     db
-      .select()
+      .select({
+        id: interactions.id,
+        contactId: interactions.contactId,
+        contactName: contacts.name,
+        date: interactions.date,
+        channel: interactions.channel,
+        replied: interactions.replied,
+      })
       .from(interactions)
+      .leftJoin(contacts, eq(contacts.id, interactions.contactId))
       .where(eq(interactions.gigId, id))
       .orderBy(asc(interactions.date), asc(interactions.id)),
   ]);
   if (!row || !gig) return null;
-  return { ...row, gig, log: log ?? null, bits: playedBits, lineup, messages };
+  return {
+    ...row,
+    gig,
+    log: log ?? null,
+    bits: playedBits,
+    lineup,
+    messages,
+    supports: gig.headlinerId ? await listSupports(gig.headlinerId) : [],
+  };
+}
+
+/**
+ * Supporty headlinera (aktualni najpierw, potem ostatnio potwierdzeni) — do „Napisz do supportu”
+ * na karcie grania i do sekcji „Supporty” na karcie komika.
+ */
+export async function listSupports(headlinerId: number) {
+  return db
+    .select({ id: supports.id, contactId: contacts.id, name: contacts.name, active: supports.active, lastSeen: supports.lastSeen })
+    .from(supports)
+    .innerJoin(contacts, eq(contacts.id, supports.supportId))
+    .where(eq(supports.headlinerId, headlinerId))
+    .orderBy(desc(supports.active), desc(supports.lastSeen), asc(contacts.name));
+}
+
+/** U kogo ten komik robi (robił) support — na jego karcie. */
+export async function listSupportedBy(supportId: number) {
+  return db
+    .select({ id: supports.id, contactId: contacts.id, name: contacts.name, active: supports.active, lastSeen: supports.lastSeen })
+    .from(supports)
+    .innerJoin(contacts, eq(contacts.id, supports.headlinerId))
+    .where(eq(supports.supportId, supportId))
+    .orderBy(desc(supports.active), desc(supports.lastSeen), asc(contacts.name));
 }
 
 export async function listCities() {
@@ -235,10 +275,23 @@ export async function listContacts() {
 export async function getContact(id: number) {
   const [[contact], history, sharedGigs, asHeadliner] = await Promise.all([
     db.select().from(contacts).where(eq(contacts.id, id)),
+    // Też wiadomości przy graniach przed nim wysłane do kogoś innego (np. przez supportu).
     db
-      .select()
+      .select({
+        id: interactions.id,
+        contactId: interactions.contactId,
+        contactName: contacts.name,
+        gigId: interactions.gigId,
+        date: interactions.date,
+        channel: interactions.channel,
+        topic: interactions.topic,
+        replied: interactions.replied,
+      })
       .from(interactions)
-      .where(eq(interactions.contactId, id))
+      .leftJoin(contacts, eq(contacts.id, interactions.contactId))
+      .where(
+        sql`${interactions.contactId} = ${id} or ${interactions.gigId} in (select g.id from gigs g where g.headliner_id = ${id})`,
+      )
       .orderBy(desc(interactions.date), desc(interactions.id)),
     gigListQuery()
       .innerJoin(gigContacts, eq(gigContacts.gigId, gigs.id))

@@ -50,3 +50,13 @@ export function pitchMessage({ startsAt, cityName, openMic }: { startsAt: string
   if (openMic) return `Siemanko, macie może wolny slot na ${date}?`;
   return `Siemanko, masz może miejsce na open-mic’a ${date}${cityName ? ` w ${inCity(cityName)}` : ""}? 😄`;
 }
+
+/**
+ * Do supportu dużego headlinera — to on pyta headlinera o open mica. Imię headlinera w nawiasie
+ * (bez odmiany nazwisk), i tak edytujesz przed wysłaniem.
+ */
+export function supportMessage({ startsAt, cityName, headlinerName }: { startsAt: string; cityName: string | null; headlinerName: string | null }) {
+  const date = format(parseISO(startsAt), "d.MM");
+  const where = cityName ? ` w ${inCity(cityName)}` : "";
+  return `Siemanko, robisz support ${date}${where}${headlinerName ? ` (${headlinerName})` : ""}? Jest szansa, żebym wskoczył na open-mica przed występem? Zapytasz? 😄`;
+}

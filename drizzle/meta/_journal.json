@@ -113,6 +113,13 @@
       "when": 1791806326108,
       "tag": "0015_perfect_fat_cobra",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "6",
+      "when": 1792433091942,
+      "tag": "0016_wealthy_enchantress",
+      "breakpoints": true
     }
   ]
 }

@@ -2,20 +2,23 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
   addInteraction,
+  addSupport,
   deleteContact,
+  deleteSupport,
   deleteInteraction,
   setContactSnooze,
+  setSupportActive,
   snoozeContact,
   unhideContact,
   unsnoozeContact,
 } from "@/app/actions";
-import { ConfirmButton, FieldRow, Select, SubmitButton, TextInput, PendingButton } from "@/components/form";
+import { ConfirmButton, FieldRow, NEW, Select, SelectOrNew, SubmitButton, TextInput, PendingButton } from "@/components/form";
 import { GigRow } from "@/components/gig-row";
 import { Empty, PageHeader, Pill, Row, Section } from "@/components/ios";
 import { Button } from "@/components/ui/button";
 import { CHANNELS, IGNORE_REASON_LABEL, RELATION_LABEL, RELATION_TONE, ROLE_LABEL } from "@/lib/labels";
 import { ACTIVE_GIG, COOLDOWN_DAYS, muteState } from "@/lib/opportunities";
-import { getContact } from "@/lib/queries";
+import { getContact, getFormOptions, listSupportedBy, listSupports } from "@/lib/queries";
 import { loadLeadTimes } from "@/lib/lead-data";
 import { leadLabel, PERSONAL_MIN } from "@/lib/lead-time";
 import { plural } from "@/lib/text";
@@ -23,7 +26,13 @@ import { fmtDate, nowLocal } from "@/lib/time";
 
 export default async function ContactPage({ params }: PageProps<"/contacts/[id]">) {
   const { id } = await params;
-  const [data, leads] = await Promise.all([getContact(Number(id)), loadLeadTimes()]);
+  const [data, leads, supportList, supportFor, options] = await Promise.all([
+    getContact(Number(id)),
+    loadLeadTimes(),
+    listSupports(Number(id)),
+    listSupportedBy(Number(id)),
+    getFormOptions(),
+  ]);
   if (!data) notFound();
   const lead = leads.leadFor(data.contact.id, "opener");
   const { contact, history } = data;
@@ -124,6 +133,62 @@ export default async function ContactPage({ params }: PageProps<"/contacts/[id]"
 
       {contact.role === "comedian" && (
         <Section
+          title="Supporty"
+          footer="Do dużych headlinerów na open mica często pisze się przez supportu — on pyta headlinera. Supporty się zmieniają: „już nie robi” zostawia historię, ale nie podpowiada go więcej. Para dopisuje się też sama, gdy przy graniu wyślesz „Napisz do supportu”."
+        >
+          {supportList.map((x) => (
+            <div key={x.id} className="border-border/70 flex items-center gap-2 border-b px-4 py-2.5 has-[[data-pending]]:opacity-50">
+              <Link href={`/contacts/${x.contactId}`} className="min-w-0 flex-1">
+                <div className={x.active ? "text-[15px]" : "text-muted-foreground text-[15px] line-through"}>{x.name}</div>
+                <div className="text-muted-foreground text-[12px]">
+                  {x.active ? "aktualny" : "już nie robi"}
+                  {x.lastSeen && ` · ostatnio ${fmtDate(x.lastSeen)}`}
+                </div>
+              </Link>
+              <form action={setSupportActive.bind(null, x.id, !x.active)}>
+                <PendingButton className="text-primary h-8 px-1 text-[13px]">{x.active ? "Już nie robi" : "Znowu robi"}</PendingButton>
+              </form>
+              <form action={deleteSupport.bind(null, x.id)}>
+                <PendingButton className="text-muted-foreground/60 hover:text-destructive px-1 text-lg" aria-label="Usuń">
+                  ×
+                </PendingButton>
+              </form>
+            </div>
+          ))}
+          <form action={addSupport.bind(null, contact.id)} className="flex items-center gap-2 px-4 py-2">
+            <span className="min-w-0 flex-1">
+              <SelectOrNew
+                key={supportList.length}
+                name="supportId"
+                newName="supportName"
+                newPlaceholder="imię i nazwisko supportu"
+                placeholder="Dodaj supportu…"
+                defaultValue={supportList.length ? undefined : NEW}
+                options={options.contacts
+                  .filter((c) => c.role === "comedian" && c.id !== contact.id && !supportList.some((x) => x.contactId === c.id))
+                  .map((c) => ({ value: c.id, label: c.name }))}
+              />
+            </span>
+            <PendingButton className="bg-primary text-primary-foreground h-9 shrink-0 rounded-lg px-3 text-[14px] font-semibold">Dodaj</PendingButton>
+          </form>
+        </Section>
+      )}
+
+      {supportFor.length > 0 && (
+        <Section title="Robi support u" footer="Przez niego możesz zapytać tych headlinerów o open mica.">
+          {supportFor.map((x) => (
+            <Row
+              key={x.id}
+              href={`/contacts/${x.contactId}`}
+              title={<span className={x.active ? undefined : "text-muted-foreground line-through"}>{x.name}</span>}
+              detail={x.active ? (x.lastSeen ? `ostatnio ${fmtDate(x.lastSeen)}` : "aktualnie") : "już nie"}
+            />
+          ))}
+        </Section>
+      )}
+
+      {contact.role === "comedian" && (
+        <Section
           title="Kiedy pisać"
           footer="Liczone z rozmów z wynikiem: przy „zgodził się” — ile dni przed graniem napisałeś; „ktoś zajął miejsce” — że to było za późno. Z tego przypomnienia „napisz” i Najgorętsze okazje."
         >
@@ -162,6 +227,7 @@ export default async function ContactPage({ params }: PageProps<"/contacts/[id]"
                 </div>
                 <div className="text-muted-foreground text-[13px]">
                   {fmtDate(i.date)} · {i.channel}
+                  {i.contactId && i.contactId !== contact.id && i.contactName && ` · przez supportu: ${i.contactName}`}
                 </div>
               </div>
               {i.replied != null && <Pill tone={i.replied ? "success" : "warning"}>{i.replied ? "odpisał" : "cisza"}</Pill>}

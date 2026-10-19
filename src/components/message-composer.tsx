@@ -16,22 +16,26 @@ export function MessageComposer({
   hidden = {},
   used = [],
   next,
+  children,
 }: {
   message: string;
   action: (fd: FormData) => Promise<void>;
   hidden?: Record<string, string | number | null | undefined>;
   used?: string[];
   next?: string | null;
+  /** Dodatkowe pola nad wiadomością (np. wybór supportu). */
+  children?: React.ReactNode;
 }) {
   const [text, setText] = useState(message);
   const [copied, setCopied] = useState(false);
   return (
     <form action={action} className="space-y-2">
       {Object.entries(hidden).map(([k, v]) => v != null && <input key={k} type="hidden" name={k} value={v} />)}
+      {children}
       <textarea
         value={text}
         onChange={(e) => setText(e.target.value)}
-        rows={2}
+        rows={Math.min(5, Math.max(2, Math.ceil(text.length / 38)))}
         className="bg-card w-full resize-none rounded-lg px-3 py-2 text-[15px] leading-snug outline-none"
       />
       <div className="flex flex-wrap items-center gap-1.5">

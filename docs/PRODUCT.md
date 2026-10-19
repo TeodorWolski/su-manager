@@ -31,6 +31,7 @@ Używana głównie **z telefonu** (PWA, styl iOS). Produkcyjna baza to źródło
 | Graliśmy razem | Obaj headlinerami / co-headline | relacja `played_with` |
 | Open mic | Wieczór otwartej sceny, piszę do organizatorów | `context: "open_mic"` |
 | Headliner („przed kim”) | Komik, przed którym gram | `gigs.headlinerId` |
+| Support headlinera | Komik, który robi u niego support; do dużych headlinerów na open mica pisze się często przez niego (on pyta headlinera). Supporty się zmieniają, bywa ich kilku | tabela `supports` (`active`, `lastSeen`) |
 | Bit | Kawałek materiału | tabela `bits` |
 
 Trzy różne oceny, nie mieszać:
@@ -76,6 +77,7 @@ Ocena grania **nie jest** oceną bitu, bo zależy od publiki, line-upu itd. Bit 
     - **Odpisał, jeszcze nie wie:** status „czekam”, przypomnienie przed graniem dalej działa.
     
     Relację nadpisuje tylko „miękką” (bez historii wspólnych grań). Powrót do statusu z pipeline'u kasuje wynik.
+- **„Napisz do supportu”** (karta grania przed headlinerem, pod zwykłą wiadomością): wybór supportu z bazy albo „＋ Wpisz inne…”, gotowy tekst (`supportMessage`), „Wysłałem” zapisuje wiadomość z supportem jako adresatem (`interactions.contactId`), a granie dalej jest przed headlinerem; para trafia do bazy jako aktualna (`logSupportMessage` → `touchSupport`). Na liście wiadomości „do supportu: X”. „Zghostował”, gdy ostatnio pisałem przez supportu, nie wycisza headlinera ani nie zmienia mu relacji (milczał support).
 - **Bramka oceny** (`components/review-gate.tsx`): 90 min po starcie potwierdzonego grania, ale nie przed 20:00, cała apka jest zasłonięta formularzem logu. Ucieczka: „nie zagrałem” (status `cancelled`). Grania importowane wstecz mają `skipReview`.
 - **Log bez zasięgu** (piwnica klubu; `src/lib/offline-log.ts`, `components/offline-sync.tsx`, `public/offline.html`):
   - formularz logu przy braku sieci odkłada log w telefonie (localStorage `su-log-queue`, jeden wpis na granie) zamiast się wysypać,
@@ -115,7 +117,7 @@ Ocena grania **nie jest** oceną bitu, bo zależy od publiki, line-upu itd. Bit 
   - „Zgodził się” → mediana takich wyprzedzeń, „Ktoś zajął miejsce” → było za późno (min. o 3 dni więcej); odmowa / ghosting / „nie robi open miców” nic nie mówią o czasie,
   - własne od 2 takich rozmów z komikiem (`PERSONAL_MIN`), inaczej ogólne (osobno open miki i grania przed komikiem, od 5 rozmów — `GLOBAL_MIN`), a bez danych 14 dni; zakres 5–42 dni,
   - używają tego: przypomnienia „Napisz” (push), Najgorętsze okazje (okno i idealny moment pod komika, powód „pisz ~3 tyg. przed”), karta w Okazjach („pisz ~X przed”, tylko własne) i sekcja „Kiedy pisać” na karcie komika.
-- **Historia przy komiku:** na karcie widać „pisałeś 12.09 (IG) · bez odpowiedzi / odpisał” z ostatniej interakcji w CRM, żeby nie pytać za często.
+- **Historia przy komiku:** na karcie widać „pisałeś 12.09 (IG) · bez odpowiedzi / odpisał” z ostatniej interakcji w CRM (też przez supportu, przy graniu przed nim), żeby nie pytać za często. Aktualni supporci: „support: X”, a w „Napisz” druga wiadomość „Albo przez supportu” (wybór supportu, `messageFromEvent` z `supportId`).
 - **Grupowanie:** jedna karta na komika; najbliższy termin główny, reszta jako „Inne terminy”.
 - **Wyciszanie komika:**
   - ręcznie,
@@ -152,6 +154,7 @@ Pisze się poza apką (Notion / Docs) — apka liczy regularność, wiąże prac
 ### Ludzie (`/contacts`, w zakładce Więcej)
 - **CRM:** rola (komik / organizator / scena), relacja, aliasy (pomagają dopasować nazwiska ze scrapera), notatki.
 - **Kiedy pisać** (karta komika): wyuczone wyprzedzenie z liczbą zgód i „zajętych miejsc” albo informacja, że za mało danych (szczegóły w Okazjach → „Kiedy pisać do komika”).
+- **Supporty** (karta komika): kto robi u niego support (aktualny / „już nie robi”, ostatnio potwierdzony), dodawanie ręczne, „Znowu robi”, usuwanie; u supportu — „Robi support u”. Historia kontaktu headlinera pokazuje też wiadomości wysłane przez supportu.
 - **Historia kontaktu** (`interactions`):
   - kanał to tekst z listy `CHANNELS` w `labels.ts`,
   - „odpisał” to `replied`,
