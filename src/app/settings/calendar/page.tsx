@@ -1,6 +1,7 @@
 import { CopyField } from "@/components/copy-field";
 import { PageHeader, Section } from "@/components/ios";
 import { ARRIVE_BEFORE_MIN } from "@/lib/ics";
+import { TRAIN_CALENDAR_LEAD_MIN } from "@/lib/trips";
 
 export default function CalendarSettingsPage() {
   const token = process.env.CALENDAR_TOKEN;
@@ -14,7 +15,7 @@ export default function CalendarSettingsPage() {
         <>
           <Section
             title="Link do subskrypcji"
-            footer="Link jest tajny — każdy, kto go zna, zobaczy Twoje grania. Nie wklejaj go publicznie."
+            footer="Link jest tajny — każdy, kto go zna, zobaczy Twoje grania i podróże. Nie wklejaj go publicznie."
           >
             <CopyField value={url} />
           </Section>
@@ -31,12 +32,16 @@ export default function CalendarSettingsPage() {
           </Section>
           <Section title="Co trafia do kalendarza">
             <ul className="text-muted-foreground list-disc space-y-1.5 py-3 pr-4 pl-9 text-[15px] leading-relaxed">
-              <li>Tylko potwierdzone grania.</li>
+              <li>Potwierdzone grania i podróże (pociągi z Podróży).</li>
               <li>
                 Wpis zaczyna się <b className="text-foreground">{ARRIVE_BEFORE_MIN} min przed startem sceny</b> — scena o 19:00 to w
                 kalendarzu 18:00. W opisie: godzina sceny, przed kim, link do biletów.
               </li>
               <li>Granie bez godziny — wydarzenie całodniowe z dopiskiem „godzina nieznana”.</li>
+              <li>
+                Pociąg zaczyna się <b className="text-foreground">{TRAIN_CALENDAR_LEAD_MIN} min przed odjazdem</b> (odjazd 17:10 → w kalendarzu
+                17:00) i kończy przy przyjeździe; w opisie godzina odjazdu, pociąg, miejsce i granie.
+              </li>
               <li>Google odświeża subskrybowane kalendarze co kilka–kilkanaście godzin, więc zmiany nie są natychmiastowe.</li>
             </ul>
           </Section>
