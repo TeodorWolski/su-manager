@@ -16,7 +16,7 @@ function readPayload(): Payload | null {
   try {
     const hash = decodeURIComponent(location.hash.slice(1));
     if (hash) {
-      // Skrót / bookmarklet przysyłają {"u": adres, "t": tekst strony}; gołe hasło też przyjmujemy.
+      // Skrót ze strony / bookmarklet przysyłają {"u": adres, "t": tekst strony}; skrót z PDF-a — sam tekst.
       const p = hash.startsWith("{") ? (JSON.parse(hash) as Payload) : { u: null, t: hash };
       localStorage.setItem(PENDING_KEY, JSON.stringify(p));
       history.replaceState(null, "", location.pathname);
@@ -57,7 +57,7 @@ export function TripImport() {
     return (
       <div className="space-y-3">
         <p className="text-muted-foreground text-[15px] leading-relaxed">
-          Wklej tekst ze strony biletu (zaznacz wszystko → kopiuj) albo użyj „Udostępnij → Dodaj do SU Manager” na stronie biletu.{" "}
+          Wklej tekst ze strony albo z PDF-a biletu (zaznacz wszystko → kopiuj) albo użyj „Udostępnij → Dodaj do SU Manager”.{" "}
           <Link href="/trips/setup" className="text-primary">
             Jak to ustawić?
           </Link>

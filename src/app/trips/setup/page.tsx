@@ -60,6 +60,30 @@ export default async function TripSetupPage() {
       </Section>
 
       <Section
+        title="iPhone — PDF biletu (np. z maila od KOLEO)"
+        footer="Osobny skrót dla PDF-ów: w mailu albo w Plikach otwórz PDF biletu → Udostępnij → „Dodaj bilet PDF do SU Manager”. Odczyt jest ten sam co ze strony."
+      >
+        <div className={step}>
+          <b>1.</b>
+          <span>
+            Skróty → <b>+</b> → nazwij „Dodaj bilet PDF do SU Manager”. W ⓘ włącz <b>Pokaż w arkuszu udostępniania</b> i zostaw tylko typ <b>PDF</b>.
+          </span>
+        </div>
+        <div className={step}>
+          <b>2.</b>
+          <span>
+            Dodaj akcję <b>Pobierz tekst z PDF</b> (z danych wejściowych skrótu), potem <b>Koduj URL</b>.
+          </span>
+        </div>
+        <div className={`${step} flex-col`}>
+          <span>
+            <b>3.</b> Dodaj akcję <b>Tekst</b> z tym adresem i zaraz za nim zmienną <b>Zakodowany URL</b>, a na końcu <b>Otwórz adresy URL</b>:
+          </span>
+          <CopyBox text={importUrl} label="Kopiuj adres" />
+        </div>
+      </Section>
+
+      <Section
         title="Komputer — przycisk na pasku zakładek"
         footer="Dodaj nową zakładkę (np. „+ SU Manager”) i jako adres wklej poniższy kod. Na stronie biletu kliknij zakładkę — otworzy się nowa karta z podróżą do zapisania."
       >
@@ -68,7 +92,7 @@ export default async function TripSetupPage() {
         </div>
       </Section>
 
-      <Section title="Bez skrótu" footer="Na stronie biletu zaznacz wszystko, skopiuj i wklej w Podróże → Dodaj.">
+      <Section title="Bez skrótu" footer="Na stronie biletu albo w PDF-ie zaznacz wszystko, skopiuj i wklej w Podróże → Dodaj.">
         <div className="text-muted-foreground px-4 py-2.5 text-[14px]">Zawsze działa, też dla innych przewoźników — czego parser nie rozpozna, uzupełnisz ręcznie.</div>
       </Section>
     </>

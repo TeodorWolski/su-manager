@@ -76,3 +76,52 @@ test("bez rozkładu przy stacjach — godziny z „Ważny od … do …”; śmi
   assert.equal(t.arrivesAt, "2026-12-01T19:45");
   assert.deepEqual(missingFields(parseTicket("coś zupełnie innego")), ["fromStation", "toStation", "departsAt", "priceGr"]);
 });
+
+/** Tekst z PDF-a biletu KOLEO (KOLEO_2026-11-05_WA99377019.pdf) — inny układ niż strona. */
+const KOLEO_PDF = `REZERWACJE
+Informacja o cenie
+Opłata za przejazd: 88.41 PLN
+w tym PTU B (8%): 6.55 PLN 
+Płatność przelewem
+Sprzedawca: PKP Intercity S.A.
+Wystawiono: 02.11.2026 18:43
+Data wydruku:02.11.2026 18:44
+Bilet ważny łącznie z dokumentem potwierdzającym tożsamość. 
+Właściciel biletu: 
+Teodor Wolski
+Numer biletu:
+WA99377019
+7693
+88,41 PLN
+BILET 
+PRZEJAZD TAM (1) 
+Teodor Wolski 
+0 NORMAL.
+1 ULG. 
+OD -> DO KL.
+05.11 07:16 Słupsk -> Warszawa Centralna 05.11 11:31   2  
+* * * -> * * *   *  
+Przewoźnik: PKP Intercity S.A.
+K-Promo I: 1×51% STU/DOK [99] Cena
+PRZEZ: --* 
+458 km
+05.11 07:16 Słupsk -> Warszawa Centralna 05.11 11:31   2  
+Pociąg
+EIP 8300
+Wagon
+4
+Wagon bezprzedziałowy
+1 miejsce do siedzenia
+82 
+Okno 
+Numer referencyjny: 518577224665 `;
+
+test("PDF biletu KOLEO: to samo co ze strony (rok z „Wystawiono”, PLN, etykiety bez dwukropka)", () => {
+  assert.deepEqual(parseTicket(KOLEO_PDF), { ...parseTicket(KOLEO, null) });
+});
+
+test("PDF kupiony w grudniu na styczeń → rok później", () => {
+  const t = parseTicket(KOLEO_PDF.replace("Wystawiono: 02.11.2026", "Wystawiono: 20.12.2026").replaceAll("05.11", "03.01"));
+  assert.equal(t.departsAt, "2027-01-03T07:16");
+  assert.equal(t.arrivesAt, "2027-01-03T11:31");
+});
