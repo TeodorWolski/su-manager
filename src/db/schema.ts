@@ -209,6 +209,33 @@ export const gigs = sqliteTable("gigs", {
   notes: text("notes"),
   /** Granie wpisane wstecz (import historii) — nie wymuszaj formularza oceny. */
   skipReview: integer("skip_review", { mode: "boolean" }).notNull().default(false),
+  /** Honorarium / stawka za granie w groszach (support, headline…); null = nie wpisane, open mic zwykle 0. */
+  feeGr: integer("fee_gr"),
+  createdAt: createdAt(),
+});
+
+/**
+ * Podróż (bilet: pociąg, autobus…) — import ze strony biletu (skrót „Udostępnij” / bookmarklet)
+ * albo ręcznie. `gigId` = koszt dojazdu na to granie; null = prywatna podróż (tylko kalendarz,
+ * nie liczy się do kosztów grań). Czasy lokalne Warszawy jak przy graniach, cena w groszach.
+ */
+export const trips = sqliteTable("trips", {
+  id: id(),
+  gigId: integer("gig_id").references(() => gigs.id, { onDelete: "set null" }),
+  carrier: text("carrier"),
+  /** Pociąg(i): "EIP 8300", przy przesiadkach "IC 1234 → TLK 55". */
+  train: text("train"),
+  fromStation: text("from_station").notNull(),
+  toStation: text("to_station").notNull(),
+  departsAt: text("departs_at").notNull(),
+  arrivesAt: text("arrives_at"),
+  priceGr: integer("price_gr"),
+  /** "wagon 4, miejsce 82 (okno)". */
+  seat: text("seat"),
+  /** Numer referencyjny / biletu u przewoźnika — ten sam bilet drugi raz się nie doda. */
+  reference: text("reference").unique(),
+  url: text("url"),
+  notes: text("notes"),
   createdAt: createdAt(),
 });
 

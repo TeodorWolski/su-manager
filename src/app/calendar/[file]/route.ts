@@ -1,7 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 import type { NextRequest } from "next/server";
 import { buildCalendar } from "@/lib/ics";
-import { listCalendarGigs } from "@/lib/queries";
+import { listCalendarGigs, listCalendarTrips } from "@/lib/queries";
 
 /**
  * Feed .ics dla Google Calendar: /calendar/<CALENDAR_TOKEN>.ics
@@ -14,8 +14,8 @@ export async function GET(request: NextRequest, ctx: RouteContext<"/calendar/[fi
   const ok = !!token && given.length === token.length && timingSafeEqual(Buffer.from(given), Buffer.from(token));
   if (!ok) return new Response("Not found", { status: 404 });
 
-  const gigs = await listCalendarGigs();
-  return new Response(buildCalendar(gigs, request.nextUrl.origin), {
+  const [gigs, trips] = await Promise.all([listCalendarGigs(), listCalendarTrips()]);
+  return new Response(buildCalendar(gigs, request.nextUrl.origin, trips), {
     headers: {
       "Content-Type": "text/calendar; charset=utf-8",
       "Content-Disposition": 'inline; filename="grania.ics"',

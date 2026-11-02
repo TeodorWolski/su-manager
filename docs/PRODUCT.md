@@ -33,6 +33,7 @@ Używana głównie **z telefonu** (PWA, styl iOS). Produkcyjna baza to źródło
 | Headliner („przed kim”) | Komik, przed którym gram | `gigs.headlinerId` |
 | Support headlinera | Komik, który robi u niego support; do dużych headlinerów na open mica pisze się często przez niego (on pyta headlinera). Supporty się zmieniają, bywa ich kilku | tabela `supports` (`active`, `lastSeen`) |
 | Bit | Kawałek materiału | tabela `bits` |
+| Podróż | Bilet (pociąg…) z ceną; przy graniu = koszt dojazdu, bez grania = prywatna | tabela `trips` (`gigId`, `priceGr`) |
 
 Trzy różne oceny, nie mieszać:
 
@@ -132,6 +133,14 @@ Ocena grania **nie jest** oceną bitu, bo zależy od publiki, line-upu itd. Bit 
   - open mic: „Siemanko, macie może wolny slot na [d.MM]?”,
   - „Wysłałem przez…” zakłada granie jako `contacted` i zostawia na liście.
 
+### Podróże i pieniądze (`/trips`, w zakładce Więcej; logika `src/lib/trips.ts`, parser `src/lib/ticket-parse.ts`)
+- **Import biletu jednym tapem:** na stronie biletu (KOLEO, `koleo.pl/ticket/…`, za logowaniem — serwer apki jej nie otworzy) skrót iOS w „Udostępnij → Dodaj do SU Manager” albo bookmarklet na komputerze czyta tekst strony i otwiera `/trips/import#<json>` (dane tylko w adresie po „#”, nie w logach). Instrukcja i kod do skopiowania: `/trips/setup`. Zapas: wklejenie tekstu biletu.
+- **`/trips/import`** jest bez logowania w proxy (Safari nie ma sesji PWA) — parser wypełnia formularz (trasa, odjazd / przyjazd, pociąg(i), wagon i miejsce, cena, przewoźnik, numer referencyjny), wszystko do poprawienia; grania ±3 dni i dopasowanie, zapis — akcje z `requireSession()` (bez sesji: link do logowania, bilet czeka w localStorage). Ten sam numer referencyjny = aktualizacja, nie duplikat.
+- **Dopasowanie do grania** (`suggestGig`): granie tego dnia albo ±1 dzień w mieście docelowym (dojazd) albo startowym (powrót), z pominięciem miasta domowego (`HOME_CITY`, Warszawa); nic nie pasuje → **prywatna podróż** (tylko kalendarz, nie liczy się do kosztów grań). Tam i z powrotem to dwa bilety, oba lądują przy tym samym graniu.
+- **Karta grania → „Dojazd i pieniądze”:** bilety, **honorarium** (`gigs.feeGr`, osobny formularz `setGigFee`), bilans = honorarium − bilety (`gigBalance`). Kwoty w groszach.
+- **Kalendarz:** pociągi w feedzie `.ics` od **10 min przed odjazdem** (`TRAIN_CALENDAR_LEAD_MIN`, 17:10 → 17:00) do przyjazdu, prawdziwa godzina w opisie; w mini kalendarzu 🚆 przy dniu i lista pod dniem (`/api/month` zwraca `{ gigs, trips }`).
+- **`/trips`:** nadchodzące i minione, „Dojazdy na grania” — suma biletów podpiętych do grań wg miesiąca.
+
 ### MGM — material generated per month (`src/lib/mgm.ts`, dane `getMgm` w `planning.ts`)
 - **Co liczy:** minuty bitów **założonych** w danym miesiącu (`bits.createdAt` po czasie warszawskim, długość `lengthMin`), z podziałem: **sprawdzone** (status „Sprawdzony”) i **niesprawdzone** (w testach / do redakcji / vomit). Odrzucone się nie liczą; bity bez długości są liczone jako bity, a karta podpowiada, żeby uzupełnić długość.
 - **Cel miesięczny** jak przy graniach: klucz `goals` „mgm:YYYY-MM”, domyślnie `DEFAULT_MGM_MIN` (5 min), szybki wybór 3/5/8/10 albo pole w Celach. **Do celu, tempa (`pace`), serii i historii (6 miesięcy) liczy się tylko sprawdzony materiał.** Niesprawdzony i suma są w rozpisce pod paskiem (sprawdzone · niesprawdzone · razem) i w mailach.
@@ -181,7 +190,7 @@ Pisze się poza apką (Notion / Docs) — apka liczy regularność, wiąże prac
 ### Logowanie i bezpieczeństwo (`/login`, Więcej → Bezpieczeństwo)
 Basic auth zastąpione, bo w PWA na iOS nie trzymał sesji, a odmowy 401 w tle wyglądały jak „brak internetu”.
 - **Sesja** (`src/lib/session.ts`): ciasteczko `sum_session` HttpOnly + Secure + SameSite=Lax, rok, odnawiane raz dziennie (proxy). Format `<sid>.<issuedAt>.<hmac>`, klucz HMAC z `SESSION_SECRET` albo `APP_PASSWORD` (zmiana hasła = wylogowanie wszystkich). W tabeli `sessions` tylko SHA-256 z `sid`; ważność sprawdzana w bazie z 60-sekundowym cache.
-- **Proxy** (`src/proxy.ts`): bez sesji strony → `/login?next=…`, reszta → 401 JSON. Poza logowaniem: `/login`, `/calendar/<token>.ics`, `/api/notify` (CRON_SECRET), statyczne pliki, ikony, manifest, `sw.js`, `offline.html`.
+- **Proxy** (`src/proxy.ts`): bez sesji strony → `/login?next=…`, reszta → 401 JSON. Poza logowaniem: `/login`, `/calendar/<token>.ics`, `/api/notify` (CRON_SECRET), statyczne pliki, ikony, manifest, `sw.js`, `offline.html`, `/trips/import` (dane tylko w przeglądarce, zapis wymaga sesji).
 - **Każda akcja serwerowa** zaczyna się od `requireSession()` (`src/lib/auth.ts`) — zgodnie z dokumentacją Next nie polegamy tylko na proxy. Layout bez sesji nie renderuje paska, kalendarza ani bramki oceny.
 - **Hasło:** `APP_PASSWORD`, porównanie stałoczasowe, 5 błędnych prób → 15 min blokady logowania hasłem (`app_state` „login-lock”); passkey działa dalej.
 - **Face ID / passkeys** (`@simplewebauthn`, tabela `passkeys`): dodawanie tylko po zalogowaniu (Bezpieczeństwo; po pierwszym logowaniu hasłem bez passkeya apka tam przenosi), logowanie bez hasła na `/login`. Wyzwanie w ciasteczku HttpOnly na 5 min, `userVerification: required`, RP = domena z nagłówków (produkcja: su-manager.vercel.app).

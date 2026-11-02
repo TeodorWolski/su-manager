@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils";
  * Otwarty / zamknięty zostaje między stronami (localStorage).
  */
 type MonthGig = { id: number; title: string; startsAt: string; status: string; context: string | null; city: string | null };
+type MonthTrip = { id: number; fromStation: string; toStation: string; departsAt: string; arrivesAt: string | null; gigId: number | null };
 
 const STORAGE_KEY = "mini-calendar-open";
 const WEEK_MIN = 2;
@@ -88,6 +89,7 @@ export function MiniCalendar() {
   const open = useSyncExternalStore(subscribeOpen, readOpen, () => false);
   const [month, setMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
   const [gigs, setGigs] = useState<MonthGig[]>([]);
+  const [trips, setTrips] = useState<MonthTrip[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const today = iso(new Date());
 
@@ -102,8 +104,12 @@ export function MiniCalendar() {
     if (!open) return;
     let cancelled = false;
     fetch(`/api/month?from=${from}&to=${to}`)
-      .then((r) => (r.ok ? r.json() : []))
-      .then((rows: MonthGig[]) => !cancelled && setGigs(rows))
+      .then((r) => (r.ok ? r.json() : { gigs: [], trips: [] }))
+      .then((data: { gigs: MonthGig[]; trips: MonthTrip[] }) => {
+        if (cancelled) return;
+        setGigs(data.gigs);
+        setTrips(data.trips);
+      })
       .catch(() => {});
     return () => {
       cancelled = true;
@@ -116,11 +122,18 @@ export function MiniCalendar() {
     return m;
   }, [gigs]);
 
+  const tripsByDay = useMemo(() => {
+    const m = new Map<string, MonthTrip[]>();
+    for (const t of trips) m.set(t.departsAt.slice(0, 10), [...(m.get(t.departsAt.slice(0, 10)) ?? []), t]);
+    return m;
+  }, [trips]);
+
   const shift = (n: number) => {
     setMonth((m) => new Date(m.getFullYear(), m.getMonth() + n, 1));
     setSelected(null);
   };
   const dayGigs = selected ? (byDay.get(selected) ?? []) : [];
+  const dayTrips = selected ? (tripsByDay.get(selected) ?? []) : [];
 
   return (
     <>
@@ -198,6 +211,12 @@ export function MiniCalendar() {
                           )}
                         >
                           {d.getDate()}
+                          {/* Podróż tego dnia — mały pociąg w rogu. */}
+                          {tripsByDay.has(key) && (
+                            <span className="absolute -top-1 -left-1 text-[9px] leading-none" aria-hidden>
+                              🚆
+                            </span>
+                          )}
                           {/* Kolejne granie tego dnia — kropka w jego kolorze. */}
                           {list.length > 1 && (
                             <span className={cn("ring-card absolute -right-0.5 -bottom-0.5 size-2.5 rounded-full ring-2", styleOf(list.find((g) => g !== main)?.context ?? null).dot)} />
@@ -239,6 +258,18 @@ export function MiniCalendar() {
           {selected && (
             <div className="border-border/70 mt-2 border-t pt-2">
               <div className="text-muted-foreground mb-1 px-1 text-[12px] first-letter:uppercase">{format(parseISO(selected), "EEEE, d MMMM", { locale: pl })}</div>
+              {dayTrips.map((t) => (
+                <Link key={`t${t.id}`} href={t.gigId ? `/gigs/${t.gigId}` : "/trips"} className="hover:bg-muted flex items-center gap-2 rounded-lg px-1 py-1 text-[13px]">
+                  <span aria-hidden>🚆</span>
+                  <span className="min-w-0 flex-1 truncate">
+                    {t.fromStation} → {t.toStation}
+                  </span>
+                  <span className="text-muted-foreground tabular-nums">
+                    {t.departsAt.slice(11, 16)}
+                    {t.arrivesAt && `–${t.arrivesAt.slice(11, 16)}`}
+                  </span>
+                </Link>
+              ))}
               {dayGigs.length ? (
                 <>
                   {dayGigs.map((g) => (

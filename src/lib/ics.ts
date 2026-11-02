@@ -1,7 +1,9 @@
 /**
- * Feed iCalendar (.ics) z potwierdzonymi graniami — subskrybowany w Google Calendar.
+ * Feed iCalendar (.ics) z potwierdzonymi graniami i podróżami — subskrybowany w Google Calendar.
  * Wpis zaczyna się ARRIVE_BEFORE_MIN przed startem na scenie (tyle wcześniej trzeba być na miejscu).
  */
+
+import { TRAIN_CALENDAR_LEAD_MIN } from "./trips";
 
 /** Ile minut przed startem sceny zaczyna się wpis w kalendarzu. */
 export const ARRIVE_BEFORE_MIN = 60;
@@ -71,7 +73,22 @@ function fold(line: string) {
   return out.join("\r\n ");
 }
 
-export function buildCalendar(gigs: CalendarGig[], appUrl: string) {
+export type CalendarTrip = {
+  id: number;
+  fromStation: string;
+  toStation: string;
+  departsAt: string; // lokalny czas Warszawy "YYYY-MM-DDTHH:mm"
+  arrivesAt: string | null;
+  train: string | null;
+  seat: string | null;
+  gigId: number | null;
+  gigTitle: string | null;
+};
+
+/** Bez godziny przyjazdu wpis pociągu trwa tyle. */
+const TRIP_FALLBACK_MIN = 60;
+
+export function buildCalendar(gigs: CalendarGig[], appUrl: string, trips: CalendarTrip[] = []) {
   const now = utcStamp(Date.now());
   const lines = [
     "BEGIN:VCALENDAR",
@@ -117,6 +134,34 @@ export function buildCalendar(gigs: CalendarGig[], appUrl: string) {
       ...(where ? [`LOCATION:${escape(where)}`] : []),
       `DESCRIPTION:${escape(description)}`,
       `URL:${escape(g.url ?? `${appUrl}/gigs/${g.id}`)}`,
+      "STATUS:CONFIRMED",
+      "TRANSP:OPAQUE",
+      "END:VEVENT",
+    );
+  }
+  // Pociągi: wpis TRAIN_CALENDAR_LEAD_MIN przed odjazdem (17:10 → 17:00), do przyjazdu.
+  for (const t of trips) {
+    if (t.departsAt.length <= 10) continue;
+    const dep = warsawToUtc(t.departsAt);
+    const arr = t.arrivesAt && t.arrivesAt.length > 10 ? warsawToUtc(t.arrivesAt) : dep + TRIP_FALLBACK_MIN * 60_000;
+    const description = [
+      `Odjazd ${t.departsAt.slice(11, 16)}${t.arrivesAt ? `, przyjazd ${t.arrivesAt.slice(11, 16)}` : ""}`,
+      t.train,
+      t.seat,
+      t.gigTitle && `Na: ${t.gigTitle}`,
+      `${appUrl}${t.gigId ? `/gigs/${t.gigId}` : "/trips"}`,
+    ]
+      .filter(Boolean)
+      .join("\n");
+    lines.push(
+      "BEGIN:VEVENT",
+      `UID:trip-${t.id}@su-manager`,
+      `DTSTAMP:${now}`,
+      `DTSTART:${utcStamp(dep - TRAIN_CALENDAR_LEAD_MIN * 60_000)}`,
+      `DTEND:${utcStamp(arr)}`,
+      `SUMMARY:${escape(`🚆 ${t.fromStation} → ${t.toStation}${t.train ? ` (${t.train})` : ""}`)}`,
+      `LOCATION:${escape(t.fromStation)}`,
+      `DESCRIPTION:${escape(description)}`,
       "STATUS:CONFIRMED",
       "TRANSP:OPAQUE",
       "END:VEVENT",

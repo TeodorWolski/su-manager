@@ -12,6 +12,7 @@ import {
   gigs,
   interactions,
   supports,
+  trips,
   venues,
   writingSessions,
   ideas,
@@ -543,4 +544,54 @@ export async function getStats() {
       .limit(6),
   ]);
   return { outcomes, channels, byContext, byVenue, byMonth: byMonth.reverse() };
+}
+
+/** Podróże (najbliższe na górze, potem minione) z graniem, na które były. */
+export async function listTrips() {
+  return db
+    .select({
+      id: trips.id,
+      gigId: trips.gigId,
+      gigTitle: gigs.title,
+      carrier: trips.carrier,
+      train: trips.train,
+      fromStation: trips.fromStation,
+      toStation: trips.toStation,
+      departsAt: trips.departsAt,
+      arrivesAt: trips.arrivesAt,
+      priceGr: trips.priceGr,
+      seat: trips.seat,
+      url: trips.url,
+    })
+    .from(trips)
+    .leftJoin(gigs, eq(gigs.id, trips.gigId))
+    .orderBy(desc(trips.departsAt));
+}
+
+export type TripItem = Awaited<ReturnType<typeof listTrips>>[number];
+
+/** Podróże na granie (dojazd i powrót) — karta grania, bilans wyjazdu. */
+export async function listGigTrips(gigId: number) {
+  return db.select().from(trips).where(eq(trips.gigId, gigId)).orderBy(asc(trips.departsAt));
+}
+
+/** Podróże do feedu .ics (od tygodnia wstecz). */
+export async function listCalendarTrips() {
+  const since = new Date(Date.now() - 7 * 864e5).toISOString().slice(0, 10);
+  return db
+    .select({
+      id: trips.id,
+      fromStation: trips.fromStation,
+      toStation: trips.toStation,
+      departsAt: trips.departsAt,
+      arrivesAt: trips.arrivesAt,
+      train: trips.train,
+      seat: trips.seat,
+      gigId: trips.gigId,
+      gigTitle: gigs.title,
+    })
+    .from(trips)
+    .leftJoin(gigs, eq(gigs.id, trips.gigId))
+    .where(gte(trips.departsAt, since))
+    .orderBy(asc(trips.departsAt));
 }

@@ -9,6 +9,7 @@ import { EVENTS_TAG, isOpenMic, MUTE_AFTER_OUTCOME_DAYS } from "@/lib/opportunit
 import { seriesKey } from "@/lib/recurring";
 import { syncRecurring } from "@/lib/recurring-sync";
 import { normalize } from "@/lib/text";
+import { parseZl, suggestGig } from "@/lib/trips";
 import { nowLocal } from "@/lib/time";
 import {
   BIT_STATUSES,
@@ -30,6 +31,7 @@ import {
   RECURRENCE_INTERVALS,
   recurringSeries,
   supports,
+  trips,
   WRITING_KINDS,
   writingSessions,
   ideas,
@@ -834,4 +836,74 @@ export async function setMgmGoal(month: string, target: number) {
 export async function saveMgmGoal(fd: FormData) {
   await requireSession();
   await setMgmGoal(required(str(fd, "month"), "miesiąc"), required(int(fd, "target"), "cel"));
+}
+
+// ── Podróże ─────────────────────────────────────────────────────────────
+
+/**
+ * Do ekranu importu biletu (/trips/import — strona bez logowania, dane tylko w przeglądarce):
+ * grania ±3 dni od podróży do wyboru, podpowiedziane granie i czy ten bilet już jest.
+ */
+export async function tripImportContext(trip: { fromStation: string; toStation: string; departsAt: string; arrivesAt: string | null; reference: string | null }) {
+  await requireSession();
+  const day = (n: number) => new Date(Date.parse(trip.departsAt.slice(0, 10)) + n * 864e5).toISOString().slice(0, 10);
+  const candidates = await db
+    .select({
+      id: gigs.id,
+      title: gigs.title,
+      startsAt: gigs.startsAt,
+      cityName: sql<string | null>`coalesce((select c.name from cities c where c.id = ${gigs.cityId}),
+        (select c.name from venues v join cities c on c.id = v.city_id where v.id = ${gigs.venueId}))`,
+    })
+    .from(gigs)
+    .where(sql`${gigs.startsAt} >= ${day(-3)} and ${gigs.startsAt} < ${day(4)} and ${gigs.status} not in ('rejected', 'cancelled')`)
+    .orderBy(gigs.startsAt);
+  const [existing] = trip.reference
+    ? await db.select({ id: trips.id, gigId: trips.gigId }).from(trips).where(eq(trips.reference, trip.reference))
+    : [];
+  return { gigs: candidates, suggested: suggestGig(trip, candidates)?.id ?? null, existing: existing ?? null };
+}
+
+/** Zapis podróży z ekranu importu (albo ręcznie). Ten sam numer referencyjny = aktualizacja, nie duplikat. */
+export async function saveTrip(fd: FormData) {
+  await requireSession();
+  const values = {
+    gigId: int(fd, "gigId"),
+    carrier: str(fd, "carrier"),
+    train: str(fd, "train"),
+    fromStation: required(str(fd, "fromStation"), "skąd"),
+    toStation: required(str(fd, "toStation"), "dokąd"),
+    departsAt: required(str(fd, "departsAt"), "odjazd"),
+    arrivesAt: str(fd, "arrivesAt"),
+    priceGr: parseZl(str(fd, "price")),
+    seat: str(fd, "seat"),
+    reference: str(fd, "reference"),
+    url: str(fd, "url"),
+    notes: str(fd, "notes"),
+  };
+  const [row] = await db
+    .insert(trips)
+    .values(values)
+    .onConflictDoUpdate({ target: trips.reference, set: values })
+    .returning({ id: trips.id });
+  done(values.gigId ? `/gigs/${values.gigId}` : `/trips?saved=${row.id}`);
+}
+
+export async function setTripGig(id: number, gigId: number | null) {
+  await requireSession();
+  await db.update(trips).set({ gigId }).where(eq(trips.id, id));
+  refresh();
+}
+
+export async function deleteTrip(id: number) {
+  await requireSession();
+  await db.delete(trips).where(eq(trips.id, id));
+  refresh();
+}
+
+/** Honorarium za granie (karta grania → „Pieniądze”); puste pole kasuje kwotę. */
+export async function setGigFee(gigId: number, fd: FormData) {
+  await requireSession();
+  await db.update(gigs).set({ feeGr: parseZl(str(fd, "fee")) }).where(eq(gigs.id, gigId));
+  refresh();
 }

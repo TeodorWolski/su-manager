@@ -1,10 +1,11 @@
 import { Check, ExternalLink } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { deleteGig, deleteGigMessage, logGigMessage, logSupportMessage, replyToGig, setGigStatus } from "@/app/actions";
+import { deleteGig, deleteGigMessage, logGigMessage, logSupportMessage, replyToGig, setGigFee, setGigStatus } from "@/app/actions";
 import { ConfirmButton, NEW, PendingButton, SelectOrNew } from "@/components/form";
 import { PageHeader, Pill, Row, Section, Stat } from "@/components/ios";
 import { MessageComposer } from "@/components/message-composer";
+import { TripRow } from "@/components/trip-row";
 import { Button } from "@/components/ui/button";
 import { daysSince, FOLLOW_UP_BEFORE_DAYS, followUpTiming, lastActivity, nextChannel } from "@/lib/follow-up";
 import {
@@ -17,7 +18,9 @@ import {
 } from "@/lib/labels";
 import type { GigOutcome } from "@/db/schema";
 import { pitchMessage, supportMessage } from "@/lib/messages";
-import { getGig, type GigStatus } from "@/lib/queries";
+import { getGig, listGigTrips, type GigStatus } from "@/lib/queries";
+import { fmtZl } from "@/lib/ticket-parse";
+import { gigBalance } from "@/lib/trips";
 import { effectiveStart, fmtDate, fmtDateTime, nowLocal } from "@/lib/time";
 import { cn } from "@/lib/utils";
 
@@ -40,7 +43,7 @@ const STEP_ACTIVE: Partial<Record<GigStatus, string>> = {
 
 export default async function GigPage({ params }: PageProps<"/gigs/[id]">) {
   const { id } = await params;
-  const data = await getGig(Number(id));
+  const [data, gigTrips] = await Promise.all([getGig(Number(id)), listGigTrips(Number(id))]);
   if (!data) notFound();
   const { gig, log } = data;
   const isPast = effectiveStart(gig.startsAt) < nowLocal();
@@ -49,6 +52,7 @@ export default async function GigPage({ params }: PageProps<"/gigs/[id]">) {
   const used = [...new Set(data.messages.map((m) => m.channel))];
   const lastMessage = data.messages.at(-1);
   const activeSupports = data.supports.filter((x) => x.active);
+  const balance = gigBalance(data.gig.feeGr, gigTrips.map((t) => t.priceGr));
   // Ostatnio pisałem przez supportu → blok „Napisz do supportu” od razu otwarty.
   const viaSupport = !!lastMessage?.contactId && lastMessage.contactId !== data.gig.headlinerId;
   const since = lastActivity({ statusChangedAt: gig.statusChangedAt, createdAt: gig.createdAt, lastMessageAt: lastMessage?.date ?? null });
@@ -206,6 +210,52 @@ export default async function GigPage({ params }: PageProps<"/gigs/[id]">) {
           )}
         </Section>
       )}
+
+      <Section
+        title="Dojazd i pieniądze"
+        action={
+          <Link href="/trips/import" className="text-primary text-[15px]">
+            + bilet
+          </Link>
+        }
+        footer="Bilety dodasz z „Udostępnij → Dodaj do SU Manager” na stronie biletu (Podróże → Jak dodawać). Bilans = honorarium − bilety."
+      >
+        {gigTrips.map((t) => (
+          <TripRow key={t.id} trip={t} />
+        ))}
+        <form action={setGigFee.bind(null, data.gig.id)} className="border-border/70 flex items-center gap-2 border-b py-2 pr-5 pl-4 has-[[data-pending]]:opacity-50">
+          <label className="flex flex-1 items-center gap-3">
+            <span className="text-[16px]">Honorarium</span>
+            <input
+              key={data.gig.feeGr ?? "none"}
+              name="fee"
+              inputMode="decimal"
+              placeholder="0 zł"
+              defaultValue={data.gig.feeGr != null ? (data.gig.feeGr / 100).toFixed(2).replace(".", ",") : ""}
+              className="min-w-0 flex-1 bg-transparent text-right text-[16px] outline-none"
+            />
+          </label>
+          <PendingButton className="text-primary h-9 shrink-0 pl-1 text-[15px]">Zapisz</PendingButton>
+        </form>
+        {balance && data.gig.feeGr == null ? (
+          <div className="flex items-baseline justify-between px-4 py-2.5 text-[15px]">
+            <span className="text-muted-foreground">Dojazd razem · wpisz honorarium, żeby zobaczyć bilans</span>
+            <b className="font-semibold tabular-nums">{fmtZl(balance.costs)}</b>
+          </div>
+        ) : balance ? (
+          <div className="flex items-baseline justify-between px-4 py-2.5 text-[15px]">
+            <span className="text-muted-foreground">
+              {fmtZl(balance.fee)} − bilety {fmtZl(balance.costs)}
+            </span>
+            <b className={cn("font-semibold tabular-nums", balance.balance < 0 ? "text-st-rej" : "text-st-ok")}>
+              {balance.balance < 0 ? "−" : "+"}
+              {fmtZl(Math.abs(balance.balance))}
+            </b>
+          </div>
+        ) : (
+          <div className="text-muted-foreground px-4 py-2.5 text-[14px]">Brak biletów i honorarium.</div>
+        )}
+      </Section>
 
       {log ? (
         <>

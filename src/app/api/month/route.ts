@@ -1,11 +1,11 @@
 import { and, gte, lte, notInArray, sql } from "drizzle-orm";
 import type { NextRequest } from "next/server";
-import { cities, db, gigs, venues } from "@/db";
+import { cities, db, gigs, trips, venues } from "@/db";
 import { eq } from "drizzle-orm";
 import { currentSession } from "@/lib/auth";
 
 /**
- * Grania do mini kalendarza: /api/month?from=YYYY-MM-DD&to=YYYY-MM-DD (widoczne tygodnie miesiąca).
+ * Grania i podróże do mini kalendarza: /api/month?from=YYYY-MM-DD&to=YYYY-MM-DD (widoczne tygodnie miesiąca).
  * Za basic auth jak cała apka. Bez odrzuconych i odwołanych.
  */
 export async function GET(request: NextRequest) {
@@ -35,5 +35,11 @@ export async function GET(request: NextRequest) {
       ),
     )
     .orderBy(gigs.startsAt);
-  return Response.json(rows, { headers: { "Cache-Control": "no-store" } });
+  // Podróże (pociągi) w tych dniach — znaczek 🚆 i lista pod dniem.
+  const tripRows = await db
+    .select({ id: trips.id, fromStation: trips.fromStation, toStation: trips.toStation, departsAt: trips.departsAt, arrivesAt: trips.arrivesAt, gigId: trips.gigId })
+    .from(trips)
+    .where(and(gte(sql`substr(${trips.departsAt}, 1, 10)`, from), lte(sql`substr(${trips.departsAt}, 1, 10)`, to)))
+    .orderBy(trips.departsAt);
+  return Response.json({ gigs: rows, trips: tripRows }, { headers: { "Cache-Control": "no-store" } });
 }

@@ -31,5 +31,7 @@ export async function proxy(request: NextRequest) {
 export const config = {
   // Bez logowania: /login (strona i jej akcje), /calendar/<token>.ics (tajny token), /api/notify
   // (CRON_SECRET), statyczne pliki, ikony, manifest, sw.js i offline.html — przeglądarka pobiera je w tle.
-  matcher: ["/((?!login|_next/static|_next/image|favicon.ico|manifest.webmanifest|icon|apple-icon|calendar/|api/notify|sw.js|offline.html).*)"],
+  // /trips/import: skrót „Udostępnij” otwiera ją w Safari (bez sesji PWA) — dane biletu są tylko w adresie
+  // po „#”, a zapis i lista grań idą akcjami z requireSession().
+  matcher: ["/((?!login|_next/static|_next/image|favicon.ico|manifest.webmanifest|icon|apple-icon|calendar/|api/notify|sw.js|offline.html|trips/import).*)"],
 };
