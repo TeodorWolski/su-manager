@@ -11,7 +11,7 @@ import { before, describe, test } from "node:test";
 
 process.env.DATABASE_URL = `file:${join(mkdtempSync(join(tmpdir(), "su-notify-")), "test.db")}`;
 
-const { db, gigs, gigLogs, interactions, writingSessions, contacts } = await import("@/db");
+const { db, gigs, gigLogs, interactions, writingSessions, contacts, events, cities } = await import("@/db");
 const { migrate } = await import("drizzle-orm/libsql/migrator");
 const { eq } = await import("drizzle-orm");
 const { notifications } = await import("@/lib/notify");
@@ -86,6 +86,45 @@ describe("poranne powiadomienia", () => {
     assert.match(n.title, /^Napisz: 1 granie/, "przy 20 dniach to pierwszy próg, nie ostatni dzwonek");
     assert.match(n.body, /Kasia Wcześniejsza/);
     assert.doesNotMatch(n.body, /inny za 19 dni/, "bez danych — dalej 14 dni");
+  });
+});
+
+describe("nowe terminy komików z CRM", () => {
+  test("nowe daty w zasięgu → „Nowe terminy”; dalekie, ukryte i stare pomijane; drugi raz nic", async () => {
+    await db.insert(cities).values([
+      { name: "Łódź", travelMinutes: 80 },
+      { name: "Szczecin", travelMinutes: 330 },
+    ]);
+    const [{ id: czarek }] = await db.insert(contacts).values({ name: "Czarek Sikora", role: "comedian" }).returning({ id: contacts.id });
+    await db.insert(contacts).values({ name: "Ukryty Komik", role: "comedian", ignoreInReport: true });
+    const utcAgo = (h: number) => new Date(Date.now() - h * 36e5).toISOString().replace("T", " ").slice(0, 19);
+    const ev = (n: number, title: string, city: string, firstSeenH: number) => ({
+      source: "kupbilecik",
+      sourceId: `nd${n}`,
+      url: `https://example.com/${n}`,
+      title,
+      startsAt: `${day(20 + n)}T19:00`,
+      cityName: city,
+      dedupeKey: `nd-${n}`,
+      firstSeenAt: utcAgo(firstSeenH),
+      lastSeenAt: utcAgo(0),
+    });
+    // Poprzednie sprawdzenie dobę temu (wcześniejsze testy porannych przesunęły znacznik na „teraz”).
+    const { setState } = await import("@/lib/app-state");
+    await setState("push-new-dates-since", utcAgo(24));
+    await db.insert(events).values([
+      ev(1, "Stand-up: Czarek Sikora", "Łódź", 2),
+      ev(2, "Stand-up: Czarek Sikora", "Łódź", 3),
+      ev(3, "Stand-up: Czarek Sikora", "Szczecin", 2), // poza zasięgiem
+      ev(4, "Stand-up: Czarek Sikora", "Łódź", 72), // stary — sprzed poprzedniego sprawdzenia
+      ev(5, "Stand-up: Ukryty Komik", "Łódź", 1), // pomijany w Okazjach
+    ]);
+    const n = (await notifications("morning")).find((x) => x.tag === "new-dates");
+    assert.ok(n, "jest „Nowe terminy”");
+    assert.equal(n.title, "🎟️ Nowe terminy: Czarek Sikora");
+    assert.match(n.body, /Czarek Sikora: 2 \(najbliżej .+ Łódź\)/);
+    assert.equal(n.url, `/contacts/${czarek}`);
+    assert.equal((await notifications("morning")).find((x) => x.tag === "new-dates"), undefined, "drugi przebieg — nic nowego");
   });
 });
 

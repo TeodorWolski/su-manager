@@ -11,6 +11,7 @@ import { contacts, db, gigLogs, gigs } from "@/db";
 import { getState, oncePerDay, setState } from "./app-state";
 import { CHANNEL_SHORT } from "./labels";
 import { loadLeadTimes } from "./lead-data";
+import { loadMarketEvents } from "./market-data";
 import { getFollowUps, getWriting } from "./planning";
 import type { PushPayload } from "./push";
 import { plural } from "./text";
@@ -86,6 +87,9 @@ export async function notifications(kind: "morning" | "evening"): Promise<PushPa
         tag: "write",
       });
     }
+
+    const fresh = await newDatesNotice(today);
+    if (fresh) out.push(fresh);
   }
 
   if (kind === "evening") {
@@ -112,4 +116,43 @@ export async function notifications(kind: "morning" | "evening"): Promise<PushPa
     }
   }
   return out;
+}
+
+/** Pierwsze sprawdzenie „nowych terminów” sięga tyle godzin wstecz. */
+const NEW_DATES_FIRST_LOOKBACK_H = 24;
+
+/**
+ * „Nowe terminy”: komicy z CRM, którzy od poprzedniego sprawdzenia wrzucili daty w zasięgu — napisz, zanim
+ * zajmą sloty. Bez ukrytych w Okazjach i wyciszonych (odmowa / ghosting / ręcznie). Licznik „od kiedy”
+ * w app_state, więc nic się nie powtarza ani nie przepada.
+ */
+async function newDatesNotice(today: string): Promise<PushPayload | null> {
+  const nowUtc = new Date().toISOString().replace("T", " ").slice(0, 19);
+  const since =
+    (await getState("push-new-dates-since")) ??
+    new Date(Date.now() - NEW_DATES_FIRST_LOOKBACK_H * 36e5).toISOString().replace("T", " ").slice(0, 19);
+  const [market, snoozed] = await Promise.all([
+    loadMarketEvents(),
+    db.select({ id: contacts.id }).from(contacts).where(sql`${contacts.snoozeUntil} > ${today}`),
+  ]);
+  await setState("push-new-dates-since", nowUtc);
+  const muted = new Set(snoozed.map((c) => c.id));
+  const fresh = market.events.filter(
+    (e) => e.contactId != null && e.firstSeenAt > since && e.inRange && e.startsAt.slice(0, 10) >= today && !market.hidden.has(e.key) && !muted.has(e.contactId),
+  );
+  if (!fresh.length) return null;
+  const byContact = new Map<number, typeof fresh>();
+  for (const e of fresh) byContact.set(e.contactId!, [...(byContact.get(e.contactId!) ?? []), e]);
+  const people = [...byContact.values()].map((list) => {
+    const first = [...list].sort((a, b) => a.startsAt.localeCompare(b.startsAt))[0];
+    return { id: list[0].contactId!, name: list[0].name, count: list.length, first };
+  });
+  const line = (p: (typeof people)[number]) =>
+    `${p.name}: ${p.count} (najbliżej ${p.first.startsAt.slice(8, 10)}.${p.first.startsAt.slice(5, 7)}${p.first.cityName ? ` ${p.first.cityName}` : ""})`;
+  return {
+    title: people.length === 1 ? `🎟️ Nowe terminy: ${people[0].name}` : `🎟️ Nowe terminy: ${plural(people.length, "komik", "komików", "komików")}`,
+    body: `${people.slice(0, 3).map(line).join(" · ")}${people.length > 3 ? "…" : ""} — napisz, zanim zajmą sloty.`,
+    url: people.length === 1 ? `/contacts/${people[0].id}` : "/events?tab=friends",
+    tag: "new-dates",
+  };
 }

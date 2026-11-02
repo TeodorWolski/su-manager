@@ -21,17 +21,20 @@ import { ACTIVE_GIG, COOLDOWN_DAYS, muteState } from "@/lib/opportunities";
 import { getContact, getFormOptions, listSupportedBy, listSupports } from "@/lib/queries";
 import { loadLeadTimes } from "@/lib/lead-data";
 import { leadLabel, PERSONAL_MIN } from "@/lib/lead-time";
+import { announceLabel } from "@/lib/market";
+import { loadAnnounceLead } from "@/lib/market-data";
 import { plural } from "@/lib/text";
 import { fmtDate, nowLocal } from "@/lib/time";
 
 export default async function ContactPage({ params }: PageProps<"/contacts/[id]">) {
   const { id } = await params;
-  const [data, leads, supportList, supportFor, options] = await Promise.all([
+  const [data, leads, supportList, supportFor, options, announce] = await Promise.all([
     getContact(Number(id)),
     loadLeadTimes(),
     listSupports(Number(id)),
     listSupportedBy(Number(id)),
     getFormOptions(),
+    loadAnnounceLead(Number(id)),
   ]);
   if (!data) notFound();
   const lead = leads.leadFor(data.contact.id, "opener");
@@ -190,7 +193,7 @@ export default async function ContactPage({ params }: PageProps<"/contacts/[id]"
       {contact.role === "comedian" && (
         <Section
           title="Kiedy pisać"
-          footer="Liczone z rozmów z wynikiem: przy „zgodził się” — ile dni przed graniem napisałeś; „ktoś zajął miejsce” — że to było za późno. Z tego przypomnienia „napisz” i Najgorętsze okazje."
+          footer="Liczone z rozmów z wynikiem: przy „zgodził się” — ile dni przed graniem napisałeś; „ktoś zajął miejsce” — że to było za późno. Z tego przypomnienia „napisz” i Najgorętsze okazje. „Wrzuca terminy” — z bileterii: tyle przed występem pojawiają się jego daty."
         >
           <div className="px-4 py-3 text-[15px]">
             {lead.personal ? (
@@ -208,6 +211,12 @@ export default async function ContactPage({ params }: PageProps<"/contacts/[id]"
               </span>
             )}
           </div>
+          {announce && (
+            <div className="border-border/70 border-t px-4 py-3 text-[15px]">
+              Terminy wrzuca do bileterii <b className="font-semibold">{announceLabel(announce)}</b> przed występem
+              <span className="text-muted-foreground"> · z {plural(announce.samples, "terminu", "terminów", "terminów")}</span>
+            </div>
+          )}
         </Section>
       )}
 

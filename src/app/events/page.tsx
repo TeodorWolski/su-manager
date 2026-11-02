@@ -1,4 +1,4 @@
-import { ChevronDown, ExternalLink, MapPin, Navigation, Repeat, Search, X } from "lucide-react";
+import { ChevronDown, ExternalLink, MapPin, Navigation, Repeat, Search, Star, X } from "lucide-react";
 import Link from "next/link";
 import { PendingButton, Select } from "@/components/form";
 import {
@@ -756,6 +756,9 @@ export default async function EventsPage({ searchParams }: PageProps<"/events">)
       <SearchBox q="" />
       <RouteForm p={{ date: nowLocal().slice(0, 10) }} open={sp.route === "1"} />
       <NearForm date={nowLocal().slice(0, 10)} cities={[...new Set(everything.map((o) => o.event.cityName).filter((c): c is string => !!c))].sort((a, b) => a.localeCompare(b, "pl"))} />
+      <Link href="/events/stars" className="text-primary mb-3 flex items-center gap-1.5 px-1 text-[14px]">
+        <Star className="size-4" /> Kto sprzedaje sale — przed kim warto zagrać
+      </Link>
 
       <div className="bg-muted mb-3 grid grid-cols-4 gap-1 rounded-xl p-1">
         {(Object.keys(TABS) as TabKey[]).map((t) => (
