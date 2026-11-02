@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { existsSync } from "node:fs";
 import { test } from "node:test";
 import { fmtZl, missingFields, parseTicket } from "../src/lib/ticket-parse";
 
@@ -124,4 +125,15 @@ test("PDF kupiony w grudniu na styczeń → rok później", () => {
   const t = parseTicket(KOLEO_PDF.replace("Wystawiono: 02.11.2026", "Wystawiono: 20.12.2026").replaceAll("05.11", "03.01"));
   assert.equal(t.departsAt, "2027-01-03T07:16");
   assert.equal(t.arrivesAt, "2027-01-03T11:31");
+});
+
+// Prawdziwy bilet (dane osobowe, QR) — tylko lokalnie, nie w repo; w CI test się pomija.
+const PRIVATE_PDF = "tests/fixtures/private/koleo-bilet.pdf";
+test("prawdziwy PDF biletu KOLEO → tekst (bez bibliotek) → te same dane co ze strony", { skip: !existsSync(PRIVATE_PDF) && "brak prywatnego PDF-a" }, async () => {
+  const { readFileSync } = await import("node:fs");
+  const { inflateSync } = await import("node:zlib");
+  const { pdfText } = await import("../src/lib/pdf-text");
+  const text = await pdfText(new Uint8Array(readFileSync(PRIVATE_PDF)), async (d) => new Uint8Array(inflateSync(d)));
+  assert.match(text, /05\.11 07:16 Słupsk -> Warszawa Centralna 05\.11 11:31/);
+  assert.deepEqual(parseTicket(text), parseTicket(KOLEO, null));
 });

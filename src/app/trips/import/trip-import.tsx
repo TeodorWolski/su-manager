@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { saveTrip, tripImportContext } from "@/app/actions";
 import { FieldRow, Select, SubmitButton, TextArea, TextInput } from "@/components/form";
+import { pdfText } from "@/lib/pdf-text";
 import { fmtZl, missingFields, parseTicket, type ParsedTicket } from "@/lib/ticket-parse";
 
 /** Bilet czekający na zalogowanie (Safari bez sesji) — po powrocie z /login wraca z localStorage. */
@@ -29,6 +30,10 @@ function readPayload(): Payload | null {
   }
 }
 
+/** PDF w przeglądarce: rozpakowanie strumieni przez wbudowany DecompressionStream (bez bibliotek). */
+const inflate = async (d: Uint8Array) =>
+  new Uint8Array(await new Response(new Blob([d as BlobPart]).stream().pipeThrough(new DecompressionStream("deflate"))).arrayBuffer());
+
 const zl = (gr: number | null) => (gr == null ? "" : (gr / 100).toFixed(2).replace(".", ","));
 
 export function TripImport() {
@@ -36,6 +41,7 @@ export function TripImport() {
   const [ctx, setCtx] = useState<Context | null>(null);
   const [needsLogin, setNeedsLogin] = useState(false);
   const [pasted, setPasted] = useState("");
+  const [pdfError, setPdfError] = useState(false);
 
   function load(p: Payload) {
     const t = parseTicket(p.t, p.u);
@@ -53,9 +59,25 @@ export function TripImport() {
     if (p) load(p);
   }, []);
 
+  async function fromPdf(file: File | undefined) {
+    if (!file) return;
+    setPdfError(false);
+    try {
+      load({ u: null, t: await pdfText(new Uint8Array(await file.arrayBuffer()), inflate) });
+    } catch {
+      setPdfError(true);
+    }
+  }
+
   if (!ticket) {
     return (
       <div className="space-y-3">
+        <label className="bg-primary text-primary-foreground flex h-12 w-full cursor-pointer items-center justify-center rounded-xl text-[16px] font-semibold active:scale-[0.98]">
+          Wgraj PDF biletu
+          <input type="file" accept="application/pdf,.pdf" className="sr-only" onChange={(e) => fromPdf(e.target.files?.[0])} />
+        </label>
+        {pdfError && <p className="text-st-rej text-[14px]">Nie udało się odczytać tego PDF-a — wklej tekst niżej.</p>}
+        <div className="text-muted-foreground text-center text-[13px]">albo</div>
         <p className="text-muted-foreground text-[15px] leading-relaxed">
           Wklej tekst ze strony albo z PDF-a biletu (zaznacz wszystko → kopiuj) albo użyj „Udostępnij → Dodaj do SU Manager”.{" "}
           <Link href="/trips/setup" className="text-primary">
@@ -67,9 +89,9 @@ export function TripImport() {
           type="button"
           disabled={!pasted.trim()}
           onClick={() => load({ u: null, t: pasted })}
-          className="bg-primary text-primary-foreground h-11 w-full rounded-xl text-[16px] font-semibold disabled:opacity-40"
+          className="bg-secondary text-secondary-foreground h-11 w-full rounded-xl text-[16px] font-semibold disabled:opacity-40"
         >
-          Odczytaj bilet
+          Odczytaj wklejony tekst
         </button>
       </div>
     );

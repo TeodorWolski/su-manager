@@ -9,7 +9,8 @@ import { EVENTS_TAG, isOpenMic, MUTE_AFTER_OUTCOME_DAYS } from "@/lib/opportunit
 import { seriesKey } from "@/lib/recurring";
 import { syncRecurring } from "@/lib/recurring-sync";
 import { normalize } from "@/lib/text";
-import { parseZl, suggestGig } from "@/lib/trips";
+import { tripContext } from "@/lib/trip-ingest";
+import { parseZl } from "@/lib/trips";
 import { nowLocal } from "@/lib/time";
 import {
   BIT_STATUSES,
@@ -846,22 +847,7 @@ export async function saveMgmGoal(fd: FormData) {
  */
 export async function tripImportContext(trip: { fromStation: string; toStation: string; departsAt: string; arrivesAt: string | null; reference: string | null }) {
   await requireSession();
-  const day = (n: number) => new Date(Date.parse(trip.departsAt.slice(0, 10)) + n * 864e5).toISOString().slice(0, 10);
-  const candidates = await db
-    .select({
-      id: gigs.id,
-      title: gigs.title,
-      startsAt: gigs.startsAt,
-      cityName: sql<string | null>`coalesce((select c.name from cities c where c.id = ${gigs.cityId}),
-        (select c.name from venues v join cities c on c.id = v.city_id where v.id = ${gigs.venueId}))`,
-    })
-    .from(gigs)
-    .where(sql`${gigs.startsAt} >= ${day(-3)} and ${gigs.startsAt} < ${day(4)} and ${gigs.status} not in ('rejected', 'cancelled')`)
-    .orderBy(gigs.startsAt);
-  const [existing] = trip.reference
-    ? await db.select({ id: trips.id, gigId: trips.gigId }).from(trips).where(eq(trips.reference, trip.reference))
-    : [];
-  return { gigs: candidates, suggested: suggestGig(trip, candidates)?.id ?? null, existing: existing ?? null };
+  return tripContext(trip);
 }
 
 /** Zapis podróży z ekranu importu (albo ręcznie). Ten sam numer referencyjny = aktualizacja, nie duplikat. */

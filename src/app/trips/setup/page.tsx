@@ -5,7 +5,46 @@ import { CopyBox } from "./copy-box";
 /** Skrypt czytający stronę biletu — ten sam w skrócie iOS i w bookmarklecie. */
 const READ_PAGE = "JSON.stringify({u:location.href,t:(document.querySelector('main')||document.body).innerText.slice(0,8000)})";
 
-/** Jak dodawać bilety jednym tapem: skrót w „Udostępnij” (iPhone) i bookmarklet (komputer). */
+/** Skrypt Google Apps Script: maile od KOLEO z Gmaila → /api/ingest/ticket (co 10 min, raz na mail). */
+function gmailScript(app: string) {
+  return `// SU Manager — bilety KOLEO z Gmaila. Wklej na script.google.com, uzupełnij TOKEN, uruchom „setup”.
+const APP = '${app}';
+const TOKEN = 'WKLEJ_TU_CRON_SECRET';
+const QUERY = 'from:kasa.biletowa@koleo.pl -label:su-manager newer_than:14d';
+
+function checkTickets() {
+  const label = GmailApp.getUserLabelByName('su-manager') || GmailApp.createLabel('su-manager');
+  for (const thread of GmailApp.search(QUERY)) {
+    let ok = true;
+    for (const msg of thread.getMessages()) {
+      const pdfs = msg.getAttachments().filter((a) => a.getContentType() === 'application/pdf' || /\\.pdf$/i.test(a.getName()));
+      const bodies = pdfs.length
+        ? pdfs.map((a) => ({ pdf: Utilities.base64Encode(a.getBytes()) }))
+        : [{ text: msg.getPlainBody() }];
+      for (const body of bodies) {
+        const res = UrlFetchApp.fetch(APP + '/api/ingest/ticket', {
+          method: 'post',
+          contentType: 'application/json',
+          headers: { Authorization: 'Bearer ' + TOKEN },
+          payload: JSON.stringify(body),
+          muteHttpExceptions: true,
+        });
+        console.log(res.getResponseCode(), res.getContentText());
+        if (res.getResponseCode() === 401 || res.getResponseCode() >= 500) ok = false;
+      }
+    }
+    if (ok) thread.addLabel(label); // oznaczony = przetworzony, drugi raz go nie weźmie
+  }
+}
+
+function setup() {
+  ScriptApp.getProjectTriggers().forEach((t) => ScriptApp.deleteTrigger(t));
+  ScriptApp.newTrigger('checkTickets').timeBased().everyMinutes(10).create();
+  checkTickets();
+}`;
+}
+
+/** Jak dodawać bilety: automat z Gmaila, wgranie PDF-a, skróty „Udostępnij” (iPhone) i bookmarklet (komputer). */
 export default async function TripSetupPage() {
   const h = await headers();
   const origin = `${h.get("x-forwarded-proto") ?? "https"}://${h.get("host")}`;
@@ -15,10 +54,38 @@ export default async function TripSetupPage() {
 
   return (
     <>
-      <PageHeader title="Bilety jednym tapem" back={{ href: "/trips", label: "Podróże" }} />
+      <PageHeader title="Jak dodawać bilety" back={{ href: "/trips", label: "Podróże" }} />
 
       <Section
-        title="iPhone — „Udostępnij → Dodaj do SU Manager”"
+        title="Automatycznie z Gmaila (polecane)"
+        footer="Ustawiasz raz. Potem każdy bilet od kasa.biletowa@koleo.pl sam trafia do Podróży (podpięty do grania albo jako prywatna podróż) i dostajesz powiadomienie. Skrypt działa na Twoim koncie Google — nikt poza Tobą go nie widzi."
+      >
+        <div className={step}>
+          <b>1.</b>
+          <span>
+            Na komputerze wejdź na <b>script.google.com</b> → <b>Nowy projekt</b>, nazwij „SU Manager — bilety”.
+          </span>
+        </div>
+        <div className={`${step} flex-col`}>
+          <span>
+            <b>2.</b> Usuń przykładowy kod i wklej ten. W linii <b>TOKEN</b> wpisz swój <b>CRON_SECRET</b> (ten sam co w cron-job.org):
+          </span>
+          <CopyBox text={gmailScript(origin)} label="Kopiuj skrypt" />
+        </div>
+        <div className={step}>
+          <b>3.</b>
+          <span>
+            Zapisz, z listy funkcji wybierz <b>setup</b> → <b>Uruchom</b> i zgódź się na dostęp do Gmaila („Zaawansowane → Przejdź do projektu”, bo to Twój własny skrypt). Gotowe — sprawdza co 10 minut.
+          </span>
+        </div>
+      </Section>
+
+      <Section title="Wgraj PDF biletu" footer="Bez ustawiania czegokolwiek: Podróże → Dodaj → „Wgraj PDF biletu” (PDF z maila zapisz najpierw w Plikach).">
+        <div className="text-muted-foreground px-4 py-2.5 text-[14px]">Działa też dla biletów spoza Gmaila.</div>
+      </Section>
+
+      <Section
+        title="Dodatkowo: iPhone — „Udostępnij → Dodaj do SU Manager”"
         footer="Działa na stronie biletu w Safari (koleo.pl/ticket/…), nie w aplikacji KOLEO. Skrót niczego nie wysyła do KOLEO — czyta tylko otwartą stronę i otwiera SU Managera z gotowymi danymi do sprawdzenia."
       >
         <div className={step}>
@@ -60,7 +127,7 @@ export default async function TripSetupPage() {
       </Section>
 
       <Section
-        title="iPhone — PDF biletu (np. z maila od KOLEO)"
+        title="Dodatkowo: iPhone — „Udostępnij” na PDF-ie biletu"
         footer="Osobny skrót dla PDF-ów: w mailu albo w Plikach otwórz PDF biletu → Udostępnij → „Dodaj bilet PDF do SU Manager”. Odczyt jest ten sam co ze strony."
       >
         <div className={step}>

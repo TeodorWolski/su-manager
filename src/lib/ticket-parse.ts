@@ -67,13 +67,17 @@ export function parseTicket(raw: string, url: string | null = null): ParsedTicke
   const fare = flat.match(/Opłata za przejazd\s*:?.{0,60}?(\d+[.,]\d{2})\s*(?:zł|PLN)/i); // po drodze bywa „w tym PTU (8%)”
   const price = total ?? fare;
 
-  const trains = [...flat.matchAll(/Pociąg\s*:?\s*([A-ZŁŚŻ]{1,4}\s?\d{1,6}(?:\s(?!Wagon|Klasa|Miejsce)[A-ZŁŚŻ][\wąćęłńóśźż-]+)?)/g)].map((m) => m[1].trim());
-  const wagon = flat.match(/Wagon\s*:?\s*(\d+)/i)?.[1]; // strona: „Wagon: 4”, PDF: „Wagon 4”
-  const seatMatch = flat.match(/miejsc[ea] do (?:siedzenia|leżenia)\s*:?\s*(\d+)(?:\s+(OKNO|ŚRODEK|KORYTARZ))?/i);
-  const seat = [
-    wagon && `wagon ${wagon}`,
-    seatMatch && `miejsce ${seatMatch[1]}${seatMatch[2] ? ` (${seatMatch[2].toLowerCase()})` : ""}`,
-  ]
+  // PDF (nowy układ): tabelka „Pociąg Wagon 1 miejsce do siedzenia” / „EIP 8300 4 82” — etykiety w jednej
+  // linii, wartości w następnej. Strona: „Pociąg: EIP 8300”, „Wagon: 4”, „1 miejsce do siedzenia: 82 OKNO”.
+  const table = [...flat.matchAll(/Pociąg Wagon (?:\d+ )?miejsc[ea] do (?:siedzenia|leżenia) ([A-ZŁŚŻ]{1,4} ?\d{1,6}) (\d{1,3}) (\d{1,3})\b/gi)];
+  const trains = table.length
+    ? table.map((m) => m[1])
+    : [...flat.matchAll(/Pociąg\s*:?\s*([A-ZŁŚŻ]{1,4}\s?\d{1,6}(?:\s(?!Wagon|Klasa|Miejsce)[A-ZŁŚŻ][\wąćęłńóśźż-]+)?)/g)].map((m) => m[1].trim());
+  const wagon = table[0]?.[2] ?? flat.match(/Wagon\s*:?\s*(\d+)(?! miejsc)/i)?.[1]; // strona: „Wagon: 4”, PDF: „Wagon 4”
+  const seatMatch = flat.match(/miejsc[ea] do (?:siedzenia|leżenia)\s*:?\s*(\d+)/i);
+  const seatNo = table[0]?.[3] ?? seatMatch?.[1];
+  const side = seatNo ? flat.match(/\b(OKNO|ŚRODEK|KORYTARZ)\b/i)?.[1] : undefined;
+  const seat = [wagon && `wagon ${wagon}`, seatNo && `miejsce ${seatNo}${side ? ` (${side.toLowerCase()})` : ""}`]
     .filter(Boolean)
     .join(", ");
 
