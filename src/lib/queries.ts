@@ -20,6 +20,7 @@ import {
 } from "@/db";
 import { loadUpcomingEventsCached } from "./events-cache";
 import { gigTotals } from "./gig-totals";
+import { typeIssue } from "./gig-types";
 import { getFollowUps, getPlanning } from "./planning";
 import { DEFAULT_START_TIME, nowLocal } from "./time";
 import { normalize } from "./text";
@@ -594,4 +595,82 @@ export async function listCalendarTrips() {
     .leftJoin(gigs, eq(gigs.id, trips.gigId))
     .where(gte(trips.departsAt, since))
     .orderBy(asc(trips.departsAt));
+}
+
+/**
+ * Karta „Przed wyjściem na scenę” (Dziś): dzisiejsze potwierdzone granie bez logu, które się jeszcze nie
+ * skończyło, ostatni log z tej sceny (notatka, ile było minut), bity do setu i pociągi na to granie.
+ */
+export async function getStageCard() {
+  const now = nowLocal();
+  const today = now.slice(0, 10);
+  const todays = await gigListQuery()
+    .where(and(eq(gigs.status, "confirmed"), isNull(gigLogs.gigId), sql`substr(${gigs.startsAt}, 1, 10) = ${today}`))
+    .orderBy(asc(gigs.startsAt));
+  // Granie „trwa” do 3 h po starcie — potem i tak wchodzi bramka oceny.
+  const gig = todays.find((g) => (g.startsAt.length > 10 ? new Date(Date.parse(`${g.startsAt}Z`) + 3 * 36e5).toISOString().slice(0, 16) : `${today}T23:59`) >= now);
+  if (!gig) return null;
+  const [lastHere, bitStats, gigTrips] = await Promise.all([
+    gig.venueId
+      ? db
+          .select({
+            startsAt: gigs.startsAt,
+            rating: gigLogs.rating,
+            thoughts: gigLogs.thoughts,
+            minutesAvailable: gigLogs.minutesAvailable,
+            minutesPlayed: gigLogs.minutesPlayed,
+          })
+          .from(gigLogs)
+          .innerJoin(gigs, eq(gigs.id, gigLogs.gigId))
+          .where(and(eq(gigs.venueId, gig.venueId), ne(gigs.id, gig.id)))
+          .orderBy(desc(gigs.startsAt))
+          .limit(1)
+          .then((r) => r[0] ?? null)
+      : null,
+    listBits(),
+    listGigTrips(gig.id),
+  ]);
+  return { gig, lastHere, bits: bitStats, trips: gigTrips };
+}
+
+/**
+ * Grania do „zmień granie” przy biletach: dla każdej podróży te ±3 dni od odjazdu (bez odrzuconych
+ * i odwołanych). Jedno zapytanie na całą listę.
+ */
+export async function gigChoicesForTrips(tripList: { id: number; departsAt: string }[]) {
+  const choices = new Map<number, { value: number; label: string }[]>();
+  if (!tripList.length) return choices;
+  const shift = (iso: string, n: number) => new Date(Date.parse(iso.slice(0, 10)) + n * 864e5).toISOString().slice(0, 10);
+  const days = tripList.map((t) => t.departsAt.slice(0, 10)).sort();
+  const near = await db
+    .select({ id: gigs.id, title: gigs.title, startsAt: gigs.startsAt })
+    .from(gigs)
+    .where(
+      and(
+        gte(gigs.startsAt, shift(days[0], -3)),
+        lt(gigs.startsAt, shift(days[days.length - 1], 4)),
+        sql`${gigs.status} not in ('rejected', 'cancelled')`,
+      ),
+    )
+    .orderBy(asc(gigs.startsAt));
+  for (const t of tripList) {
+    const from = shift(t.departsAt, -3);
+    const to = shift(t.departsAt, 4);
+    choices.set(
+      t.id,
+      near
+        .filter((g) => g.startsAt >= from && g.startsAt < to)
+        .map((g) => ({ value: g.id, label: `${g.startsAt.slice(8, 10)}.${g.startsAt.slice(5, 7)} · ${g.title}` })),
+    );
+  }
+  return choices;
+}
+
+/** „Uzupełnij typ”: potwierdzone grania z brakującym albo podejrzanym typem (logika: src/lib/gig-types.ts). */
+export async function listTypeSuspects() {
+  const all = await gigListQuery().where(eq(gigs.status, "confirmed")).orderBy(desc(gigs.startsAt));
+  return all.flatMap((g) => {
+    const issue = typeIssue(g);
+    return issue ? [{ ...g, ...issue }] : [];
+  });
 }

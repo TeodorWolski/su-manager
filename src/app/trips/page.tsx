@@ -2,12 +2,13 @@ import Link from "next/link";
 import { Empty, PageHeader, Section } from "@/components/ios";
 import { TripRow } from "@/components/trip-row";
 import { fmtZl } from "@/lib/ticket-parse";
-import { listTrips } from "@/lib/queries";
+import { gigChoicesForTrips, listTrips } from "@/lib/queries";
 import { nowLocal } from "@/lib/time";
 
 /** Podróże: nadchodzące i minione, koszty dojazdów na grania w miesiącu. */
 export default async function TripsPage() {
   const all = await listTrips();
+  const choices = await gigChoicesForTrips(all);
   const now = nowLocal();
   const upcoming = all.filter((t) => (t.arrivesAt ?? t.departsAt) >= now).reverse();
   const past = all.filter((t) => (t.arrivesAt ?? t.departsAt) < now);
@@ -27,7 +28,7 @@ export default async function TripsPage() {
         }
       />
       <Section title="Nadchodzące" footer={<Link href="/trips/setup" className="text-primary">Jak dodawać bilety jednym tapem (iPhone i komputer)</Link>}>
-        {upcoming.length ? upcoming.map((t) => <TripRow key={t.id} trip={t} showGig />) : <Empty>Brak zaplanowanych podróży.</Empty>}
+        {upcoming.length ? upcoming.map((t) => <TripRow key={t.id} trip={t} showGig gigChoices={choices.get(t.id)} />) : <Empty>Brak zaplanowanych podróży.</Empty>}
       </Section>
       {byMonth.size > 0 && (
         <Section title="Dojazdy na grania" footer="Tylko podróże podpięte do grań — prywatne się nie liczą.">
@@ -39,7 +40,7 @@ export default async function TripsPage() {
           ))}
         </Section>
       )}
-      {past.length > 0 && <Section title="Minione">{past.map((t) => <TripRow key={t.id} trip={t} showGig />)}</Section>}
+      {past.length > 0 && <Section title="Minione">{past.map((t) => <TripRow key={t.id} trip={t} showGig gigChoices={choices.get(t.id)} />)}</Section>}
     </>
   );
 }

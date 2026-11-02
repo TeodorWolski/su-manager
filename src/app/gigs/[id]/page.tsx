@@ -18,7 +18,7 @@ import {
 } from "@/lib/labels";
 import type { GigOutcome } from "@/db/schema";
 import { pitchMessage, supportMessage } from "@/lib/messages";
-import { getGig, listGigTrips, type GigStatus } from "@/lib/queries";
+import { getGig, gigChoicesForTrips, listGigTrips, type GigStatus } from "@/lib/queries";
 import { fmtZl } from "@/lib/ticket-parse";
 import { gigBalance } from "@/lib/trips";
 import { effectiveStart, fmtDate, fmtDateTime, nowLocal } from "@/lib/time";
@@ -53,6 +53,7 @@ export default async function GigPage({ params }: PageProps<"/gigs/[id]">) {
   const lastMessage = data.messages.at(-1);
   const activeSupports = data.supports.filter((x) => x.active);
   const balance = gigBalance(data.gig.feeGr, gigTrips.map((t) => t.priceGr));
+  const tripChoices = await gigChoicesForTrips(gigTrips);
   // Ostatnio pisałem przez supportu → blok „Napisz do supportu” od razu otwarty.
   const viaSupport = !!lastMessage?.contactId && lastMessage.contactId !== data.gig.headlinerId;
   const since = lastActivity({ statusChangedAt: gig.statusChangedAt, createdAt: gig.createdAt, lastMessageAt: lastMessage?.date ?? null });
@@ -221,7 +222,7 @@ export default async function GigPage({ params }: PageProps<"/gigs/[id]">) {
         footer="Bilety dodasz z „Udostępnij → Dodaj do SU Manager” na stronie biletu (Podróże → Jak dodawać). Bilans = honorarium − bilety."
       >
         {gigTrips.map((t) => (
-          <TripRow key={t.id} trip={t} />
+          <TripRow key={t.id} trip={t} gigChoices={tripChoices.get(t.id)} />
         ))}
         <form action={setGigFee.bind(null, data.gig.id)} className="border-border/70 flex items-center gap-2 border-b py-2 pr-5 pl-4 has-[[data-pending]]:opacity-50">
           <label className="flex flex-1 items-center gap-3">

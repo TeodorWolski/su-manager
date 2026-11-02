@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { deleteTrip } from "@/app/actions";
+import { deleteTrip, setTripGig } from "@/app/actions";
 import { fmtZl } from "@/lib/ticket-parse";
-import { PendingButton } from "./form";
+import { PendingButton, Select } from "./form";
 
 type Trip = {
   id: number;
@@ -21,7 +21,16 @@ const hm = (iso: string | null) => (iso && iso.length > 10 ? iso.slice(11, 16) :
 const dm = (iso: string) => `${iso.slice(8, 10)}.${iso.slice(5, 7)}`;
 
 /** 🚆 Słupsk → Warszawa Centralna · 05.11 07:16–11:31 · EIP 8300 · wagon 4, miejsce 82 · 88,41 zł */
-export function TripRow({ trip: t, showGig }: { trip: Trip; showGig?: boolean }) {
+export function TripRow({
+  trip: t,
+  showGig,
+  gigChoices,
+}: {
+  trip: Trip;
+  showGig?: boolean;
+  /** Grania ±3 dni do „zmień granie”; brak = bez przełącznika. */
+  gigChoices?: { value: number; label: string }[];
+}) {
   return (
     <div className="border-border/70 flex items-start gap-3 px-4 py-2.5 [&:not(:last-child)]:border-b has-[[data-pending]]:opacity-50">
       <span className="pt-0.5 text-[16px]" aria-hidden>
@@ -44,6 +53,21 @@ export function TripRow({ trip: t, showGig }: { trip: Trip; showGig?: boolean })
               <span className="text-muted-foreground">prywatna</span>
             )}
           </div>
+        )}
+        {gigChoices && (
+          <details className="group/gig mt-1">
+            <summary className="text-primary w-fit cursor-pointer list-none text-[12.5px] [&::-webkit-details-marker]:hidden">zmień granie</summary>
+            <form action={setTripGig.bind(null, t.id)} className="mt-1.5 flex items-center gap-2">
+              <Select
+                name="gigId"
+                placeholder="Prywatna podróż"
+                defaultValue={t.gigId ?? ""}
+                options={gigChoices}
+                className="bg-muted min-w-0 flex-1 rounded-lg px-2 py-1.5 text-[14px]"
+              />
+              <PendingButton className="bg-primary text-primary-foreground h-8 shrink-0 rounded-lg px-3 text-[13px] font-semibold">Zapisz</PendingButton>
+            </form>
+          </details>
         )}
       </div>
       <div className="flex shrink-0 flex-col items-end gap-1">

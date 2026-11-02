@@ -8,18 +8,20 @@ import { FOLLOW_UP_BEFORE_DAYS } from "@/lib/follow-up";
 import { CHANNEL_SHORT } from "@/lib/labels";
 import { HotOpportunities } from "@/components/hot";
 import { RhythmCard } from "@/components/rhythm";
+import { StageCard } from "@/components/stage-card";
 import { WritingCard } from "@/components/writing";
 import { getWriting } from "@/lib/planning";
-import { getDashboard, getRhythm } from "@/lib/queries";
+import { getDashboard, getRhythm, getStageCard } from "@/lib/queries";
 import { getGoals } from "@/lib/goals";
 import { fmtDate, fmtDateLong, nowLocal } from "@/lib/time";
 
 export default async function Home() {
-  const [{ upcoming, pipeline, followUps, month, recent }, goals, rhythm, writing] = await Promise.all([
+  const [{ upcoming, pipeline, followUps, month, recent }, goals, rhythm, writing, stage] = await Promise.all([
     getDashboard(),
     getGoals(),
     getRhythm(),
     getWriting(),
+    getStageCard(),
   ]);
   const today = nowLocal();
 
@@ -36,6 +38,8 @@ export default async function Home() {
           </Button>
         }
       />
+
+      {stage && <StageCard data={stage} />}
 
       <div className="mb-7 space-y-2.5">
         <GigGoalCard goals={goals} />

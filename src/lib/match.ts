@@ -57,3 +57,19 @@ export function matchContacts<T extends Matchable>(text: string, contacts: T[]):
     variants(c).some((variant) => variant.every((w) => have.some((h) => tokenMatches(w, h)))),
   );
 }
+
+/**
+ * Zapas, gdy imię jest mocno odmienione („Tomkiem” ↔ „Tomek”): samo nazwisko (ostatnie słowo pełnego zapisu),
+ * ale tylko jeśli wskazuje jedną osobę (przy kilku — rozstrzyga początek imienia); inaczej nic, lepiej nie zgadywać.
+ */
+export function matchBySurname<T extends Matchable>(text: string, contacts: T[]): T | null {
+  const have = tokens(text);
+  const hits = contacts.filter((c) => {
+    const full = tokens(c.name);
+    return full.length > 1 && have.some((h) => tokenMatches(full[full.length - 1], h));
+  });
+  if (hits.length <= 1) return hits[0] ?? null;
+  // Kilka osób o tym nazwisku (Kołecki / Kołecka) — rozstrzyga początek imienia („Tom…” w „Tomkiem”).
+  const byName = hits.filter((c) => have.some((h) => h.startsWith(tokens(c.name)[0].slice(0, 3))));
+  return byName.length === 1 ? byName[0] : null;
+}

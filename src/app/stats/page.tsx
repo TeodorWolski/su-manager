@@ -3,7 +3,7 @@ import { Empty, PageHeader, Section, Stat } from "@/components/ios";
 import type { GigContext, GigOutcome } from "@/db/schema";
 import { GIG_CONTEXT_LABEL, GIG_OUTCOME_LABEL } from "@/lib/labels";
 import { GigTotalsCard } from "@/components/gig-totals";
-import { getGigTotals, getStats } from "@/lib/queries";
+import { getGigTotals, getStats, listTypeSuspects } from "@/lib/queries";
 import { plural } from "@/lib/text";
 import { monthName } from "@/components/goals";
 
@@ -35,7 +35,7 @@ function BarRow({ label, share, value, sub, href }: { label: React.ReactNode; sh
 }
 
 export default async function StatsPage() {
-  const [s, totals] = await Promise.all([getStats(), getGigTotals()]);
+  const [s, totals, suspects] = await Promise.all([getStats(), getGigTotals(), listTypeSuspects()]);
   const decided = s.outcomes.reduce((sum, o) => sum + Number(o.n), 0);
   const count = (o: GigOutcome) => Number(s.outcomes.find((x) => x.outcome === o)?.n ?? 0);
   const maxOutcome = Math.max(1, ...s.outcomes.map((o) => Number(o.n)));
@@ -45,6 +45,14 @@ export default async function StatsPage() {
     <>
       <PageHeader title="Statystyki" back={{ href: "/more", label: "Więcej" }} />
 
+      {suspects.length > 0 && (
+        <Link href="/gigs/types" className="bg-st-wai/15 mb-2.5 flex items-center justify-between rounded-xl px-3.5 py-2.5 text-[14px]">
+          <span>
+            {plural(suspects.length, "granie ma", "grania mają", "grań ma")} brakujący albo podejrzany typ
+          </span>
+          <span className="text-primary font-semibold">Uzupełnij →</span>
+        </Link>
+      )}
       <GigTotalsCard t={totals} />
 
       <Section title="Pisanie do komików" footer="Wyniki zapisujesz na karcie grania („Jak się skończyło?”).">

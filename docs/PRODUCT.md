@@ -46,6 +46,10 @@ Ocena grania **nie jest** oceną bitu, bo zależy od publiki, line-upu itd. Bit 
 ## Funkcje (ekrany)
 
 ### Dziś (`/`)
+- **Przed wyjściem na scenę** (`components/stage-card.tsx`, dane `getStageCard`, logika `src/lib/set-plan.ts`): na górze Dziś w dniu potwierdzonego grania (bez logu, do 3 h po starcie):
+  - ile minut — tyle, ile było dostępne ostatnio na tej scenie, inaczej typowo wg typu (`SET_MINUTES_BY_CONTEXT`: open mic 5, przed kimś 10, support 15, headline 30),
+  - propozycja setu: pewniaki (Sprawdzone, potem w testach z bilansem 👍 ≥ 👎) — najmocniejszy na otwarcie, drugi na zamknięcie, w środku jeden do testu (w testach, najmniej grany; bit z przewagą 👎 po 2+ graniach odpada — czeka na redakcję); bit bez długości = ~2 min; tylko podpowiedź,
+  - notatka i ocena z poprzedniego razu na tej scenie, pociągi na to granie (wagon, miejsce).
 - **Cel miesiąca:** liczba grań, domyślnie 10 („super target”), tempo i seria miesięcy. Obok kafelki: MGM (sprawdzony materiał napisany w miesiącu) i średnia ocena w miesiącu.
 - **Rytm** (`src/lib/rhythm.ts`, `components/rhythm.tsx`):
   - cel to 2–3 grania tygodniowo, równomiernie,
@@ -141,6 +145,7 @@ Ocena grania **nie jest** oceną bitu, bo zależy od publiki, line-upu itd. Bit 
 - **Dopasowanie do grania** (`suggestGig`): granie tego dnia albo ±1 dzień w mieście docelowym (dojazd) albo startowym (powrót), z pominięciem miasta domowego (`HOME_CITY`, Warszawa); nic nie pasuje → **prywatna podróż** (tylko kalendarz, nie liczy się do kosztów grań). Tam i z powrotem to dwa bilety, oba lądują przy tym samym graniu.
 - **Karta grania → „Dojazd i pieniądze”:** bilety, **honorarium** (`gigs.feeGr`, osobny formularz `setGigFee`), bilans = honorarium − bilety (`gigBalance`). Kwoty w groszach.
 - **Kalendarz:** pociągi w feedzie `.ics` od **10 min przed odjazdem** (`TRAIN_CALENDAR_LEAD_MIN`, 17:10 → 17:00) do przyjazdu, prawdziwa godzina w opisie; w mini kalendarzu 🚆 przy dniu i lista pod dniem (`/api/month` zwraca `{ gigs, trips }`).
+- **„Zmień granie” przy bilecie** (lista podróży i karta grania): grania ±3 dni albo „Prywatna podróż” (`setTripGig`, `gigChoicesForTrips`) — gdy automat z Gmaila podpiął źle.
 - **`/trips`:** nadchodzące i minione, „Dojazdy na grania” — suma biletów podpiętych do grań wg miesiąca.
 
 ### MGM — material generated per month (`src/lib/mgm.ts`, dane `getMgm` w `planning.ts`)
@@ -176,7 +181,7 @@ Pisze się poza apką (Notion / Docs) — apka liczy regularność, wiąże prac
   - statusy: `tested`, `testing`, `editing` („do redakcji”), `vomit`, `rejected` (odrzucony: nie liczy się do celu i nie ma go w logu),
   - sekcja „Do pracy”: do redakcji oraz w testach i niegrane od 21+ dni,
   - karta bitu: baner „może już Sprawdzony?”, gdy bit jest gotowy do zaliczenia (patrz MGM).
-- **Statystyki** (`/stats`): na górze licznik występów od początku (`src/lib/gig-totals.ts`, `getGigTotals`, karta `components/gig-totals.tsx`) — zagrane = potwierdzone i już po starcie; łącznie, w tym roku, podział na typ w kolorach mini kalendarza (open mic / przed kimś / support / headline / inne + ile bez typu), liczba miast, scen i komików, przed którymi grałem; liczba występów też przy „Statystyki” w Więcej. Wszystko na karcie jest klikalne (`/stats/played`): typ → lista występów po miesiącach (`?k=`), miasta / sceny / komicy → lista z liczbą i „ostatnio” (`?by=`, `playedGroups`), a z niej występy w mieście, na scenie albo przed komikiem (`?city=` / `?venue=` / `?headliner=`, z linkiem do sceny / kontaktu). Niżej skuteczność pisania (wyniki rozmów, % odpowiedzi wg kanału) i moje oceny wg kontekstu, miesiąca i sceny.
+- **Statystyki** (`/stats`): na górze licznik występów od początku (`src/lib/gig-totals.ts`, `getGigTotals`, karta `components/gig-totals.tsx`) — zagrane = potwierdzone i już po starcie; łącznie, w tym roku, podział na typ w kolorach mini kalendarza (open mic / przed kimś / support / headline / inne + ile bez typu), liczba miast, scen i komików, przed którymi grałem; liczba występów też przy „Statystyki” w Więcej. Wszystko na karcie jest klikalne (`/stats/played`): typ → lista występów po miesiącach (`?k=`), miasta / sceny / komicy → lista z liczbą i „ostatnio” (`?by=`, `playedGroups`), a z niej występy w mieście, na scenie albo przed komikiem (`?city=` / `?venue=` / `?headliner=`, z linkiem do sceny / kontaktu). Nad licznikiem, gdy jest co poprawiać: **„Uzupełnij typ”** (`/gigs/types`, `src/lib/gig-types.ts`) — potwierdzone grania bez typu albo oznaczone jako open mic, choć w tytule jest „przed X” lub mają headlinera (w słowniku to „przed kimś”); jeden tap ustawia typ (`setGigContext`), przy „przed kimś” / „support” bez headlinera apka szuka go w CRM po nazwisku z tytułu (`matchContacts`, a przy mocno odmienionym imieniu — samo nazwisko, `matchBySurname`, tylko jednoznacznie; nowego kontaktu nie zakłada). Niżej skuteczność pisania (wyniki rozmów, % odpowiedzi wg kanału) i moje oceny wg kontekstu, miesiąca i sceny.
 - **Cele** (`/goals`): grania na miesiąc i MGM (minuty nowego sprawdzonego materiału na miesiąc).
 - **Myśli po graniach:** przeszukiwalne notatki z logów.
 - **Sceny:** werdykt, ocena miejsca, czas dojazdu.

@@ -4,11 +4,12 @@ import { desc, eq, sql } from "drizzle-orm";
 import { refresh, updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireSession } from "@/lib/auth";
-import { matchContacts } from "@/lib/match";
+import { matchBySurname, matchContacts } from "@/lib/match";
 import { EVENTS_TAG, isOpenMic, MUTE_AFTER_OUTCOME_DAYS } from "@/lib/opportunities";
 import { seriesKey } from "@/lib/recurring";
 import { syncRecurring } from "@/lib/recurring-sync";
 import { normalize } from "@/lib/text";
+import { headlinerFromTitle } from "@/lib/gig-types";
 import { tripContext } from "@/lib/trip-ingest";
 import { parseZl } from "@/lib/trips";
 import { nowLocal } from "@/lib/time";
@@ -875,9 +876,10 @@ export async function saveTrip(fd: FormData) {
   done(values.gigId ? `/gigs/${values.gigId}` : `/trips?saved=${row.id}`);
 }
 
-export async function setTripGig(id: number, gigId: number | null) {
+/** „Zmień granie” przy bilecie (automat z Gmaila podpiął źle albo to jednak prywatna podróż). */
+export async function setTripGig(id: number, fd: FormData) {
   await requireSession();
-  await db.update(trips).set({ gigId }).where(eq(trips.id, id));
+  await db.update(trips).set({ gigId: int(fd, "gigId") }).where(eq(trips.id, id));
   refresh();
 }
 
@@ -891,5 +893,23 @@ export async function deleteTrip(id: number) {
 export async function setGigFee(gigId: number, fd: FormData) {
   await requireSession();
   await db.update(gigs).set({ feeGr: parseZl(str(fd, "fee")) }).where(eq(gigs.id, gigId));
+  refresh();
+}
+
+/**
+ * „Uzupełnij typ” jednym tapem. Przy „przed kimś” / „support” bez headlinera próbuje go znaleźć w CRM
+ * po nazwisku z tytułu („Open mic przed Tomkiem Kołeckim”) — tylko istniejący kontakt, nowego nie zakłada.
+ */
+export async function setGigContext(id: number, context: (typeof GIG_CONTEXTS)[number]) {
+  await requireSession();
+  const [gig] = await db.select({ title: gigs.title, headlinerId: gigs.headlinerId }).from(gigs).where(eq(gigs.id, id));
+  if (!gig) return;
+  let headlinerId = gig.headlinerId;
+  const name = (context === "opener" || context === "support") && !headlinerId ? headlinerFromTitle(gig.title) : null;
+  if (name) {
+    const people = await db.select({ id: contacts.id, name: contacts.name, aliases: contacts.aliases }).from(contacts);
+    headlinerId = matchContacts(name, people)[0]?.id ?? matchBySurname(name, people)?.id ?? null;
+  }
+  await db.update(gigs).set({ context, headlinerId }).where(eq(gigs.id, id));
   refresh();
 }
