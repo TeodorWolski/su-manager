@@ -12,7 +12,7 @@ W liczbach: 2 100+ wydarzeń zebranych z bileterii w pierwszy miesiąc, 18 migra
 
 ## Co działa beze mnie
 
-- Scraper trzech bileterii o 10:30 z kontrolą zdrowia przebiegu, która łapie zmianę strony
+- Scraper trzech bileterii codziennie (10:30 z zewnętrznego crona, harmonogram GitHuba jako zapas) z kontrolą zdrowia przebiegu, która łapie zmianę strony
   serwisu — czego testy na zapisanych plikach z definicji nie zobaczą
 - Poranny mail i pushe: do kogo ponowić, najgorętsze okazje, nowe terminy komików z CRM
 - Niedzielne podsumowanie tygodnia
@@ -99,20 +99,22 @@ Zmiana schematu: edytuj `src/db/schema.ts`, potem `pnpm db:generate && pnpm db:m
 | `DATABASE_URL` | `libsql://…turso.io` na produkcji; domyślnie `file:local.db` |
 | `DATABASE_AUTH_TOKEN` | token Turso |
 | `APP_PASSWORD` | hasło logowania (ekran `/login`; Face ID dodasz po zalogowaniu). Bez niego — lokalnie — apka jest otwarta |
+| `CRON_SECRET` | token dla `/api/notify/*` i `/api/ingest/ticket` (cron-job.org, skrypt Gmaila) |
+| `CALENDAR_TOKEN` | tajny token w adresie feedu `/calendar/<token>.ics`; bez niego kalendarz jest wyłączony |
 | `SESSION_SECRET` | opcjonalnie: klucz podpisu sesji (domyślnie wyprowadzany z `APP_PASSWORD`) |
 
 ### Jak to działa
 
-- **Bramka oceny** (`src/components/review-gate.tsx`): 90 min po starcie potwierdzonego grania bez logu (a gdy granie nie ma godziny — o 21:00 tego dnia) cała apka zostaje zasłonięta formularzem. Formularz znika po zapisaniu logu albo po kliknięciu „nie zagrałem”.
+- **Bramka oceny** (`src/components/review-gate.tsx`): 90 min po starcie potwierdzonego grania bez logu, ale nie przed 20:00 (a gdy granie nie ma godziny — o 21:00 tego dnia), cała apka zostaje zasłonięta formularzem. Formularz znika po zapisaniu logu albo po kliknięciu „nie zagrałem”.
 - Daty grań są trzymane jako lokalny czas Warszawy (`2026-10-14T20:00`); `nowLocal()` w `src/lib/time.ts` liczy „teraz” w tej samej strefie, niezależnie od serwera.
 
 ### Scraper okazji
 
-- `pnpm scrape` — zbiera wydarzenia z bileterii, zapisuje nowe, wysyła mail z nowymi okazjami (Resend). Bez `RESEND_API_KEY` mail jest tylko logowany.
+- `pnpm scrape` — zbiera wydarzenia z bileterii i zapisuje nowe. Poranny mail wysyła tylko zapasowo (główny idzie z Vercela, patrz niżej); bez `RESEND_API_KEY` mail jest pomijany.
 - Parsery: `src/scraper/sources/*.ts`, jeden plik na serwis. Gdy strona zmieni HTML — poprawiasz tylko ten plik. Nowy serwis = nowy plik + wpis w `sources/index.ts`.
 - Współrzędne miejscowości do „Jestem w…” w Okazjach: `src/data/places-pl.json` z GeoNames (CC BY 4.0). Odświeżenie: pobierz `https://download.geonames.org/export/dump/PL.zip`, rozpakuj i uruchom `pnpm tsx scripts/build-places.ts PL.txt`.
 - Filtr i dopasowanie do CRM: `src/lib/opportunities.ts`, `src/lib/match.ts`.
-- Cron: `.github/workflows/scrape.yml` (codziennie o 10:30 czasu polskiego, niezależnie od czasu letniego/zimowego + ręcznie z zakładki Actions). Podsumowanie tygodnia: `.github/workflows/weekly.yml` (niedziela 19:00, `pnpm weekly`, te same sekrety). Sekrety repo: `DATABASE_URL`, `DATABASE_AUTH_TOKEN`, `RESEND_API_KEY`, `REPORT_EMAIL`. Padnięty parser = czerwony build, GitHub wysyła o tym mail.
+- Cron: `.github/workflows/scrape.yml` — uruchamiany o 10:30 przez zewnętrzny cron (niżej), własny harmonogram GitHuba o 12:00 czasu polskiego tylko jako zapas (niezależnie od czasu letniego/zimowego); ręcznie z zakładki Actions. Podsumowanie tygodnia: `.github/workflows/weekly.yml` (niedziela 19:00, `pnpm weekly`, te same sekrety). Sekrety repo: `DATABASE_URL`, `DATABASE_AUTH_TOKEN`, `RESEND_API_KEY`, `REPORT_EMAIL`. Padnięty parser = czerwony build, GitHub wysyła o tym mail.
 
 ### Zewnętrzny cron (cron-job.org) i powiadomienia
 

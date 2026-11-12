@@ -15,18 +15,22 @@ w Next 16.
 4. Zaktualizuj `docs/PRODUCT.md`, jeśli zmieniło się zachowanie funkcji.
 
 Hook w `.claude/settings.json` puszcza ESLint (`--max-warnings 0`) na każdym edytowanym pliku
-`.ts/.tsx` — ostrzeżenie też trzeba poprawić, nie wyciszać.
+`.ts/.tsx/.mts` — ostrzeżenie też trzeba poprawić, nie wyciszać.
 
 ## Granice architektury
 
-- **Czysta logika** (scoring, rytm, parsery, dopasowania) w `src/lib/*.ts` bez importu bazy —
-  żeby testować ją bez bazy. Odczyty z bazy w `src/lib/queries.ts` (`server-only`), osobne
-  moduły `*-data.ts`, gdy logikę dzielą skrypty i powiadomienia.
-- **Mutacje = server actions** w `src/app/actions.ts`. Każda zaczyna się od `requireSession()`;
-  proxy to nie jest zabezpieczenie. Wyjątki bez sesji (cron, ingest biletów) sprawdzają
-  `CRON_SECRET` porównaniem stałoczasowym.
+- **Czysta logika** (scoring, rytm, parsery, dopasowania — np. `market.ts`, `route.ts`,
+  `ticket-parse.ts`) w osobnych modułach `src/lib/*.ts` bez importu bazy, żeby testować ją bez
+  bazy. Dostęp do bazy: `src/lib/queries.ts` (`server-only`) dla stron; bez `server-only`
+  moduły, których używają też skrypty, powiadomienia i API (`planning.ts`, `notify.ts`,
+  `opportunities.ts`, `*-data.ts`, `morning-mail.ts`, `trip-ingest.ts`).
+- **Mutacje = server actions** (`src/app/actions.ts`, `src/app/settings/security/actions.ts`).
+  Każda zaczyna się od `requireSession()`; proxy to nie jest zabezpieczenie. Jedyny wyjątek
+  to logowanie (`src/app/login/actions.ts`). Trasy bez sesji (cron, ingest biletów, feed
+  kalendarza) sprawdzają token porównaniem stałoczasowym.
 - **Daty grań** to lokalny czas Warszawy jako tekst (`"2026-10-14T20:00"`), „teraz” z `nowLocal()`.
-  Nie mieszaj z `new Date()` w strefie serwera; UTC tylko dla `createdAt`.
+  Nie mieszaj z `new Date()` w strefie serwera; UTC tylko dla znaczników technicznych
+  (`createdAt`, `firstSeenAt`, znaczniki w `app_state`).
 - **Kwoty w groszach** (`integer`), nigdy float.
 - **Nowa zależność npm** — tylko po pytaniu. Wolimy kilkadziesiąt linii własnego kodu
   (czytnik PDF, parser biletów) niż bibliotekę do jednego zastosowania.
@@ -37,8 +41,8 @@ Hook w `.claude/settings.json` puszcza ESLint (`--max-warnings 0`) na każdym ed
 - Nowa czysta logika = test w `tests/*.test.ts` (`node:test`, bez frameworka).
 - Nowy parser = przycięta prawdziwa strona w `tests/fixtures/` + oczekiwane wartości.
 - Coś, co dotyka bazy (powiadomienia, mail) = test `*.test.mts` na tymczasowej bazie z migracjami.
-- Dane osobowe (prawdziwe bilety, kopie bazy) nigdy w repo: `tests/fixtures/private/` jest lokalne,
-  test bez pliku się pomija.
+- Dane osobowe (prawdziwe bilety, kopie bazy) nigdy w repo: `tests/fixtures/private/` trzymamy
+  tylko lokalnie, a test bez tego pliku się pomija (w CI też).
 - Błąd znaleziony ręcznie = najpierw test, który go łapie.
 
 ## Styl kodu

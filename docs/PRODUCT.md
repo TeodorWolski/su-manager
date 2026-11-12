@@ -19,7 +19,7 @@ Używana głównie **z telefonu** (PWA, styl iOS). Produkcyjna baza to źródło
 - **Jeden tap.** Najczęstsze akcje (status, ocena, „Wysłałem przez IG”) mają być przyciskiem, nie formularzem.
 - **UI i teksty po polsku**, ton luźny („Siemanko”, „Zabiłem się / Rozwaliłem”). Komentarze w kodzie też po polsku.
 - **Pojedynczy użytkownik.** Bez kont, ról i multi-tenancy. Dostęp: logowanie hasłem (`APP_PASSWORD`) albo Face ID (passkey), sesja w ciasteczku na rok — szczegóły w „Logowanie i bezpieczeństwo”.
-- **Tanio i prosto.** Vercel Hobby + Turso. Bez kolejek, bez zewnętrznych serwisów poza scraperem i mailem (Resend).
+- **Tanio i prosto.** Vercel Hobby + Turso. Bez kolejek; z zewnętrznych usług tylko mail (Resend), darmowy cron-job.org (godziny) i skrypt Google Apps Script na moim koncie (bilety z Gmaila).
 - **Rozróżnienia domenowe są ważne.** Patrz słownik niżej i nie upraszczaj ich.
 
 ## Słownik domeny
@@ -83,7 +83,7 @@ Ocena grania **nie jest** oceną bitu, bo zależy od publiki, line-upu itd. Bit 
     
     Relację nadpisuje tylko „miękką” (bez historii wspólnych grań). Powrót do statusu z pipeline'u kasuje wynik.
 - **„Napisz do supportu”** (karta grania przed headlinerem, pod zwykłą wiadomością): wybór supportu z bazy albo „＋ Wpisz inne…”, gotowy tekst (`supportMessage`), „Wysłałem” zapisuje wiadomość z supportem jako adresatem (`interactions.contactId`), a granie dalej jest przed headlinerem; para trafia do bazy jako aktualna (`logSupportMessage` → `touchSupport`). Na liście wiadomości „do supportu: X”. „Zghostował”, gdy ostatnio pisałem przez supportu, nie wycisza headlinera ani nie zmienia mu relacji (milczał support).
-- **Bramka oceny** (`components/review-gate.tsx`): 90 min po starcie potwierdzonego grania, ale nie przed 20:00, cała apka jest zasłonięta formularzem logu. Ucieczka: „nie zagrałem” (status `cancelled`). Grania importowane wstecz mają `skipReview`.
+- **Bramka oceny** (`components/review-gate.tsx`): 90 min po starcie potwierdzonego grania, ale nie przed 20:00 (granie bez godziny — o 21:00), cała apka jest zasłonięta formularzem logu. Ucieczka: „nie zagrałem” (status `cancelled`). Grania importowane wstecz mają `skipReview`.
 - **Log bez zasięgu** (piwnica klubu; `src/lib/offline-log.ts`, `components/offline-sync.tsx`, `public/offline.html`):
   - formularz logu przy braku sieci odkłada log w telefonie (localStorage `su-log-queue`, jeden wpis na granie) zamiast się wysypać,
   - gdy apka w ogóle się nie otwiera, service worker pokazuje `offline.html` — czysty HTML/JS (bez Next), log z oceną, myślami, miejscem, liczbami i bitami z reakcjami; grania (od wczoraj do jutra, potwierdzone, bez logu) i bity apka odkłada przy każdym otwarciu (`getOfflineLogData`),
@@ -101,7 +101,7 @@ Ocena grania **nie jest** oceną bitu, bo zależy od publiki, line-upu itd. Bit 
 - **Poranny mail** (10:35 z Vercela razem z porannymi pushami — `/api/notify/morning`, `src/lib/morning-mail.ts`; scraper na GitHubie wysyła go tylko zapasowo; treść `src/scraper/email.ts`; „nowe terminy” = dodane od poprzedniego maila, `app_state` „morning-mail-since”): „Do ponowienia”, „Najgorętsze okazje” z gotowym tekstem i nowe terminy z bileterii, do tego linijki o pisaniu (seria puent, tydzień, kolejka) i MGM (sprawdzone względem celu, rozpiska, bity gotowe do zaliczenia). Wysyłany, gdy którakolwiek sekcja nie jest pusta.
 - **Źródła:** kupbilecik, evently, Biletyna (`src/scraper/sources/*`). Biletyna: programy z publicznej sitemapy (`/sitemap/sitemap-events.xml`, robots.txt zabrania `/ajax/`), terminy ze schema.org na stronie artysty/programu (do 30 terminów; gdy strona jest pełna, a 30. termin wypada przed horyzontem — dociąga strony miast). „Ostatnie bilety” z `remainingAttendeeCapacity` ≤ 10 (to pula Biletyny, bywa mała przy normalnej sprzedaży).
 - **Duplikaty między serwisami** (`src/lib/dedupe.ts`, `sameShow`): ten sam dzień i miasto, start ±60 min, wspólne nazwisko (słowo spoza ogólnych typu stand-up/festiwal/open mic) albo jeden tytuł zaczyna drugi. Wygrywa serwis wcześniej na liście `SOURCES`; duplikat nie jest zapisywany.
-- **Scraper** (`src/scraper/sources/*`, zewnętrzny cron o 10:30 czasu polskiego, razem z mailem; GitHub o 12:00 jako zapas) zbiera wydarzenia. Klasyfikacja jest w `src/lib/opportunities.ts`.
+- **Scraper** (`src/scraper/sources/*`, zewnętrzny cron o 10:30 czasu polskiego; GitHub o 12:00 jako zapas; poranny mail idzie osobno z Vercela o 10:35) zbiera wydarzenia. Klasyfikacja jest w `src/lib/opportunities.ts`.
 - **Zakładki:** Znajomi (komicy z CRM), W zasięgu (≤3 h dojazdu albo nocleg), Open miki, Uzupełnij (miasta bez czasu dojazdu).
 - **Poranne godziny z kupbilecik:** godzina przed 12:00 to zwykle pomyłka organizatora (06:00 zamiast 18:00). Parser bierze wtedy „Start Wydarzenia” ze strony wydarzenia; bez niego przed 10:00 dodaje 12 h (`fixMorning`).
 - **Dostępność biletów** (`events.availability`): z kupbilecik etykieta „ostatnie bilety” / „sold out” z kafelka listy, odświeżana przy każdym przebiegu. Liczby sprzedanych biletów serwis nie podaje. Evently nie daje tej informacji (`undefined` = nie nadpisuj).
@@ -189,7 +189,7 @@ Pisze się poza apką (Notion / Docs) — apka liczy regularność, wiąże prac
 - **Myśli po graniach:** przeszukiwalne notatki z logów.
 - **Sceny:** werdykt, ocena miejsca, czas dojazdu.
 - **Miasta:** czas dojazdu z Warszawy, nocleg, priorytet.
-- **Kalendarz:** feed `.ics` z potwierdzonymi graniami pod tajnym tokenem (`/calendar/<token>.ics`).
+- **Kalendarz:** feed `.ics` z potwierdzonymi graniami i podróżami pod tajnym tokenem (`/calendar/<token>.ics`, `CALENDAR_TOKEN`).
 
 ### Mini kalendarz (każda podstrona)
 - Pływający przycisk w prawym dolnym rogu (`components/mini-calendar.tsx`, w `layout.tsx`); otwarty / zamknięty pamiętany w `localStorage` (`useSyncExternalStore`).
@@ -200,7 +200,7 @@ Pisze się poza apką (Notion / Docs) — apka liczy regularność, wiąże prac
 ### Logowanie i bezpieczeństwo (`/login`, Więcej → Bezpieczeństwo)
 Basic auth zastąpione, bo w PWA na iOS nie trzymał sesji, a odmowy 401 w tle wyglądały jak „brak internetu”.
 - **Sesja** (`src/lib/session.ts`): ciasteczko `sum_session` HttpOnly + Secure + SameSite=Lax, rok, odnawiane raz dziennie (proxy). Format `<sid>.<issuedAt>.<hmac>`, klucz HMAC z `SESSION_SECRET` albo `APP_PASSWORD` (zmiana hasła = wylogowanie wszystkich). W tabeli `sessions` tylko SHA-256 z `sid`; ważność sprawdzana w bazie z 60-sekundowym cache.
-- **Proxy** (`src/proxy.ts`): bez sesji strony → `/login?next=…`, reszta → 401 JSON. Poza logowaniem: `/login`, `/calendar/<token>.ics`, `/api/notify` (CRON_SECRET), statyczne pliki, ikony, manifest, `sw.js`, `offline.html`, `/trips/import` (dane tylko w przeglądarce, zapis wymaga sesji).
+- **Proxy** (`src/proxy.ts`): bez sesji strony → `/login?next=…`, reszta → 401 JSON. Poza logowaniem: `/login`, `/calendar/<token>.ics`, `/api/notify` i `/api/ingest` (CRON_SECRET), statyczne pliki, ikony, manifest, `sw.js`, `offline.html`, `/trips/import` (dane tylko w przeglądarce, zapis wymaga sesji).
 - **Każda akcja serwerowa** zaczyna się od `requireSession()` (`src/lib/auth.ts`) — zgodnie z dokumentacją Next nie polegamy tylko na proxy. Layout bez sesji nie renderuje paska, kalendarza ani bramki oceny.
 - **Hasło:** `APP_PASSWORD`, porównanie stałoczasowe, 5 błędnych prób → 15 min blokady logowania hasłem (`app_state` „login-lock”); passkey działa dalej.
 - **Face ID / passkeys** (`@simplewebauthn`, tabela `passkeys`): dodawanie tylko po zalogowaniu (Bezpieczeństwo; po pierwszym logowaniu hasłem bez passkeya apka tam przenosi), logowanie bez hasła na `/login`. Wyzwanie w ciasteczku HttpOnly na 5 min, `userVerification: required`, RP = domena z nagłówków (produkcja: su-manager.vercel.app).
@@ -209,7 +209,7 @@ Basic auth zastąpione, bo w PWA na iOS nie trzymał sesji, a odmowy 401 w tle w
 
 ### Powiadomienia i harmonogram
 - **Web Push** (PWA, `public/sw.js`, `src/lib/push.ts`, włącznik: Więcej → Powiadomienia, tabela `push_subscriptions`): rano grania do ponowienia oraz „Napisz” do grań w statusie „zainteresowany” z wyprzedzeniem dla komika i drugi raz w połowie tego czasu (domyślnie 14 i 7 dni, `writeReminderDays`, patrz „Kiedy pisać”; każdy próg raz na granie, zbiorczo; po „Wysłałem” granie przechodzi na „napisałem” i dalej działa ponawianie), wieczorem trening puent (jeśli dziś nie było, z serią) i „jak poszło?” 90 min po starcie grania bez logu (`src/lib/notify.ts`). Każde przypomnienie raz dziennie (`oncePerDay`, tabela `app_state`). Bez żadnego zapisanego urządzenia `/api/notify` nic nie liczy ani nie odhacza (inaczej przypomnienia by przepadły). `OfflineSync` przy otwarciu apki sprawdza (`pushKnown`), czy serwer zna subskrypcję tego telefonu — jeśli iOS ją unieważnił i została usunięta, zapisuje nową (zgoda już jest).
-- **Wyzwalanie:** zewnętrzny cron (cron-job.org, Europe/Warsaw) — 10:30 scraper (workflow_dispatch przez API GitHuba), niedziela 19:00 podsumowanie, 10:35 / 21:00 `/api/notify/morning|evening` (rano też poranny mail; Vercel potrzebuje `RESEND_API_KEY` i `REPORT_EMAIL`, bez nich nic nie odhacza i mail idzie zapasowo z GitHuba) (Bearer `CRON_SECRET`, poza basic auth). Harmonogram GitHuba to zapas (12:00 / niedz. 21:00); maile wychodzą raz dziennie (`morning-mail`, `weekly-mail`), ręcznie można wymusić (`force_mail`). Szczegóły konfiguracji: README.
+- **Wyzwalanie:** zewnętrzny cron (cron-job.org, Europe/Warsaw) — 10:30 scraper (workflow_dispatch przez API GitHuba), niedziela 19:00 podsumowanie, 10:35 / 21:00 `/api/notify/morning|evening` (rano też poranny mail; Vercel potrzebuje `RESEND_API_KEY` i `REPORT_EMAIL`, bez nich nic nie odhacza i mail idzie zapasowo z GitHuba) (Bearer `CRON_SECRET`, poza logowaniem). Harmonogram GitHuba to zapas (12:00 / niedz. 21:00); maile wychodzą raz dziennie (`morning-mail`, `weekly-mail`), ręcznie można wymusić (`force_mail`). Szczegóły konfiguracji: README.
 
 ## Konwencje w kodzie
 
