@@ -50,7 +50,7 @@ W liczbach: 2 100+ wydarzeń zebranych z bileterii w pierwszy miesiąc, 18 migra
 - **Czysta logika osobno od bazy** w `src/lib/*`, dzięki czemu większość z 17 plików testów
   nie potrzebuje bazy; te, które jej potrzebują (powiadomienia, mail), stawiają tymczasową
   bazę z migracjami
-- Dokumentacja domeny: `docs/PRODUCT.md`
+- Dokumentacja domeny: [`docs/PRODUCT.md`](docs/PRODUCT.md)
 
 ## Decyzje, które warto znać
 
@@ -64,6 +64,18 @@ W liczbach: 2 100+ wydarzeń zebranych z bileterii w pierwszy miesiąc, 18 migra
   imporcie są w adresie po „#”, więc nie trafiają do logów serwera
 - **Produkcyjna baza to źródło prawdy:** kolejność wydania to kopia bazy → migracja →
   dopiero deploy
+
+## Praca z Claude Code
+
+Apkę rozwijam z Claude Code. Zasady pracy są w repo, a nie w głowie:
+
+- [`CLAUDE.md`](CLAUDE.md) — co musi przejść przed „gotowe” (typecheck, lint, testy, podgląd
+  na telefonie), granice architektury, zasady testów i stylu, czego nie robić bez pytania
+- [`.claude/settings.json`](.claude/settings.json) — egzekwowanie: ESLint po każdej edycji pliku
+  TS (ostrzeżenia też blokują), pytanie przed `git push`, komendami Turso, env na Vercelu
+  i sekretami GitHuba; force-push i usunięcie bazy zablokowane
+- [`docs/PRODUCT.md`](docs/PRODUCT.md) — dokumentacja domeny: słownik pojęć, które łatwo pomylić,
+  i opis każdej funkcji z plikami, w których żyje
 
 ---
 

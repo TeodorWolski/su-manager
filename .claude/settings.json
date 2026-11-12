@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "ask": [
+      "Bash(git push)",
+      "Bash(git push *)",
+      "Bash(turso *)",
+      "Bash(vercel env *)",
+      "Bash(npx vercel env *)",
+      "Bash(gh secret *)",
+      "Read(./.env)",
+      "Read(./.env.*)"
+    ],
+    "deny": [
+      "Bash(git push --force *)",
+      "Bash(git push -f *)",
+      "Bash(turso db destroy *)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=$(jq -r '.tool_input.file_path // .tool_response.filePath // empty'); case \"$f\" in *.ts|*.tsx|*.mts) out=$(pnpm -s exec eslint --max-warnings 0 \"$f\" 2>&1) || { printf \"ESLint: %s\\n%s\\n\" \"$f\" \"$out\" >&2; exit 2; };; esac",
+            "timeout": 60,
+            "statusMessage": "ESLint na zmienionym pliku…"
+          }
+        ]
+      }
+    ]
+  }
+}
