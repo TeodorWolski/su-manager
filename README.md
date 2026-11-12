@@ -1,10 +1,74 @@
 # SU Manager
 
-Osobista apka do zarządzania graniem stand-upu: grania + pipeline statusów, log po występie, CRM, materiał, sceny.
+Osobista apka do zarządzania graniem stand-upu: grania i pipeline statusów, log zaraz po
+zejściu ze sceny, CRM komików i organizatorów, materiał, sceny. Jeden użytkownik, używana
+z telefonu (PWA), w codziennym użyciu od października 2026. Zastąpiła arkusz i jakieś
+10–15 godzin ręcznej roboty tygodniowo.
 
-Stack: Next.js 16 · Drizzle · SQLite (lokalnie plik, na produkcji Turso) · shadcn/Tailwind 4.
+Stack: Next.js 16 · Drizzle · SQLite (lokalnie plik, na produkcji Turso) · Tailwind 4 · Vercel.
 
-## Lokalnie
+W liczbach: 2 100+ wydarzeń zebranych z bileterii w pierwszy miesiąc, 18 migracji schematu,
+17 plików testów (~90 testów), zero zewnętrznych bibliotek do PDF.
+
+## Co działa beze mnie
+
+- Scraper trzech bileterii o 10:30 z kontrolą zdrowia przebiegu, która łapie zmianę strony
+  serwisu — czego testy na zapisanych plikach z definicji nie zobaczą
+- Poranny mail i pushe: do kogo ponowić, najgorętsze okazje, nowe terminy komików z CRM
+- Niedzielne podsumowanie tygodnia
+- Bilety kolejowe z Gmaila: PDF → tekst → parser → podpięcie do grania → powiadomienie
+- Cotygodniowa kopia bazy w GitHub Actions
+
+## Co może być ciekawe w kodzie
+
+- **Wyuczone wyprzedzenie** (`src/lib/lead-time.ts`) — ile dni przed występem pisać do
+  konkretnego komika, liczone z wyników poprzednich rozmów, z fallbackiem na ogólne,
+  gdy próbka jest za mała
+- **Ranking „kto sprzedaje sale"** (`src/lib/market.ts`) — popyt razy skala trasy,
+  wygładzony tak, żeby dwa sold outy z trzech terminów nie robiły gwiazdy
+- **Kiedy komik wrzuca terminy** (`announceLead` w `src/lib/market.ts`) — mediana czasu od
+  pojawienia się wydarzenia w bileterii do występu. Scraper patrzy tylko 90 dni naprzód, więc
+  termin „pojawiający się” na granicy horyzontu to dana ucięta: zamiast fałszywego „90 dni”
+  wynik to „ponad 3 miesiące”
+- **Trasa** (`src/lib/route.ts`) — jadę z A do B na dzień D: grania po drodze przez N dni,
+  w korytarzu wzdłuż linii trasy; plan wybiera najwyżej jedno granie dziennie tak, żeby
+  jechać do przodu (programowanie dynamiczne)
+- **Ten sam występ w dwóch bileteriach** (`src/lib/dedupe.ts`) — inny tytuł, ta sama data,
+  miasto i godzina ±60 min plus wspólne nazwisko; ta sama logika rozstrzyga, czy wydarzenie
+  to „moje granie”, czy tylko inne granie tego samego wieczoru
+- **Cykliczne open miki** (`src/lib/recurring.ts`) — wykrywanie stałego rytmu (co tydzień,
+  co 2 tygodnie, n-ty dzień tygodnia w miesiącu) i przewidywane terminy, które ustępują
+  prawdziwym, gdy te pojawią się w bileterii
+- **Propozycja setu** (`src/lib/set-plan.ts`) — w dniu grania: pewniaki na otwarcie
+  i zamknięcie, w środku jeden bit do przetestowania, w budżecie minut z poprzedniego razu
+  na tej scenie
+- **Własny czytnik PDF bez zależności** (`src/lib/pdf-text.ts`) — FlateDecode, ObjStm,
+  fonty CID z ToUnicode; ten sam kod działa na serwerze (zlib) i w przeglądarce
+  (`DecompressionStream`)
+- **Log bez zasięgu** — kolejka w telefonie i osobny `offline.html` bez Nexta, zapis idempotentny
+- **Czysta logika osobno od bazy** w `src/lib/*`, dzięki czemu większość z 17 plików testów
+  nie potrzebuje bazy; te, które jej potrzebują (powiadomienia, mail), stawiają tymczasową
+  bazę z migracjami
+- Dokumentacja domeny: `docs/PRODUCT.md`
+
+## Decyzje, które warto znać
+
+- **Tanio i prosto:** Vercel Hobby i darmowy Turso, bez kolejek. Godziny trzyma zewnętrzny
+  cron, harmonogram GitHuba jest tylko zapasem; maile wychodzą raz dziennie (znacznik
+  w bazie), więc zapas ich nie dubluje
+- **Przypomnienia nie przepadają:** gdy nie ma zapisanego urządzenia, push nic nie odhacza
+  jako wysłane; telefon sam odnawia subskrypcję, którą iOS unieważnił
+- **Bezpieczeństwo:** sesja w podpisanym ciasteczku i Face ID (passkeys, WebAuthn) zamiast
+  basic auth; każda akcja serwerowa sama sprawdza sesję, nie tylko proxy. Dane biletu przy
+  imporcie są w adresie po „#”, więc nie trafiają do logów serwera
+- **Produkcyjna baza to źródło prawdy:** kolejność wydania to kopia bazy → migracja →
+  dopiero deploy
+
+---
+
+## Uruchomienie i utrzymanie
+
+### Lokalnie
 
 ```bash
 pnpm install
@@ -15,7 +79,7 @@ pnpm dev
 
 Zmiana schematu: edytuj `src/db/schema.ts`, potem `pnpm db:generate && pnpm db:migrate`.
 
-## Zmienne środowiskowe
+### Zmienne środowiskowe
 
 | Zmienna | Opis |
 | --- | --- |
@@ -24,12 +88,12 @@ Zmiana schematu: edytuj `src/db/schema.ts`, potem `pnpm db:generate && pnpm db:m
 | `APP_PASSWORD` | hasło logowania (ekran `/login`; Face ID dodasz po zalogowaniu). Bez niego — lokalnie — apka jest otwarta |
 | `SESSION_SECRET` | opcjonalnie: klucz podpisu sesji (domyślnie wyprowadzany z `APP_PASSWORD`) |
 
-## Jak to działa
+### Jak to działa
 
 - **Bramka oceny** (`src/components/review-gate.tsx`): 90 min po starcie potwierdzonego grania bez logu (a gdy granie nie ma godziny — o 21:00 tego dnia) cała apka zostaje zasłonięta formularzem. Formularz znika po zapisaniu logu albo po kliknięciu „nie zagrałem”.
 - Daty grań są trzymane jako lokalny czas Warszawy (`2026-10-14T20:00`); `nowLocal()` w `src/lib/time.ts` liczy „teraz” w tej samej strefie, niezależnie od serwera.
 
-## Scraper okazji
+### Scraper okazji
 
 - `pnpm scrape` — zbiera wydarzenia z bileterii, zapisuje nowe, wysyła mail z nowymi okazjami (Resend). Bez `RESEND_API_KEY` mail jest tylko logowany.
 - Parsery: `src/scraper/sources/*.ts`, jeden plik na serwis. Gdy strona zmieni HTML — poprawiasz tylko ten plik. Nowy serwis = nowy plik + wpis w `sources/index.ts`.
@@ -37,7 +101,7 @@ Zmiana schematu: edytuj `src/db/schema.ts`, potem `pnpm db:generate && pnpm db:m
 - Filtr i dopasowanie do CRM: `src/lib/opportunities.ts`, `src/lib/match.ts`.
 - Cron: `.github/workflows/scrape.yml` (codziennie o 10:30 czasu polskiego, niezależnie od czasu letniego/zimowego + ręcznie z zakładki Actions). Podsumowanie tygodnia: `.github/workflows/weekly.yml` (niedziela 19:00, `pnpm weekly`, te same sekrety). Sekrety repo: `DATABASE_URL`, `DATABASE_AUTH_TOKEN`, `RESEND_API_KEY`, `REPORT_EMAIL`. Padnięty parser = czerwony build, GitHub wysyła o tym mail.
 
-## Zewnętrzny cron (cron-job.org) i powiadomienia
+### Zewnętrzny cron (cron-job.org) i powiadomienia
 
 GitHubowy harmonogram potrafi spóźnić się o kilka godzin, więc godziny trzyma darmowy cron-job.org (strefa **Europe/Warsaw**). GitHub zostaje jako zapas (poranny 12:00, niedzielny 21:00); maile idą raz dziennie (`app_state`), więc zapas ich nie dubluje.
 
@@ -53,13 +117,13 @@ GitHubowy harmonogram potrafi spóźnić się o kilka godzin, więc godziny trzy
 - **Poranny mail** idzie z Vercela (`/api/notify/morning`, `src/lib/morning-mail.ts`), więc nie zależy od GitHuba. Zmienne w Vercelu (Production): `RESEND_API_KEY`, `REPORT_EMAIL`. Bez nich Vercel maila nie wysyła i nic nie odhacza — wtedy wyśle go zapasowo scraper na GitHubie. „Nowe terminy” w mailu = dodane od poprzedniego maila, więc scraper może przejść o dowolnej porze.
 - Ręcznie z Actions: „Run workflow” z opcją „wyślij mail mimo to”, gdy chcesz drugi mail tego samego dnia.
 
-## Testy scraperów
+### Testy scraperów
 
 - `pnpm test` — parsery kupbilecik / evently / Biletyny na zapisanych, przyciętych stronach (`tests/fixtures/`), deduplikacja i kontrola zdrowia. Puszczane automatycznie przy każdym pushu (`.github/workflows/test.yml`, razem z typecheckiem i lintem).
 - **Kontrola zdrowia** (`src/scraper/health.ts`) w codziennym przebiegu: 0 wydarzeń albo spadek o ponad połowę względem ostatnich dni, albo >30% wydarzeń bez miasta / >40% bez godziny → czerwony „Scraper okazji”, GitHub wysyła mail. To łapie zmianę strony bileterii, której testy na zapisanych plikach nie widzą.
 - Serwis zmienił stronę? `pnpm tsx scripts/update-fixtures.ts` pobiera świeże strony do `tests/fixtures/`, poprawiasz parser, aktualizujesz oczekiwane wartości w `tests/scrapers.test.ts`.
 
-## Kopie zapasowe i podglądy
+### Kopie zapasowe i podglądy
 
 - **Kopia bazy:** co niedzielę `.github/workflows/backup.yml` robi pełny zrzut produkcji (`pnpm backup`) i trzyma go 90 dni w GitHub Actions → przebieg → Artifacts. Ręcznie: Actions → „Kopia zapasowa bazy” → Run workflow.
 - **Odtworzenie:** pobierz artefakt, `gunzip su-manager-RRRR-MM-DD.sql.gz`, potem do pustej bazy: `turso db shell <nowa-baza> < su-manager-RRRR-MM-DD.sql` (albo lokalnie `sqlite3 odtworzona.db < plik.sql`).
