@@ -16,7 +16,8 @@ W liczbach: 2 100+ wydarzeń zebranych z bileterii w pierwszy miesiąc, 18 migra
   serwisu — czego testy na zapisanych plikach z definicji nie zobaczą
 - Poranny mail i pushe: do kogo ponowić, najgorętsze okazje, nowe terminy komików z CRM
 - Niedzielne podsumowanie tygodnia
-- Bilety kolejowe z Gmaila: PDF → tekst → parser → podpięcie do grania → powiadomienie
+- Bilety kolejowe z Gmaila przez integrację z Google Apps Script (skrypt co 10 min wysyła nowe
+  bilety do API apki): PDF → tekst → parser → podpięcie do grania → powiadomienie
 - Cotygodniowa kopia bazy w GitHub Actions
 
 ## Co może być ciekawe w kodzie
