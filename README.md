@@ -94,14 +94,14 @@ Zmiana schematu: edytuj `src/db/schema.ts`, potem `pnpm db:generate && pnpm db:m
 
 ### Zmienne środowiskowe
 
-| Zmienna               | Opis                                                                                                      |
-| --------------------- | --------------------------------------------------------------------------------------------------------- |
-| `DATABASE_URL`        | `libsql://…turso.io` na produkcji; domyślnie `file:local.db`                                              |
-| `DATABASE_AUTH_TOKEN` | token Turso                                                                                               |
-| `APP_PASSWORD`        | hasło logowania (ekran `/login`; Face ID dodasz po zalogowaniu). Bez niego — lokalnie — apka jest otwarta |
-| `CRON_SECRET`         | token dla `/api/notify/*` i `/api/ingest/ticket` (cron-job.org, skrypt Gmaila)                            |
-| `CALENDAR_TOKEN`      | tajny token w adresie feedu `/calendar/<token>.ics`; bez niego kalendarz jest wyłączony                   |
-| `SESSION_SECRET`      | opcjonalnie: klucz podpisu sesji (domyślnie wyprowadzany z `APP_PASSWORD`)                                |
+| Zmienna | Opis |
+| --- | --- |
+| `DATABASE_URL` | `libsql://…turso.io` na produkcji; domyślnie `file:local.db` |
+| `DATABASE_AUTH_TOKEN` | token Turso |
+| `APP_PASSWORD` | hasło logowania (ekran `/login`; Face ID dodasz po zalogowaniu). Bez niego — lokalnie — apka jest otwarta |
+| `CRON_SECRET` | token dla `/api/notify/*` i `/api/ingest/ticket` (cron-job.org, skrypt Gmaila) |
+| `CALENDAR_TOKEN` | tajny token w adresie feedu `/calendar/<token>.ics`; bez niego kalendarz jest wyłączony |
+| `SESSION_SECRET` | opcjonalnie: klucz podpisu sesji (domyślnie wyprowadzany z `APP_PASSWORD`) |
 
 ### Jak to działa
 
@@ -120,14 +120,14 @@ Zmiana schematu: edytuj `src/db/schema.ts`, potem `pnpm db:generate && pnpm db:m
 
 GitHubowy harmonogram potrafi spóźnić się o kilka godzin, więc godziny trzyma darmowy cron-job.org (strefa **Europe/Warsaw**). GitHub zostaje jako zapas (poranny 12:00, niedzielny 21:00); maile idą raz dziennie (`app_state`), więc zapas ich nie dubluje.
 
-| Kiedy            | Żądanie                                                                                                                    | Nagłówki                                                                      |
-| ---------------- | -------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| Kiedy | Żądanie | Nagłówki |
+| --- | --- | --- |
 | codziennie 10:30 | `POST https://api.github.com/repos/TeodorWolski/su-manager/actions/workflows/scrape.yml/dispatches`, body `{"ref":"main"}` | `Authorization: Bearer <token GitHub>`, `Accept: application/vnd.github+json` |
-| niedziela 19:00  | to samo dla `weekly.yml`                                                                                                   | jw.                                                                           |
-| codziennie 10:35 | `GET https://su-manager.vercel.app/api/notify/morning` — poranne pushe **i poranny mail**                                  | `Authorization: Bearer <CRON_SECRET>`                                         |
-| codziennie 21:00 | `GET https://su-manager.vercel.app/api/notify/evening`                                                                     | jw.                                                                           |
+| niedziela 19:00 | to samo dla `weekly.yml` | jw. |
+| codziennie 10:35 | `GET https://su-manager.vercel.app/api/notify/morning` — poranne pushe **i poranny mail** | `Authorization: Bearer <CRON_SECRET>` |
+| codziennie 21:00 | `GET https://su-manager.vercel.app/api/notify/evening` | jw. |
 
-- **Token GitHub:** fine-grained, tylko repo `su-manager`, uprawnienie _Actions: Read and write_.
+- **Token GitHub:** fine-grained, tylko repo `su-manager`, uprawnienie *Actions: Read and write*.
 - **Powiadomienia (Web Push):** zmienne w Vercelu (Production): `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `CRON_SECRET` — wartości z `.env.local` (wygenerowane `web-push`). Publiczny klucz wchodzi w build, więc ustaw je **przed** deployem. Włączenie na telefonie: Więcej → Powiadomienia (iPhone: najpierw „Do ekranu początkowego”).
 - **Poranny mail** idzie z Vercela (`/api/notify/morning`, `src/lib/morning-mail.ts`), więc nie zależy od GitHuba. Zmienne w Vercelu (Production): `RESEND_API_KEY`, `REPORT_EMAIL`. Bez nich Vercel maila nie wysyła i nic nie odhacza — wtedy wyśle go zapasowo scraper na GitHubie. „Nowe terminy” w mailu = dodane od poprzedniego maila, więc scraper może przejść o dowolnej porze.
 - Ręcznie z Actions: „Run workflow” z opcją „wyślij mail mimo to”, gdy chcesz drugi mail tego samego dnia.
@@ -138,7 +138,7 @@ GitHubowy harmonogram potrafi spóźnić się o kilka godzin, więc godziny trzy
 - **Kontrola zdrowia** (`src/scraper/health.ts`) w codziennym przebiegu: 0 wydarzeń albo spadek o ponad połowę względem ostatnich dni, albo >30% wydarzeń bez miasta / >40% bez godziny → czerwony „Scraper okazji”, GitHub wysyła mail. To łapie zmianę strony bileterii, której testy na zapisanych plikach nie widzą.
 - Serwis zmienił stronę? `pnpm tsx scripts/update-fixtures.ts` pobiera świeże strony do `tests/fixtures/`, poprawiasz parser, aktualizujesz oczekiwane wartości w `tests/scrapers.test.ts`.
 
-### Kopie zapasowe i podglądy.
+### Kopie zapasowe i podglądy
 
 - **Kopia bazy:** co niedzielę `.github/workflows/backup.yml` robi pełny zrzut produkcji (`pnpm backup`) i trzyma go 90 dni w GitHub Actions → przebieg → Artifacts. Ręcznie: Actions → „Kopia zapasowa bazy” → Run workflow.
 - **Odtworzenie:** pobierz artefakt, `gunzip su-manager-RRRR-MM-DD.sql.gz`, potem do pustej bazy: `turso db shell <nowa-baza> < su-manager-RRRR-MM-DD.sql` (albo lokalnie `sqlite3 odtworzona.db < plik.sql`).
