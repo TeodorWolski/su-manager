@@ -17,19 +17,11 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # Kopia idzie mailem: leży w skrzynce dłużej niż 90 dni (limit artifactów) i nie trzeba wchodzić na GitHuba.
       - name: Zrzut bazy produkcyjnej
-        run: |
-          FILE="su-manager-$(date -u +%Y-%m-%d).sql"
-          pnpm backup "$FILE"
-          gzip -9 "$FILE"
-          echo "FILE=$FILE.gz" >> "$GITHUB_ENV"
+        run: pnpm backup "su-manager-$(date -u +%Y-%m-%d).sql" --mail
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DATABASE_AUTH_TOKEN: ${{ secrets.DATABASE_AUTH_TOKEN }}
-      # Kopie leżą w zakładce Actions → ten przebieg → Artifacts, przez 90 dni (maksimum dla GitHuba).
-      - uses: actions/upload-artifact@v4
-        with:
-          name: ${{ env.FILE }}
-          path: ${{ env.FILE }}
-          retention-days: 90
-          if-no-files-found: error
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          REPORT_EMAIL: ${{ secrets.REPORT_EMAIL }}

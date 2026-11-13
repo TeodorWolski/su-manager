@@ -140,6 +140,6 @@ GitHubowy harmonogram potrafi spóźnić się o kilka godzin, więc godziny trzy
 
 ### Kopie zapasowe i podglądy
 
-- **Kopia bazy:** co niedzielę `.github/workflows/backup.yml` robi pełny zrzut produkcji (`pnpm backup`) i trzyma go 90 dni w GitHub Actions → przebieg → Artifacts. Ręcznie: Actions → „Kopia zapasowa bazy” → Run workflow.
-- **Odtworzenie:** pobierz artefakt, `gunzip su-manager-RRRR-MM-DD.sql.gz`, potem do pustej bazy: `turso db shell <nowa-baza> < su-manager-RRRR-MM-DD.sql` (albo lokalnie `sqlite3 odtworzona.db < plik.sql`).
+- **Kopia bazy:** co niedzielę `.github/workflows/backup.yml` robi pełny zrzut produkcji (`pnpm backup --mail`) i wysyła go (gzip) mailem na `REPORT_EMAIL`. Ręcznie: Actions → „Kopia zapasowa bazy” → Run workflow.
+- **Odtworzenie:** zapisz załącznik z maila, `gunzip su-manager-RRRR-MM-DD.sql.gz`, potem do pustej bazy: `turso db shell <nowa-baza> < su-manager-RRRR-MM-DD.sql` (albo lokalnie `sqlite3 odtworzona.db < plik.sql`).
 - **Podglądy (gałęzie):** wersje podglądowe w Vercelu używają osobnej bazy `su-manager-preview` (kopii produkcji), więc klikanie na podglądzie nie zmienia prawdziwych danych. Świeża kopia produkcji: `turso db destroy su-manager-preview`, potem `turso db create su-manager-preview --from-db su-manager`, `turso db tokens create su-manager-preview` i nowy token wpisz jako `DATABASE_AUTH_TOKEN` dla środowiska Preview w Vercelu.

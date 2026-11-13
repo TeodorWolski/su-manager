@@ -152,7 +152,12 @@ export async function sendReport(digest: Digest, log: (m: string) => void) {
 }
 
 /** Wysyłka przez Resend (bez SDK). Bez klucza — tylko log, żeby lokalnie dało się testować. */
-export async function sendMail(subject: string, html: string, log: (m: string) => void) {
+export async function sendMail(
+  subject: string,
+  html: string,
+  log: (m: string) => void,
+  attachments?: { filename: string; content: Buffer }[],
+) {
   const key = process.env.RESEND_API_KEY;
   const to = process.env.REPORT_EMAIL;
   if (!key || !to) {
@@ -162,7 +167,13 @@ export async function sendMail(subject: string, html: string, log: (m: string) =
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ from: "SU Manager <onboarding@resend.dev>", to: [to], subject, html }),
+    body: JSON.stringify({
+      from: "SU Manager <onboarding@resend.dev>",
+      to: [to],
+      subject,
+      html,
+      attachments: attachments?.map((a) => ({ filename: a.filename, content: a.content.toString("base64") })),
+    }),
   });
   if (!res.ok) throw new Error(`Resend ${res.status}: ${await res.text()}`);
   log(`mail wysłany: ${subject}`);

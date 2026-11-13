@@ -2,14 +2,20 @@
  * Pełny zrzut bazy do pliku .sql (schemat + dane), który da się odtworzyć:
  *   sqlite3 odtworzona.db < backup.sql              — lokalnie
  *   turso db shell <baza> < backup.sql              — w Turso (do pustej bazy)
- * Uruchom: pnpm backup <plik.sql>   (baza z DATABASE_URL / DATABASE_AUTH_TOKEN)
- * Co tydzień robi to GitHub Actions (.github/workflows/backup.yml).
+ * Uruchom: pnpm backup <plik.sql> [--mail]   (baza z DATABASE_URL / DATABASE_AUTH_TOKEN)
+ * --mail: wysyła kopię (gzip) jako załącznik na REPORT_EMAIL.
+ * Co tydzień robi to GitHub Actions (.github/workflows/backup.yml) i wysyła mailem.
  */
 import "dotenv/config";
 import { writeFileSync } from "node:fs";
+import { basename } from "node:path";
+import { gzipSync } from "node:zlib";
 import { createClient, type InValue } from "@libsql/client";
+import { sendMail } from "../src/scraper/email";
 
-const out = process.argv[2] ?? `backup-${new Date().toISOString().slice(0, 10)}.sql`;
+const args = process.argv.slice(2);
+const mail = args.includes("--mail");
+const out = args.find((a) => !a.startsWith("--")) ?? `backup-${new Date().toISOString().slice(0, 10)}.sql`;
 const client = createClient({
   url: process.env.DATABASE_URL ?? "file:local.db",
   authToken: process.env.DATABASE_AUTH_TOKEN,
@@ -57,9 +63,25 @@ async function main() {
   for (const r of schema.rows.filter((r) => r.type !== "table")) lines.push(`${r.sql};`);
   lines.push("COMMIT;", "");
 
-  writeFileSync(out, lines.join("\n"));
+  const sql = lines.join("\n");
+  writeFileSync(out, sql);
   console.log(`zapisano ${out}`);
   console.log(Object.entries(counts).map(([t, n]) => `  ${t}: ${n}`).join("\n"));
+
+  if (mail) {
+    const filename = `${basename(out)}.gz`;
+    const sent = await sendMail(
+      `SU Manager: kopia bazy ${new Date().toISOString().slice(0, 10)}`,
+      `<p>Kopia bazy w załączniku (<code>${filename}</code>). Odtworzenie: <code>gunzip</code>, potem <code>sqlite3 nowa.db &lt; plik.sql</code>.</p>`,
+      console.log,
+      [{ filename, content: gzipSync(sql, { level: 9 }) }],
+    );
+    // Bez wysłanej kopii przebieg ma być czerwony — inaczej nikt nie zauważy, że kopii nie ma.
+    if (!sent) process.exit(1);
+  }
 }
 
-main();
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});

@@ -228,4 +228,4 @@ Basic auth zastąpione, bo w PWA na iOS nie trzymał sesji, a odmowy 401 w tle w
 - **Zmiana schematu:** `pnpm db:generate`, potem **przeczytaj wygenerowany SQL**. Drizzle przy przebudowie tabeli (np. zdjęcie `NOT NULL`) potrafi w `INSERT … SELECT` kopiować nieistniejącą jeszcze kolumnę; trzeba to poprawić na `NULL`. Potem `pnpm db:migrate` lokalnie.
 - **Kolejność wydania:** kopia prod (`turso db shell su-manager .dump`) → migracja prod i preview → dopiero potem push na `main`. Push na `main` = auto-deploy na Vercel; nowy kod czytający nowe kolumny wysypie się bez migracji.
 - **Na wszystko, co dotyka produkcji** (push na `main`, migracje i zapisy w prod DB, env na Vercelu, sekrety GitHuba), **pytaj użytkownika o zgodę**.
-- **Kopia zapasowa:** co tydzień w GitHub Actions (`backup.yml`), trzymana 90 dni.
+- **Kopia zapasowa:** co tydzień w GitHub Actions (`backup.yml`), wysyłana mailem jako załącznik.
