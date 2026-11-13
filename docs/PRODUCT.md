@@ -51,6 +51,10 @@ Ocena grania **nie jest** oceną bitu, bo zależy od publiki, line-upu itd. Bit 
   - propozycja setu: pewniaki (Sprawdzone, potem w testach z bilansem 👍 ≥ 👎) — najmocniejszy na otwarcie, drugi na zamknięcie, w środku jeden do testu (w testach, najmniej grany; bit z przewagą 👎 po 2+ graniach odpada — czeka na redakcję); bit bez długości = ~2 min; tylko podpowiedź,
   - notatka i ocena z poprzedniego razu na tej scenie, pociągi na to granie (wagon, miejsce).
 - **Cel miesiąca:** liczba grań, domyślnie 10 („super target”), tempo i seria miesięcy. Obok kafelki: MGM (sprawdzony materiał napisany w miesiącu) i średnia ocena w miesiącu.
+- **Prognoza celu** (`src/lib/forecast.ts`, dane w `getGoals`): pod paskiem celu, dopóki zagrane + potwierdzone go nie domykają — „~8 na koniec miesiąca · napisz jeszcze do 4 osób”:
+  - spodziewane = zagrane + potwierdzone + szansa z grań w toku na ten miesiąc („napisałem” / „czekam” × skuteczność, „zainteresowany” × skuteczność × 0,5 — `INTERESTED_FACTOR`, bo do części nigdy nie napiszę),
+  - skuteczność = „Zgodził się” wobec wszystkich rozmów z wynikiem (`gigs.outcome`, wszystkie miesiące), wygładzona założeniem 1/3 o wadze 6 rozmów (`PRIOR_SUCCESS`, `PRIOR_WEIGHT`); poniżej 6 rozmów karta dopisuje, że to na razie szacunek,
+  - „napisz jeszcze do N” = brakujące grania ÷ skuteczność, w górę; tylko podpowiedź.
 - **Rytm** (`src/lib/rhythm.ts`, `components/rhythm.tsx`):
   - cel to 2–3 grania tygodniowo, równomiernie,
   - słupki: 4 tygodnie wstecz, bieżący i 3 naprzód,

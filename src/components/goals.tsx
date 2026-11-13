@@ -63,6 +63,8 @@ export function GigGoalCard({ goals, link = true }: { goals: GoalsOverview; link
   const { month: g, streak } = goals;
   const left = g.target - g.played;
   const reached = g.played >= g.target;
+  // Prognoza ma sens, dopóki cel nie jest pewny (zagrane + potwierdzone go nie domykają).
+  const forecast = goals.forecast.sure < g.target ? { ...goals.forecast, expected: Math.round(goals.forecast.expected) } : null;
   const status = reached
     ? g.target >= DEFAULT_MONTHLY_GIGS
       ? "super target zdobyty"
@@ -105,6 +107,22 @@ export function GigGoalCard({ goals, link = true }: { goals: GoalsOverview; link
           {status}
         </b>
       </div>
+
+      {forecast && (
+        <div className="text-ink-card-muted mt-2 text-[12px]">
+          Prognoza: <b className="text-ink-card-foreground font-semibold">~{forecast.expected}</b> na koniec miesiąca ·{" "}
+          {forecast.toWrite > 0 ? (
+            <>
+              napisz jeszcze do <b className="text-ink-card-foreground font-semibold">{forecast.toWrite === 1 ? "1 osoby" : `${forecast.toWrite} osób`}</b>
+            </>
+          ) : (
+            "to, co w toku, powinno wystarczyć"
+          )}
+          <span className="block">
+            Z rozmów wychodzi {Math.round(forecast.rate * 100)}% grań{forecast.learned ? "" : " (na razie szacunek — za mało rozmów z wynikiem)"}.
+          </span>
+        </div>
+      )}
 
       {!g.isSet && (
         <div className="border-ink-card-track mt-4 border-t pt-3.5">

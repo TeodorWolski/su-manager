@@ -1,6 +1,7 @@
 import "server-only";
-import { eq } from "drizzle-orm";
+import { eq, isNotNull, or } from "drizzle-orm";
 import { db, gigs, goals } from "@/db";
+import { forecastMonth } from "./forecast";
 import { getMgm } from "./planning";
 import { effectiveStart, nowLocal } from "./time";
 
@@ -27,10 +28,14 @@ export async function getGoals() {
   const today = now.slice(0, 10);
   const month = now.slice(0, 7);
 
-  const [goalRows, confirmed, mgm] = await Promise.all([
+  const [goalRows, confirmed, mgm, talks] = await Promise.all([
     db.select().from(goals),
     db.select({ startsAt: gigs.startsAt }).from(gigs).where(eq(gigs.status, "confirmed")),
     getMgm(),
+    db
+      .select({ startsAt: gigs.startsAt, status: gigs.status, outcome: gigs.outcome })
+      .from(gigs)
+      .where(or(isNotNull(gigs.outcome), eq(gigs.status, "interested"), eq(gigs.status, "contacted"), eq(gigs.status, "waiting"))),
   ]);
   const goalMap = new Map(goalRows.map((g) => [g.key, g]));
   const targetFor = (m: string) => goalMap.get(monthKey(m))?.target ?? DEFAULT_MONTHLY_GIGS;
@@ -70,8 +75,23 @@ export async function getGoals() {
   }
   const best = [...played.entries()].sort((a, b) => b[1] - a[1])[0];
 
+  // W toku na ten miesiąc (jeszcze przed nami) i historia rozmów z wynikiem — do prognozy.
+  const open = talks.filter((g) => !g.outcome && g.startsAt.slice(0, 7) === month && effectiveStart(g.startsAt) >= now);
+  const resolved = talks.filter((g) => g.outcome);
+  const forecast = forecastMonth({
+    played: current.played,
+    planned: current.planned,
+    pending: {
+      interested: open.filter((g) => g.status === "interested").length,
+      asked: open.filter((g) => g.status === "contacted" || g.status === "waiting").length,
+    },
+    target: current.target,
+    history: { agreed: resolved.filter((g) => g.outcome === "agreed").length, resolved: resolved.length },
+  });
+
   return {
     month: current,
+    forecast,
     history,
     streak,
     best: best ? { month: best[0], played: best[1] } : null,
