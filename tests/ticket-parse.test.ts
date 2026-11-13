@@ -31,14 +31,14 @@ Warszawa Centralna
 Pociąg: EIP 8300
 Wagon: 4 Wagon bezprzedziałowy
 1 miejsce do siedzenia: 82 OKNO
-Numer referencyjny: 518577224665
-WA99377019
+Numer referencyjny: 100200300400
+WA00000001
 Kod awaryjny
-7693
-Teodor Wolski`;
+0000
+Jan Kowalski`;
 
 test("bilet KOLEO: trasa, godziny, pociąg, miejsce, cena, numer", () => {
-  const t = parseTicket(KOLEO, "https://koleo.pl/ticket/341524555");
+  const t = parseTicket(KOLEO, "https://koleo.pl/ticket/100000001");
   assert.deepEqual(t, {
     carrier: "PKP Intercity",
     train: "EIP 8300",
@@ -48,8 +48,8 @@ test("bilet KOLEO: trasa, godziny, pociąg, miejsce, cena, numer", () => {
     arrivesAt: "2026-11-05T11:31",
     priceGr: 8841,
     seat: "wagon 4, miejsce 82 (okno)",
-    reference: "518577224665",
-    url: "https://koleo.pl/ticket/341524555",
+    reference: "100200300400",
+    url: "https://koleo.pl/ticket/100000001",
   });
   assert.deepEqual(missingFields(t), []);
   assert.equal(fmtZl(t.priceGr!), "88,41 zł");
@@ -78,7 +78,7 @@ test("bez rozkładu przy stacjach — godziny z „Ważny od … do …”; śmi
   assert.deepEqual(missingFields(parseTicket("coś zupełnie innego")), ["fromStation", "toStation", "departsAt", "priceGr"]);
 });
 
-/** Tekst z PDF-a biletu KOLEO (KOLEO_2026-11-05_WA99377019.pdf) — inny układ niż strona. */
+/** Tekst z PDF-a biletu KOLEO (KOLEO_2026-11-05_WA00000001.pdf) — inny układ niż strona. */
 const KOLEO_PDF = `REZERWACJE
 Informacja o cenie
 Opłata za przejazd: 88.41 PLN
@@ -89,14 +89,14 @@ Wystawiono: 02.11.2026 18:43
 Data wydruku:02.11.2026 18:44
 Bilet ważny łącznie z dokumentem potwierdzającym tożsamość. 
 Właściciel biletu: 
-Teodor Wolski
+Jan Kowalski
 Numer biletu:
-WA99377019
-7693
+WA00000001
+0000
 88,41 PLN
 BILET 
 PRZEJAZD TAM (1) 
-Teodor Wolski 
+Jan Kowalski 
 0 NORMAL.
 1 ULG. 
 OD -> DO KL.
@@ -115,7 +115,7 @@ Wagon bezprzedziałowy
 1 miejsce do siedzenia
 82 
 Okno 
-Numer referencyjny: 518577224665 `;
+Numer referencyjny: 100200300400 `;
 
 test("PDF biletu KOLEO: to samo co ze strony (rok z „Wystawiono”, PLN, etykiety bez dwukropka)", () => {
   assert.deepEqual(parseTicket(KOLEO_PDF), { ...parseTicket(KOLEO, null) });
@@ -135,5 +135,8 @@ test("prawdziwy PDF biletu KOLEO → tekst (bez bibliotek) → te same dane co z
   const { pdfText } = await import("../src/lib/pdf-text");
   const text = await pdfText(new Uint8Array(readFileSync(PRIVATE_PDF)), async (d) => new Uint8Array(inflateSync(d)));
   assert.match(text, /05\.11 07:16 Słupsk -> Warszawa Centralna 05\.11 11:31/);
-  assert.deepEqual(parseTicket(text), parseTicket(KOLEO, null));
+  // Numer referencyjny w teście wyżej jest zmyślony — prawdziwy siedzi tylko w prywatnym PDF-ie.
+  const { reference, ...rest } = parseTicket(text);
+  assert.match(reference ?? "", /^\d{12}$/);
+  assert.deepEqual({ ...rest, reference: "100200300400" }, parseTicket(KOLEO, null));
 });
