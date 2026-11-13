@@ -2,13 +2,13 @@
 
 import { generateAuthenticationOptions, verifyAuthenticationResponse } from "@simplewebauthn/server";
 import type { AuthenticationResponseJSON } from "@simplewebauthn/server";
-import { timingSafeEqual } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { db, passkeys } from "@/db";
 import { getState, setState } from "@/lib/app-state";
 import { relyingParty } from "@/lib/auth";
+import { secretMatches } from "@/lib/secret";
 import { cookieOptions, createSession, SESSION_COOKIE } from "@/lib/session";
 
 /** Po tylu błędnych hasłach z rzędu — blokada logowania hasłem (passkey działa dalej). */
@@ -44,10 +44,7 @@ export async function loginWithPassword(_prev: { error?: string } | undefined, f
     const at = new Date(lock.until).toLocaleTimeString("pl-PL", { timeZone: "Europe/Warsaw", hour: "2-digit", minute: "2-digit" });
     return { error: `Za dużo prób — hasłem spróbujesz o ${at}. Face ID działa.` };
   }
-  const given = Buffer.from(String(fd.get("password") ?? ""));
-  const expected = Buffer.from(process.env.APP_PASSWORD ?? "");
-  const ok = expected.length > 0 && given.length === expected.length && timingSafeEqual(given, expected);
-  if (!ok) {
+  if (!secretMatches(String(fd.get("password") ?? ""), process.env.APP_PASSWORD)) {
     const fails = lock.fails + 1;
     await setState(
       "login-lock",

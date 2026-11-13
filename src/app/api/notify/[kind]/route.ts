@@ -1,19 +1,16 @@
-import { timingSafeEqual } from "node:crypto";
 import type { NextRequest } from "next/server";
 import { db, pushSubscriptions } from "@/db";
 import { sendMorningMail } from "@/lib/morning-mail";
 import { notifications } from "@/lib/notify";
 import { sendPush } from "@/lib/push";
+import { bearerToken, secretMatches } from "@/lib/secret";
 
 /**
  * Powiadomienia wołane przez zewnętrzny cron (cron-job.org): /api/notify/morning (+ poranny mail), /api/notify/evening.
  * Omija basic auth (proxy.ts) — chroni go nagłówek `Authorization: Bearer <CRON_SECRET>`.
  */
 export async function GET(request: NextRequest, ctx: RouteContext<"/api/notify/[kind]">) {
-  const secret = process.env.CRON_SECRET;
-  const given = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ?? "";
-  const ok = !!secret && given.length === secret.length && timingSafeEqual(Buffer.from(given), Buffer.from(secret));
-  if (!ok) return new Response("Unauthorized", { status: 401 });
+  if (!secretMatches(bearerToken(request), process.env.CRON_SECRET)) return new Response("Unauthorized", { status: 401 });
 
   const { kind } = await ctx.params;
   if (kind !== "morning" && kind !== "evening") return new Response("Not found", { status: 404 });

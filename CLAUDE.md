@@ -27,7 +27,8 @@ Hook w `.claude/settings.json` puszcza ESLint (`--max-warnings 0`) na każdym ed
 - **Mutacje = server actions** (`src/app/actions.ts`, `src/app/settings/security/actions.ts`).
   Każda zaczyna się od `requireSession()`; proxy to nie jest zabezpieczenie. Jedyny wyjątek
   to logowanie (`src/app/login/actions.ts`). Trasy bez sesji (cron, ingest biletów, feed
-  kalendarza) sprawdzają token porównaniem stałoczasowym.
+  kalendarza) sprawdzają token porównaniem stałoczasowym — `secretMatches()` z `src/lib/secret.ts`,
+  nie własnym `===`.
 - **Daty grań** to lokalny czas Warszawy jako tekst (`"2026-10-14T20:00"`), „teraz” z `nowLocal()`.
   Nie mieszaj z `new Date()` w strefie serwera; UTC tylko dla znaczników technicznych
   (`createdAt`, `firstSeenAt`, znaczniki w `app_state`).
