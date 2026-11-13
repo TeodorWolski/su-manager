@@ -9,7 +9,10 @@ w Next 16.
 1. `pnpm typecheck && pnpm lint && pnpm test` — wszystko zielone. To samo puszcza CI
    (`.github/workflows/test.yml`), więc czerwone lokalnie = czerwone na GitHubie.
 2. Zmiana w UI: obejrzyj ją na szerokości telefonu (390 px), w trybie jasnym i ciemnym.
-   Apka jest używana głównie z telefonu.
+   Apka jest używana głównie z telefonu. `local.db` bywa pusta z przodu (brak nadchodzących
+   grań) — wtedy odtwórz kopię do tymczasowego pliku poza repo i odpal `next dev`
+   z `DATABASE_URL=file:…` i pustym `APP_PASSWORD`; dane w kopii zmieniaj śmiało, lokalnej
+   i produkcyjnej bazy nie.
 3. Zmiana schematu: przeczytaj wygenerowany SQL z `pnpm db:generate` (drizzle przy przebudowie
    tabeli potrafi kopiować kolumnę, której jeszcze nie ma).
 4. Zaktualizuj `docs/PRODUCT.md`, jeśli zmieniło się zachowanie funkcji.
@@ -37,6 +40,12 @@ Hook w `.claude/settings.json` puszcza ESLint (`--max-warnings 0`) na każdym ed
 - **Nowa zależność npm** — tylko po pytaniu. Wolimy kilkadziesiąt linii własnego kodu
   (czytnik PDF, parser biletów) niż bibliotekę do jednego zastosowania.
 - **Progi i stałe** nazwane i opisane przy definicji (`COOLDOWN_DAYS`, `HOME_CITY`…), bez magicznych liczb w środku logiki.
+- **Analityka** tylko przez `track()` / `identify()` z `src/lib/analytics.ts`; nowe zdarzenie
+  dopisz do listy `AnalyticsEvent`. We właściwościach liczby i flagi, nigdy treść z CRM
+  (nazwiska, notatki, teksty wiadomości).
+- **Refaktor „bez zmiany zachowania”** to obietnica do sprawdzenia: przy przepinaniu logiki
+  uruchom stary kod (z `git archive HEAD`) i nowy obok siebie na losowych danych i porównaj
+  wyniki, w `TZ=UTC` i `TZ=Europe/Warsaw`. Testy jednostkowe łapią tylko przewidziane przypadki.
 
 ## Testy
 
@@ -55,6 +64,20 @@ Hook w `.claude/settings.json` puszcza ESLint (`--max-warnings 0`) na każdym ed
 - Bez martwego kodu, zakomentowanych bloków, `console.log`, „na zapas” abstrakcji i opcji,
   o które nikt nie prosił. Mniejszy diff wygrywa.
 - Teksty w UI po polsku, ton luźny, jak w reszcie apki.
+
+## Repo jest publiczne
+
+Wszystko, co trafia na GitHuba, czyta każdy: kod, historia, opisy commitów, zakładka Actions.
+
+- **Nic wrażliwego w Actions.** Artifact publicznego repo pobierze każdy zalogowany, logi
+  widzi każdy. Workflow nie wrzuca kopii bazy ani jej fragmentów (kopia idzie mailem),
+  a skrypty logują liczby, nie treść (bez nazwisk, notatek, adresów).
+- **Dane w testach i fixtures zmyślone** („Jan Kowalski”, „Kasia Testowa”, numery z zer).
+  Strony bileterii w `tests/fixtures/` są OK — to publiczne wydarzenia.
+- **Bez jednorazowych skryptów z prawdziwymi danymi** (import historii grań itp.) — odpal
+  lokalnie i nie commituj.
+- **Historii nie da się cofnąć** (force-push jest zablokowany), więc czytaj diff przed
+  commitem pod kątem danych osobowych, nie tylko sekretów.
 
 ## Produkcja — zawsze pytaj
 

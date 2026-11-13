@@ -8,17 +8,18 @@ z telefonu (PWA), w codziennym użyciu od października 2026. Zastąpiła arkusz
 Stack: Next.js 16 · Drizzle · SQLite (lokalnie plik, na produkcji Turso) · Tailwind 4 · Vercel.
 
 W liczbach: 2 100+ wydarzeń zebranych z bileterii w pierwszy miesiąc, 18 migracji schematu,
-17 plików testów (~90 testów), zero zewnętrznych bibliotek do PDF.
+21 plików testów (~110 testów), zero zewnętrznych bibliotek do PDF.
 
 ## Co działa beze mnie
 
 - Scraper trzech bileterii codziennie (10:30 z zewnętrznego crona, harmonogram GitHuba jako zapas) z kontrolą zdrowia przebiegu, która łapie zmianę strony
   serwisu — czego testy na zapisanych plikach z definicji nie zobaczą
-- Poranny mail i pushe: do kogo ponowić, najgorętsze okazje, nowe terminy komików z CRM
+- Poranny mail i pushe: do kogo ponowić, najgorętsze okazje, nowe terminy komików z CRM,
+  co jeszcze gra w okolicy, gdy i tak jadę na granie do innego miasta
 - Niedzielne podsumowanie tygodnia
 - Bilety kolejowe z Gmaila przez integrację z Google Apps Script (skrypt co 10 min wysyła nowe
   bilety do API apki): PDF → tekst → parser → podpięcie do grania → powiadomienie
-- Cotygodniowa kopia bazy w GitHub Actions
+- Cotygodniowa kopia bazy z GitHub Actions, wysyłana mailem
 
 ## Co może być ciekawe w kodzie
 
@@ -31,6 +32,14 @@ W liczbach: 2 100+ wydarzeń zebranych z bileterii w pierwszy miesiąc, 18 migra
   pojawienia się wydarzenia w bileterii do występu. Scraper patrzy tylko 90 dni naprzód, więc
   termin „pojawiający się” na granicy horyzontu to dana ucięta: zamiast fałszywego „90 dni”
   wynik to „ponad 3 miesiące”
+- **Prognoza celu miesiąca** (`src/lib/forecast.ts`) — ile grań wyjdzie z tego, co zagrane,
+  potwierdzone i w toku, i do ilu osób jeszcze napisać. Skuteczność rozmów jest wygładzona
+  założeniem „co trzecia”, bo przy kilkunastu rozmowach 2 zgody z 2 dałyby 100%; karta sama
+  mówi, kiedy liczba jest jeszcze szacunkiem
+- **„Skoro już jedziesz”** (`src/lib/while-there.ts`) — z potwierdzonych grań i biletów
+  kolejowych składa pobyty poza domem (dzień przed i po, rozszerzone o bilety) i szuka grań
+  w okolicy w wolne dni. Próg 80 km od domu wyszedł z danych: bez niego granie pod Warszawą
+  podsuwało warszawskie wydarzenia
 - **Trasa** (`src/lib/route.ts`) — jadę z A do B na dzień D: grania po drodze przez N dni,
   w korytarzu wzdłuż linii trasy; plan wybiera najwyżej jedno granie dziennie tak, żeby
   jechać do przodu (programowanie dynamiczne)
@@ -47,7 +56,7 @@ W liczbach: 2 100+ wydarzeń zebranych z bileterii w pierwszy miesiąc, 18 migra
   fonty CID z ToUnicode; ten sam kod działa na serwerze (zlib) i w przeglądarce
   (`DecompressionStream`)
 - **Log bez zasięgu** — kolejka w telefonie i osobny `offline.html` bez Nexta, zapis idempotentny
-- **Czysta logika osobno od bazy** w `src/lib/*`, dzięki czemu większość z 17 plików testów
+- **Czysta logika osobno od bazy** w `src/lib/*`, dzięki czemu większość z 21 plików testów
   nie potrzebuje bazy; te, które jej potrzebują (powiadomienia, mail), stawiają tymczasową
   bazę z migracjami
 - Dokumentacja domeny: [`docs/PRODUCT.md`](docs/PRODUCT.md)
@@ -62,6 +71,10 @@ W liczbach: 2 100+ wydarzeń zebranych z bileterii w pierwszy miesiąc, 18 migra
 - **Bezpieczeństwo:** sesja w podpisanym ciasteczku i Face ID (passkeys, WebAuthn) zamiast
   basic auth; każda akcja serwerowa sama sprawdza sesję, nie tylko proxy. Dane biletu przy
   imporcie są w adresie po „#”, więc nie trafiają do logów serwera
+- **Bez kluczy działa, tylko skromniej:** mail, pushe, kalendarz, bilety z Gmaila i analityka
+  (PostHog) wyłączają się, gdy brakuje ich zmiennej w środowisku. Apka startuje po sklonowaniu
+  bez żadnej konfiguracji, a brakujący sekret zamyka trasę, zamiast ją otwierać
+  (`src/lib/secret.ts`)
 - **Produkcyjna baza to źródło prawdy:** kolejność wydania to kopia bazy → migracja →
   dopiero deploy
 
@@ -76,6 +89,12 @@ Apkę rozwijam z Claude Code. Zasady pracy są w repo, a nie w głowie:
   i sekretami GitHuba; force-push i usunięcie bazy zablokowane
 - [`docs/PRODUCT.md`](docs/PRODUCT.md) — dokumentacja domeny: słownik pojęć, które łatwo pomylić,
   i opis każdej funkcji z plikami, w których żyje
+
+Przykład z praktyki: liczenie dni było wpisane osobno w kilkunastu modułach, pod tą samą nazwą
+w trzech wariantach. Po przeniesieniu do jednego miejsca stary i nowy kod zostały uruchomione
+obok siebie na kilkuset losowych zestawach danych (rytm, okazje, ponawianie, ranking, trasa),
+w strefie serwera i warszawskiej — dopiero identyczne wyniki zamknęły zmianę. Same testy
+jednostkowe by tego nie pokazały, bo sprawdzają przypadki, które ktoś przewidział.
 
 ---
 
