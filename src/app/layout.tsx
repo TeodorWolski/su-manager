@@ -6,7 +6,7 @@ import { OfflineSync } from "@/components/offline-sync";
 import { ReviewGate } from "@/components/review-gate";
 import { TabBar } from "@/components/tab-bar";
 import { ThemeProvider } from "@/components/theme";
-import { currentSession } from "@/lib/auth";
+import { currentSession, OWNER_DISTINCT_ID } from "@/lib/auth";
 import { getFormOptions, getOfflineLogData, getPendingReviews } from "@/lib/queries";
 import "./globals.css";
 
@@ -41,7 +41,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="pl" suppressHydrationWarning className={`${instrument.variable} h-full antialiased`}>
       <body className="min-h-full">
-        <ThemeProvider>
+        <ThemeProvider posthogDistinctId={authed ? OWNER_DISTINCT_ID : undefined}>
           {authed && <TabBar />}
           <main className="mx-auto max-w-2xl px-4 pt-[env(safe-area-inset-top)] pb-28 md:pt-14 md:pb-16">
             {children}

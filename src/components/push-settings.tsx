@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { sendTestPush, subscribePush, unsubscribePush } from "@/app/actions";
+import { track } from "@/lib/analytics";
 import { urlBase64ToUint8Array } from "@/lib/vapid";
 
 
@@ -37,6 +38,7 @@ export function PushSettings() {
         applicationServerKey: urlBase64ToUint8Array(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!),
       });
       await subscribePush(JSON.parse(JSON.stringify(sub)));
+      track("push_notifications_enabled");
       setState("on");
     } catch {
       setState(Notification.permission === "denied" ? "denied" : "off");
@@ -53,6 +55,7 @@ export function PushSettings() {
     if (sub) {
       await unsubscribePush(sub.endpoint);
       await sub.unsubscribe();
+      track("push_notifications_disabled");
     }
     setState("off");
     setBusy(false);
@@ -61,6 +64,7 @@ export function PushSettings() {
   async function test() {
     setBusy(true);
     const n = await sendTestPush();
+    track("push_test_sent", { recipient_count: n });
     setInfo(n ? `Wysłane na ${n} ${n === 1 ? "urządzenie" : "urządzenia"}.` : "Brak zapisanych urządzeń.");
     setBusy(false);
   }

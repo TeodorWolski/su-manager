@@ -3,6 +3,7 @@
 import { browserSupportsWebAuthn, startRegistration } from "@simplewebauthn/browser";
 import { Loader2, ScanFace } from "lucide-react";
 import { useState, useSyncExternalStore } from "react";
+import { track } from "@/lib/analytics";
 import { markPasskeyDevice } from "@/lib/passkey-flag";
 import { passkeyRegister, passkeyRegisterOptions } from "./actions";
 
@@ -31,7 +32,10 @@ export function AddPasskey({ prominent }: { prominent?: boolean }) {
       const optionsJSON = await passkeyRegisterOptions();
       const response = await startRegistration({ optionsJSON });
       const r = await passkeyRegister(response, deviceName());
-      if (!r.error) markPasskeyDevice();
+      if (!r.error) {
+        markPasskeyDevice();
+        track("passkey_added");
+      }
       setMsg(r.error ?? "Gotowe — następnym razem zalogujesz się Face ID.");
     } catch (e) {
       const name = (e as { name?: string }).name;

@@ -101,6 +101,7 @@ Zmiana schematu: edytuj `src/db/schema.ts`, potem `pnpm db:generate && pnpm db:m
 | `APP_PASSWORD` | hasło logowania (ekran `/login`; Face ID dodasz po zalogowaniu). Bez niego — lokalnie — apka jest otwarta |
 | `CRON_SECRET` | token dla `/api/notify/*` i `/api/ingest/ticket` (cron-job.org, skrypt Gmaila) |
 | `CALENDAR_TOKEN` | tajny token w adresie feedu `/calendar/<token>.ics`; bez niego kalendarz jest wyłączony |
+| `NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN`, `NEXT_PUBLIC_POSTHOG_HOST` | analityka i błędy w PostHogu; bez nich analityka jest wyłączona |
 | `SESSION_SECRET` | opcjonalnie: klucz podpisu sesji (domyślnie wyprowadzany z `APP_PASSWORD`) |
 
 ### Jak to działa

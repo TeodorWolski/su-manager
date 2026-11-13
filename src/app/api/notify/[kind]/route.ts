@@ -1,9 +1,10 @@
-import type { NextRequest } from "next/server";
+import { after, type NextRequest } from "next/server";
 import { db, pushSubscriptions } from "@/db";
 import { sendMorningMail } from "@/lib/morning-mail";
 import { notifications } from "@/lib/notify";
 import { sendPush } from "@/lib/push";
 import { bearerToken, secretMatches } from "@/lib/secret";
+import { flushPostHogLogs, logNotificationDispatchCompleted, logNotificationDispatchSkipped } from "@/lib/posthog-logs";
 
 /**
  * Powiadomienia wołane przez zewnętrzny cron (cron-job.org): /api/notify/morning (+ poranny mail), /api/notify/evening.
@@ -27,10 +28,20 @@ export async function GET(request: NextRequest, ctx: RouteContext<"/api/notify/[
 
   // Bez żadnego urządzenia nie liczymy przypomnień — inaczej odhaczyłyby się jako „wysłane dziś” i przepadły.
   const [anyDevice] = await db.select({ e: pushSubscriptions.endpoint }).from(pushSubscriptions).limit(1);
-  if (!anyDevice) return Response.json({ kind, mail, sent: [], devices: 0, note: "brak zapisanych urządzeń — nic nie odhaczone" });
+  if (!anyDevice) {
+    logNotificationDispatchSkipped(kind);
+    after(async () => {
+      await flushPostHogLogs();
+    });
+    return Response.json({ kind, mail, sent: [], devices: 0, note: "brak zapisanych urządzeń — nic nie odhaczone" });
+  }
 
   const list = await notifications(kind);
   let devices = 0;
   for (const n of list) devices = await sendPush(n);
+  logNotificationDispatchCompleted({ kind, notificationCount: list.length, deviceCount: devices });
+  after(async () => {
+    await flushPostHogLogs();
+  });
   return Response.json({ kind, mail, sent: list.map((n) => n.title), devices });
 }

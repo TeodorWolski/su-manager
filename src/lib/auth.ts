@@ -4,6 +4,12 @@ import { cache } from "react";
 import { authEnabled, checkSession, SESSION_COOKIE } from "./session";
 
 /**
+ * Stały identyfikator jedynego użytkownika: konto passkeya i osoba w analityce.
+ * Nie zmieniaj — passkeye są do niego przypisane. Identyfikator sesji (per urządzenie) to nie osoba.
+ */
+export const OWNER_DISTINCT_ID = "su-manager-owner";
+
+/**
  * Sesja bieżącego żądania (Server Components / Server Actions / Route Handlers).
  * Lokalnie bez APP_PASSWORD zwraca „zalogowany” bez sprawdzania.
  */

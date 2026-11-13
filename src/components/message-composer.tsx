@@ -2,6 +2,7 @@
 
 import { Check, Copy } from "lucide-react";
 import { useState } from "react";
+import { track } from "@/lib/analytics";
 import { CHANNEL_SHORT, MESSAGE_CHANNELS } from "@/lib/labels";
 import { cn } from "@/lib/utils";
 import { PendingButton } from "./form";
@@ -43,6 +44,7 @@ export function MessageComposer({
           type="button"
           onClick={async () => {
             await navigator.clipboard.writeText(text);
+            track("outreach_message_copied");
             setCopied(true);
             setTimeout(() => setCopied(false), 2000);
           }}

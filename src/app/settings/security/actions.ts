@@ -7,12 +7,12 @@ import { refresh } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { db, passkeys } from "@/db";
-import { relyingParty, requireSession } from "@/lib/auth";
+import { OWNER_DISTINCT_ID, relyingParty, requireSession } from "@/lib/auth";
 import { cookieOptions, revokeOtherSessions, revokeSession, SESSION_COOKIE } from "@/lib/session";
 
 const CHALLENGE_COOKIE = "sum_wa_register";
 /** Stały identyfikator jedynego użytkownika — passkey „wie”, do jakiego konta należy. */
-const USER_ID = new TextEncoder().encode("su-manager-owner");
+const USER_ID = new TextEncoder().encode(OWNER_DISTINCT_ID);
 
 /** Krok 1 dodawania passkeya (tylko zalogowany): opcje dla przeglądarki, wyzwanie w ciasteczku. */
 export async function passkeyRegisterOptions() {

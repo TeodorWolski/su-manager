@@ -2,10 +2,23 @@
 
 import { Monitor, Moon, Sun } from "lucide-react";
 import { ThemeProvider as NextThemes, useTheme } from "next-themes";
-import { useSyncExternalStore } from "react";
+import { useEffect, useRef, useSyncExternalStore } from "react";
+import { identify } from "@/lib/analytics";
 import { cn } from "@/lib/utils";
 
-export function ThemeProvider({ children }: { children: React.ReactNode }) {
+export function ThemeProvider({ children, posthogDistinctId }: { children: React.ReactNode; posthogDistinctId?: string }) {
+  const identified = useRef(false);
+
+  useEffect(() => {
+    if (posthogDistinctId) {
+      identify(posthogDistinctId);
+      identified.current = true;
+    } else if (identified.current) {
+      identify(null);
+      identified.current = false;
+    }
+  }, [posthogDistinctId]);
+
   return (
     <NextThemes attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
       {children}

@@ -45,3 +45,4 @@ local.db*
 
 # lokalne ustawienia Claude Code
 .claude/settings.local.json
+.env.local
