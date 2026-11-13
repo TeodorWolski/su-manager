@@ -1,6 +1,5 @@
 import { leadLabel } from "./lead-time";
 import {
-  addDays,
   gigKind,
   MAX_OPENERS_PER_WEEK,
   PENDING,
@@ -10,6 +9,7 @@ import {
   weekStart,
   type RhythmGig,
 } from "./rhythm";
+import { addDays, dayOf, daysBetween } from "./time";
 
 /**
  * „Najgorętsze okazje” na ekranie Dziś: wydarzenia za HOT_FROM_DAYS–HOT_TO_DAYS dni —
@@ -44,16 +44,14 @@ export type HotCandidate = {
 
 export type Hot = HotCandidate & { score: number; reasons: string[] };
 
-const day = (iso: string) => iso.slice(0, 10);
-
 export function hotOpportunities(gigs: RhythmGig[], candidates: HotCandidate[], today: string): Hot[] {
   const from = addDays(today, HOT_FROM_DAYS);
-  const active = gigs.filter((g) => g.status === "confirmed" || (PENDING.includes(g.status) && day(g.startsAt) >= today));
-  const busy = new Set(active.map((g) => day(g.startsAt)));
+  const active = gigs.filter((g) => g.status === "confirmed" || (PENDING.includes(g.status) && dayOf(g.startsAt) >= today));
+  const busy = new Set(active.map((g) => dayOf(g.startsAt)));
   const inWeek = (date: string) => {
     const start = weekStart(date);
     const end = addDays(start, 6);
-    return active.filter((g) => day(g.startsAt) >= start && day(g.startsAt) <= end);
+    return active.filter((g) => dayOf(g.startsAt) >= start && dayOf(g.startsAt) <= end);
   };
   /** Ile dni z rzędu z graniem wyszłoby, gdybym dołożył `date`. */
   const runWith = (date: string) => {
@@ -65,7 +63,7 @@ export function hotOpportunities(gigs: RhythmGig[], candidates: HotCandidate[], 
 
   const scored: Hot[] = [];
   for (const c of candidates) {
-    const d = day(c.startsAt);
+    const d = dayOf(c.startsAt);
     // Okno: 7–21 dni, a dla komika z dłuższym wyprzedzeniem — do jego wyprzedzenia (+3 dni zapasu).
     const ideal = c.lead?.days ?? 14;
     const to = addDays(today, Math.max(HOT_TO_DAYS, ideal + 3));
@@ -103,9 +101,9 @@ export function hotOpportunities(gigs: RhythmGig[], candidates: HotCandidate[], 
     if (c.travelMinutes != null && c.travelMinutes <= 60) score += 1;
     if (c.isNew) score += 0.5;
     // Najlepiej w „jego” momencie (wyprzedzenie komika; domyślnie ok. 2 tygodnie przed).
-    score -= Math.abs((Date.parse(d) - Date.parse(today)) / 864e5 - ideal) * 0.05;
+    score -= Math.abs(daysBetween(today, d) - ideal) * 0.05;
     if (c.lead?.personal) {
-      const left = (Date.parse(d) - Date.parse(today)) / 864e5;
+      const left = daysBetween(today, d);
       if (left <= ideal + 3 && left >= ideal - 7) {
         score += 1;
         reasons.push(`pisz ${leadLabel(c.lead.days)} przed`);
@@ -120,7 +118,7 @@ export function hotOpportunities(gigs: RhythmGig[], candidates: HotCandidate[], 
   return scored
     .sort((a, b) => b.score - a.score)
     .filter((h) => {
-      const d = day(h.startsAt);
+      const d = dayOf(h.startsAt);
       const keys = [`p:${h.performer.key}`, `d:${d}`, `w:${weekStart(d)}:${h.isOpenMic}`];
       if (keys.some((k) => seen.has(k))) return false;
       keys.forEach((k) => seen.add(k));

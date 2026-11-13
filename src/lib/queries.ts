@@ -22,7 +22,7 @@ import { loadUpcomingEventsCached } from "./events-cache";
 import { gigTotals } from "./gig-totals";
 import { typeIssue } from "./gig-types";
 import { getFollowUps, getPlanning } from "./planning";
-import { DEFAULT_START_TIME, nowLocal } from "./time";
+import { addDays, DEFAULT_START_TIME, nowLocal } from "./time";
 import { normalize } from "./text";
 
 /** Ile minut po starcie grania wyskakuje formularz oceny. */
@@ -123,7 +123,7 @@ export async function getPendingReviews() {
  */
 export async function getOfflineLogData() {
   const today = nowLocal().slice(0, 10);
-  const day = (n: number) => new Date(Date.parse(today) + n * 864e5).toISOString().slice(0, 10);
+  const day = (n: number) => addDays(today, n);
   const list = await gigListQuery()
     .where(
       and(
@@ -640,22 +640,21 @@ export async function getStageCard() {
 export async function gigChoicesForTrips(tripList: { id: number; departsAt: string }[]) {
   const choices = new Map<number, { value: number; label: string }[]>();
   if (!tripList.length) return choices;
-  const shift = (iso: string, n: number) => new Date(Date.parse(iso.slice(0, 10)) + n * 864e5).toISOString().slice(0, 10);
   const days = tripList.map((t) => t.departsAt.slice(0, 10)).sort();
   const near = await db
     .select({ id: gigs.id, title: gigs.title, startsAt: gigs.startsAt })
     .from(gigs)
     .where(
       and(
-        gte(gigs.startsAt, shift(days[0], -3)),
-        lt(gigs.startsAt, shift(days[days.length - 1], 4)),
+        gte(gigs.startsAt, addDays(days[0], -3)),
+        lt(gigs.startsAt, addDays(days[days.length - 1], 4)),
         sql`${gigs.status} not in ('rejected', 'cancelled')`,
       ),
     )
     .orderBy(asc(gigs.startsAt));
   for (const t of tripList) {
-    const from = shift(t.departsAt, -3);
-    const to = shift(t.departsAt, 4);
+    const from = addDays(t.departsAt, -3);
+    const to = addDays(t.departsAt, 4);
     choices.set(
       t.id,
       near

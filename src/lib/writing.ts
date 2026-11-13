@@ -1,5 +1,6 @@
 import type { WritingKind } from "@/db/schema";
-import { addDays, weekStart } from "./rhythm";
+import { weekStart } from "./rhythm";
+import { addDays } from "./time";
 
 /**
  * Regularność pisania. Trening puent codziennie (seria dni), generowanie i redakcja — cel tygodniowy

@@ -1,5 +1,6 @@
 import { format, parseISO } from "date-fns";
 import { pl } from "date-fns/locale";
+import { addDays, dayOf, daysBetween } from "./time";
 
 /**
  * Rytm grania: wolę 2–3 grania co tydzień niż serię dzień po dniu i potem pustkę.
@@ -48,8 +49,6 @@ export type Insight =
 
 export const PENDING = ["interested", "contacted", "waiting"];
 
-const day = (iso: string) => iso.slice(0, 10);
-export const addDays = (date: string, n: number) => new Date(Date.parse(date) + n * 864e5).toISOString().slice(0, 10);
 /** Poniedziałek tygodnia, w którym jest `date`. */
 export function weekStart(date: string) {
   const dow = (new Date(Date.parse(date)).getUTCDay() + 6) % 7; // pon = 0
@@ -77,13 +76,13 @@ export function buildWeeks(gigs: RhythmGig[], today: string): Week[] {
   for (let i = -WEEKS_BACK; i <= WEEKS_AHEAD; i++) {
     const start = addDays(current, i * 7);
     const end = addDays(start, 6);
-    const inWeek = gigs.filter((g) => day(g.startsAt) >= start && day(g.startsAt) <= end);
+    const inWeek = gigs.filter((g) => dayOf(g.startsAt) >= start && dayOf(g.startsAt) <= end);
     weeks.push({
       start,
       end,
       confirmed: inWeek.filter((g) => g.status === "confirmed").length,
-      pending: inWeek.filter((g) => PENDING.includes(g.status) && day(g.startsAt) >= today).length,
-      ...balanceOf(inWeek.filter((g) => g.status === "confirmed" || (PENDING.includes(g.status) && day(g.startsAt) >= today))),
+      pending: inWeek.filter((g) => PENDING.includes(g.status) && dayOf(g.startsAt) >= today).length,
+      ...balanceOf(inWeek.filter((g) => g.status === "confirmed" || (PENDING.includes(g.status) && dayOf(g.startsAt) >= today))),
       when: i < 0 ? "past" : i === 0 ? "current" : "future",
     });
   }
@@ -95,11 +94,11 @@ function streaks(gigs: RhythmGig[], today: string) {
   const days = [
     ...new Set(
       gigs
-        .filter((g) => g.status === "confirmed" || (PENDING.includes(g.status) && day(g.startsAt) >= today))
-        .map((g) => day(g.startsAt)),
+        .filter((g) => g.status === "confirmed" || (PENDING.includes(g.status) && dayOf(g.startsAt) >= today))
+        .map((g) => dayOf(g.startsAt)),
     ),
   ].sort();
-  const pendingDays = new Set(gigs.filter((g) => PENDING.includes(g.status)).map((g) => day(g.startsAt)));
+  const pendingDays = new Set(gigs.filter((g) => PENDING.includes(g.status)).map((g) => dayOf(g.startsAt)));
   const runs: { from: string; to: string; days: number; withPending: boolean }[] = [];
   let from = days[0];
   for (let i = 0; i < days.length; i++) {
@@ -120,17 +119,17 @@ function streaks(gigs: RhythmGig[], today: string) {
  */
 function suggestFor(week: Week, gigs: RhythmGig[], opportunities: RhythmOpportunity[], today: string) {
   const busy = new Set(
-    gigs.filter((g) => g.status === "confirmed" || PENDING.includes(g.status)).map((g) => day(g.startsAt)),
+    gigs.filter((g) => g.status === "confirmed" || PENDING.includes(g.status)).map((g) => dayOf(g.startsAt)),
   );
   const isolated = (d: string) => !busy.has(addDays(d, -1)) && !busy.has(addDays(d, 1));
   const seen = new Set<string>();
   return opportunities
     .filter((o) => {
-      const d = day(o.startsAt);
+      const d = dayOf(o.startsAt);
       return d >= week.start && d <= week.end && d >= today && !busy.has(d);
     })
-    .sort((a, b) => Number(isolated(day(b.startsAt))) - Number(isolated(day(a.startsAt))))
-    .filter((o) => !seen.has(day(o.startsAt)) && seen.add(day(o.startsAt)))
+    .sort((a, b) => Number(isolated(dayOf(b.startsAt))) - Number(isolated(dayOf(a.startsAt))))
+    .filter((o) => !seen.has(dayOf(o.startsAt)) && seen.add(dayOf(o.startsAt)))
     .slice(0, 2);
 }
 
@@ -146,7 +145,7 @@ export function getInsights(gigs: RhythmGig[], opportunities: RhythmOpportunity[
 
   // Bieżący tydzień (jeśli zostały w nim co najmniej 2 dni) i następny.
   const current = weeks.find((w) => w.when === "current")!;
-  const daysLeft = Math.round((Date.parse(current.end) - Date.parse(today)) / 864e5) + 1;
+  const daysLeft = daysBetween(today, current.end) + 1;
   const candidates = [
     ...(daysLeft >= 2 ? [{ week: current, label: "W tym tygodniu" }] : []),
     { week: weeks[weeks.indexOf(current) + 1], label: "W przyszłym tygodniu" },

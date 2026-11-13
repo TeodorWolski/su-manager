@@ -8,13 +8,14 @@ import { inflateSync } from "node:zlib";
 import { db, gigs, trips } from "@/db";
 import { pdfText } from "./pdf-text";
 import { fmtZl, parseTicket, type ParsedTicket } from "./ticket-parse";
+import { addDays } from "./time";
 import { suggestGig } from "./trips";
 
 type TripKey = { fromStation: string; toStation: string; departsAt: string; arrivesAt: string | null; reference: string | null };
 
 /** Grania ±3 dni od podróży (do wyboru), podpowiedziane granie i istniejący wpis z tym numerem biletu. */
 export async function tripContext(trip: TripKey) {
-  const day = (n: number) => new Date(Date.parse(trip.departsAt.slice(0, 10)) + n * 864e5).toISOString().slice(0, 10);
+  const day = (n: number) => addDays(trip.departsAt, n);
   const candidates = await db
     .select({
       id: gigs.id,

@@ -25,6 +25,20 @@ export function nowLocal(offsetMinutes = 0): string {
   return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}`;
 }
 
+export const DAY_MS = 86_400_000;
+
+/** Sama data ("YYYY-MM-DD") ze znacznika lokalnego ("…T20:00") albo technicznego w UTC ("… 08:00:00"). */
+export const dayOf = (stamp: string) => stamp.slice(0, 10);
+
+/**
+ * Data przesunięta o `n` dni (może być ujemne). Liczymy na samej dacie w UTC, więc godzina
+ * w znaczniku, strefa serwera i zmiana czasu nie przesuwają wyniku.
+ */
+export const addDays = (date: string, n: number) => new Date(Date.parse(dayOf(date)) + n * DAY_MS).toISOString().slice(0, 10);
+
+/** Ile dni kalendarzowych od `from` do `to` — ujemne, gdy `to` jest wcześniej; godziny pomijamy. */
+export const daysBetween = (from: string, to: string) => Math.round((Date.parse(dayOf(to)) - Date.parse(dayOf(from))) / DAY_MS);
+
 /** Grania bez godziny (sama data) traktujemy przy porównaniach jak start o tej godzinie. */
 export const DEFAULT_START_TIME = "20:00";
 
@@ -101,7 +115,7 @@ export function parseDateQuery(query: string, today: string): { date: string | n
       },
     ],
     [/\b(dzis|dzisiaj)\b/, () => today],
-    [/\bjutro\b/, () => new Date(Date.parse(today) + 864e5).toISOString().slice(0, 10)],
+    [/\bjutro\b/, () => addDays(today, 1)],
   ];
   for (const [re, toDate] of patterns) {
     const m = q.match(re);

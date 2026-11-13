@@ -15,6 +15,9 @@ export const PERSONAL_MIN = 2;
 export const GLOBAL_MIN = 5;
 /** Zapas ponad wyprzedzenie, przy którym miejsce było już zajęte. */
 const TAKEN_MARGIN = 3;
+import { roundedMedian } from "./median";
+import { daysBetween } from "./time";
+
 const MIN_LEAD = 5;
 const MAX_LEAD = 42;
 
@@ -35,12 +38,7 @@ export type Lead = {
   taken: number;
 };
 
-const daysBefore = (r: LeadRecord) => Math.round((Date.parse(r.gigDate.slice(0, 10)) - Date.parse(r.firstMessage.slice(0, 10))) / 864e5);
-const median = (xs: number[]) => {
-  const s = [...xs].sort((a, b) => a - b);
-  const m = Math.floor(s.length / 2);
-  return s.length % 2 ? s[m] : Math.round((s[m - 1] + s[m]) / 2);
-};
+const daysBefore = (r: LeadRecord) => daysBetween(r.firstMessage, r.gigDate);
 
 /** Zalecane wyprzedzenie z listy rozmów (null = za mało danych). */
 export function recommend(records: LeadRecord[], min: number, fallback = DEFAULT_LEAD_DAYS): Lead | null {
@@ -48,7 +46,7 @@ export function recommend(records: LeadRecord[], min: number, fallback = DEFAULT
   if (timed.length < min) return null;
   const agreed = timed.filter((r) => r.outcome === "agreed").map(daysBefore);
   const taken = timed.filter((r) => r.outcome === "slot_taken").map(daysBefore);
-  let days = agreed.length ? median(agreed) : fallback;
+  let days = agreed.length ? roundedMedian(agreed) : fallback;
   if (taken.length) days = Math.max(days, Math.max(...taken) + TAKEN_MARGIN);
   return { days: Math.min(MAX_LEAD, Math.max(MIN_LEAD, days)), personal: false, agreed: agreed.length, taken: taken.length };
 }

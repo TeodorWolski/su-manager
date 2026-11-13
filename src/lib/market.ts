@@ -6,6 +6,9 @@
  * w pierwszych dniach działania scrapera istniały wcześniej, więc ich daty ogłoszenia nie znamy — pomijamy.
  */
 
+import { roundedMedian } from "./median";
+import { addDays, dayOf, daysBetween } from "./time";
+
 /** Wydarzenia z tylu pierwszych dni scrapera nie mówią nic o tym, kiedy komik ogłasza terminy. */
 export const ANNOUNCE_BASELINE_DAYS = 3;
 /**
@@ -31,26 +34,18 @@ export type MarketEvent = {
   firstSeenAt: string;
 };
 
-const day = (s: string) => s.slice(0, 10);
-const daysBetween = (a: string, b: string) => Math.round((Date.parse(day(b)) - Date.parse(day(a))) / 864e5);
-const median = (xs: number[]) => {
-  const s = [...xs].sort((a, b) => a - b);
-  const m = Math.floor(s.length / 2);
-  return s.length % 2 ? s[m] : Math.round((s[m - 1] + s[m]) / 2);
-};
-
 /**
  * Ile dni przed występem komik zwykle wrzuca termin (mediana). `beyondHorizon` = większość terminów
  * pojawiła się dopiero na granicy horyzontu scrapera, czyli ogłasza jeszcze wcześniej (ponad 3 mies.) —
  * wtedy `days` to dolna granica. null = za mało ogłoszeń widzianych na żywo.
  */
 export function announceLead(events: Pick<MarketEvent, "startsAt" | "firstSeenAt">[], scrapeStart: string) {
-  const since = new Date(Date.parse(day(scrapeStart)) + ANNOUNCE_BASELINE_DAYS * 864e5).toISOString().slice(0, 10);
-  const leads = events.filter((e) => day(e.firstSeenAt) >= since).map((e) => daysBetween(e.firstSeenAt, e.startsAt)).filter((d) => d >= 0);
+  const since = addDays(scrapeStart, ANNOUNCE_BASELINE_DAYS);
+  const leads = events.filter((e) => dayOf(e.firstSeenAt) >= since).map((e) => daysBetween(e.firstSeenAt, e.startsAt)).filter((d) => d >= 0);
   if (leads.length < ANNOUNCE_MIN_SAMPLES) return null;
   const atEdge = leads.filter((d) => d >= SCRAPE_HORIZON_DAYS - 3).length;
   const beyondHorizon = atEdge * 2 > leads.length;
-  return { days: beyondHorizon ? SCRAPE_HORIZON_DAYS : median(leads), samples: leads.length, beyondHorizon };
+  return { days: beyondHorizon ? SCRAPE_HORIZON_DAYS : roundedMedian(leads), samples: leads.length, beyondHorizon };
 }
 
 /** „~4 tyg.” / „ponad 3 mies.” — do UI i powiadomień. */
@@ -75,7 +70,7 @@ export function rankHeadliners(
       const { key, name, contactId } = list[0];
       const soldOut = list.filter((e) => e.availability === "sold_out").length;
       const last = list.filter((e) => e.availability === "last").length;
-      const upcoming = list.filter((e) => day(e.startsAt) >= opts.today).sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+      const upcoming = list.filter((e) => dayOf(e.startsAt) >= opts.today).sort((a, b) => a.startsAt.localeCompare(b.startsAt));
       const near = upcoming.filter((e) => e.inRange);
       // Popyt wygładzony (+3 „zwykłe” terminy) — 2 wyprzedane z 3 to jeszcze nie gwiazda.
       const demand = (soldOut + last) / (list.length + 3);

@@ -3,6 +3,7 @@
  * Wpis zaczyna się ARRIVE_BEFORE_MIN przed startem na scenie (tyle wcześniej trzeba być na miejscu).
  */
 
+import { addDays } from "./time";
 import { TRAIN_CALENDAR_LEAD_MIN } from "./trips";
 
 /** Ile minut przed startem sceny zaczyna się wpis w kalendarzu. */
@@ -53,7 +54,7 @@ export function warsawToUtc(local: string) {
 
 const utcStamp = (ms: number) => new Date(ms).toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
 const dateStamp = (d: string) => d.replace(/-/g, "");
-const nextDay = (d: string) => new Date(Date.parse(d) + 864e5).toISOString().slice(0, 10);
+const nextDay = (d: string) => addDays(d, 1);
 
 const escape = (s: string) => s.replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\r?\n/g, "\\n");
 

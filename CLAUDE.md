@@ -31,7 +31,8 @@ Hook w `.claude/settings.json` puszcza ESLint (`--max-warnings 0`) na każdym ed
   nie własnym `===`.
 - **Daty grań** to lokalny czas Warszawy jako tekst (`"2026-10-14T20:00"`), „teraz” z `nowLocal()`.
   Nie mieszaj z `new Date()` w strefie serwera; UTC tylko dla znaczników technicznych
-  (`createdAt`, `firstSeenAt`, znaczniki w `app_state`).
+  (`createdAt`, `firstSeenAt`, znaczniki w `app_state`). Dni licz przez `addDays` / `daysBetween` / `dayOf`
+  z `src/lib/time.ts`, nie własnym `Date.parse(...) / 864e5`.
 - **Kwoty w groszach** (`integer`), nigdy float.
 - **Nowa zależność npm** — tylko po pytaniu. Wolimy kilkadziesiąt linii własnego kodu
   (czytnik PDF, parser biletów) niż bibliotekę do jednego zastosowania.

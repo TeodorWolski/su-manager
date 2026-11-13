@@ -13,12 +13,14 @@ import { planRoute, routeDays } from "./route";
 import { matchContacts, matchesQuery } from "./match";
 import { isWantedLanguage, performerKey, performerName } from "./performer";
 import { normalize } from "./text";
-import { nowLocal, parseDateQuery } from "./time";
+import { addDays, DAY_MS, nowLocal, parseDateQuery } from "./time";
 
 /** Maks. czas dojazdu w jedną stronę; miasta z noclegiem wchodzą zawsze. */
 export const MAX_TRAVEL_MIN = 180;
 /** Ile dni wydarzenie jest „nowe” w aplikacji. */
 export const NEW_FOR_DAYS = 7;
+/** Granica „nowości” w formacie `events.firstSeenAt` (UTC "YYYY-MM-DD HH:MM:SS"). */
+const newSinceUtc = () => new Date(Date.now() - NEW_FOR_DAYS * DAY_MS).toISOString().replace("T", " ").slice(0, 19);
 /** Po wspólnym wieczorze nie proponuj tego komika przez tyle dni (chyba że kontakt ma własne „wyciszony do”). */
 export const COOLDOWN_DAYS = 30;
 /** Po „Odmówił” / „Zghostował” komik znika z Okazji (i Najgorętszych) na tyle dni. */
@@ -85,9 +87,6 @@ export const dedupeKey = (title: string, startsAt: string, venue: string | null)
   [normalize(title), startsAt.slice(0, 10), normalize(venue ?? "")].join("|");
 
 export const isOpenMic = (title: string) => /open[\s-]?mi[ck]|\bom\b/.test(normalize(title));
-
-const addDays = (date: string, days: number) =>
-  new Date(Date.parse(date.slice(0, 10)) + days * 864e5).toISOString().slice(0, 10);
 
 type MuteInput = {
   snoozeUntil: string | null;
@@ -324,7 +323,7 @@ export async function getOpportunities(
   const today = nowLocal().slice(0, 10);
   const [ctx, rows] = await Promise.all([loadContext(), loadEvents(today)]);
   // firstSeenAt jest w UTC (datetime('now')) — porównujemy w tym samym formacie.
-  const newSince = new Date(Date.now() - NEW_FOR_DAYS * 864e5).toISOString().replace("T", " ").slice(0, 19);
+  const newSince = newSinceUtc();
   return rows
     .filter((e) => !onlyIds || onlyIds.has(e.id))
     .map((e) => classify(e, ctx, newSince))
@@ -347,7 +346,7 @@ export async function searchOpportunities(
   if (!date && q.length < 2) return [];
   // Kontakty z CRM pasujące do frazy — ich aliasy też szukamy (np. pseudonim sceniczny).
   const people = q ? ctx.people.filter((p) => matchesQuery(rest, `${p.name} ${p.aliases ?? ""}`)) : [];
-  const newSince = new Date(Date.now() - NEW_FOR_DAYS * 864e5).toISOString().replace("T", " ").slice(0, 19);
+  const newSince = newSinceUtc();
   return rows
     .filter((e) => {
       if (date && e.startsAt.slice(0, 10) !== date) return false;
@@ -378,9 +377,8 @@ export async function nearOpportunities(
   if (!origin) return { origin: null, items: [] as Opportunity[] };
   const today = nowLocal().slice(0, 10);
   const [ctx, rows] = await Promise.all([loadContext(), loadEvents(today)]);
-  const shift = (n: number) => new Date(Date.parse(date) + n * 864e5).toISOString().slice(0, 10);
-  const [from, to] = [shift(-spanDays), shift(spanDays)];
-  const newSince = new Date(Date.now() - NEW_FOR_DAYS * 864e5).toISOString().replace("T", " ").slice(0, 19);
+  const [from, to] = [addDays(date, -spanDays), addDays(date, spanDays)];
+  const newSince = newSinceUtc();
   const items: Opportunity[] = [];
   for (const e of rows) {
     const day = e.startsAt.slice(0, 10);
@@ -411,7 +409,7 @@ export async function routeOpportunities(
   const today = nowLocal().slice(0, 10);
   const [ctx, rows] = await Promise.all([loadContext(), loadEvents(today)]);
   const dayList = routeDays(arriveBy, days).filter((d) => d >= today);
-  const newSince = new Date(Date.now() - NEW_FOR_DAYS * 864e5).toISOString().replace("T", " ").slice(0, 19);
+  const newSince = newSinceUtc();
   const totalKm = alongRoute(b, a, b).totalKm;
 
   const candidates = rows

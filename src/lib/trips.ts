@@ -2,6 +2,7 @@
  * Podróże: do którego grania pasuje bilet i jak wpisać pociąg do kalendarza. Czysta logika.
  */
 import { normalize } from "./text";
+import { daysBetween } from "./time";
 
 /** Wpis pociągu w kalendarzu zaczyna się tyle minut przed odjazdem (17:10 → 17:00). */
 export const TRAIN_CALENDAR_LEAD_MIN = 10;
@@ -12,8 +13,8 @@ export const TRIP_GIG_DAYS = 1;
 
 export type GigForTrip = { id: number; title: string; startsAt: string; cityName: string | null };
 
-const day = (iso: string) => iso.slice(0, 10);
-const daysBetween = (a: string, b: string) => Math.abs(Date.parse(day(a)) - Date.parse(day(b))) / 864e5;
+/** Odstęp w dniach bez względu na kierunek (granie dzień przed podróżą = dzień po). */
+const daysApart = (a: string, b: string) => Math.abs(daysBetween(a, b));
 /** „Warszawa Centralna” zawiera „Warszawa”, „Gdańsk Główny” — „Gdańsk”. */
 const stationIn = (station: string, city: string) => {
   const s = normalize(station);
@@ -29,7 +30,7 @@ export function suggestGig(trip: { fromStation: string; toStation: string; depar
   const matches = gigs
     .filter((g) => g.cityName && !stationIn(g.cityName, HOME_CITY))
     .filter((g) => stationIn(trip.toStation, g.cityName!) || stationIn(trip.fromStation, g.cityName!))
-    .map((g) => ({ g, dist: Math.min(daysBetween(g.startsAt, trip.departsAt), daysBetween(g.startsAt, trip.arrivesAt ?? trip.departsAt)) }))
+    .map((g) => ({ g, dist: Math.min(daysApart(g.startsAt, trip.departsAt), daysApart(g.startsAt, trip.arrivesAt ?? trip.departsAt)) }))
     .filter((x) => x.dist <= TRIP_GIG_DAYS)
     .sort((a, b) => a.dist - b.dist);
   return matches[0]?.g ?? null;

@@ -12,8 +12,8 @@ import { getInsights, type RhythmOpportunity } from "./rhythm";
 import { loadLeadTimes } from "./lead-data";
 import { readyBits } from "./bit-ready";
 import { computeMgm } from "./mgm";
-import { addDays, weekStart } from "./rhythm";
-import { nowLocal } from "./time";
+import { weekStart } from "./rhythm";
+import { addDays, nowLocal } from "./time";
 import { countInWeek, dayStreak, editQueue, fixedBits, WEEKLY_TARGET, weekDots, weekStreak, type BitReaction } from "./writing";
 
 const headliner = alias(contacts, "headliner");
@@ -70,7 +70,7 @@ export type FollowUp = Awaited<ReturnType<typeof getFollowUps>>[number];
  */
 export async function getPlanning(loadEvents: (today: string) => Promise<EventRow[]> = loadUpcomingEvents) {
   const today = nowLocal().slice(0, 10);
-  const from = new Date(Date.parse(today) - 35 * 864e5).toISOString().slice(0, 10);
+  const from = addDays(today, -35);
   const [rows, opportunities, leads] = await Promise.all([
     db
       .select({ id: gigs.id, title: gigs.title, startsAt: gigs.startsAt, status: gigs.status, context: gigs.context })

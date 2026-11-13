@@ -7,9 +7,9 @@ import { and, eq, gte, inArray, isNotNull, lte, sql } from "drizzle-orm";
 import { bits, db, gigBits, gigLogs, gigs, interactions, venues } from "@/db";
 import { GIG_CONTEXT_LABEL, GIG_OUTCOME_LABEL, REACTION_EMOJI } from "./labels";
 import { getPlanning, getWritingDigest } from "./planning";
-import { addDays, MAX_OPENERS_PER_WEEK, WEEK_MAX, WEEK_MIN, weekStart } from "./rhythm";
+import { MAX_OPENERS_PER_WEEK, WEEK_MAX, WEEK_MIN, weekStart } from "./rhythm";
 import { plural } from "./text";
-import { effectiveStart, fmtDate, fmtDateTime, nowLocal } from "./time";
+import { addDays, effectiveStart, fmtDate, fmtDateTime, nowLocal } from "./time";
 
 const APP_URL = process.env.APP_URL ?? "https://su-manager.vercel.app";
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);

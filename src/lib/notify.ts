@@ -15,7 +15,7 @@ import { loadMarketEvents } from "./market-data";
 import { getFollowUps, getWriting } from "./planning";
 import type { PushPayload } from "./push";
 import { plural } from "./text";
-import { effectiveStart, nowLocal } from "./time";
+import { addDays, daysBetween, effectiveStart, nowLocal } from "./time";
 
 /**
  * „Zainteresowany” = chcę zagrać, ale jeszcze nie napisałem. Przypominam na tyle dni przed graniem,
@@ -27,7 +27,6 @@ export const writeReminderDays = (lead: number) => [lead, Math.max(3, Math.round
 const WRITE_LOOKAHEAD_DAYS = 42;
 
 const headliner = alias(contacts, "headliner");
-const daysUntil = (today: string, startsAt: string) => Math.round((Date.parse(startsAt.slice(0, 10)) - Date.parse(today)) / 864e5);
 
 /** Ile minut po starcie grania przypominam o ocenie (jak bramka oceny w apce). */
 const REVIEW_AFTER_MIN = 90;
@@ -51,7 +50,7 @@ export async function notifications(kind: "morning" | "evening"): Promise<PushPa
     }
 
     // Grania „zainteresowany”: przypomnij, żeby napisać (progi z wyprzedzenia, każdy raz na granie).
-    const until = new Date(Date.parse(today) + WRITE_LOOKAHEAD_DAYS * 864e5).toISOString().slice(0, 10);
+    const until = addDays(today, WRITE_LOOKAHEAD_DAYS);
     const leads = await loadLeadTimes();
     const interested = await db
       .select({ id: gigs.id, title: gigs.title, startsAt: gigs.startsAt, headlinerName: headliner.name, headlinerId: gigs.headlinerId, context: gigs.context })
@@ -67,7 +66,7 @@ export async function notifications(kind: "morning" | "evening"): Promise<PushPa
       .orderBy(asc(gigs.startsAt));
     const toWrite: (typeof interested[number] & { soon: boolean })[] = [];
     for (const g of interested) {
-      const left = daysUntil(today, g.startsAt);
+      const left = daysBetween(today, g.startsAt);
       const [first, last] = writeReminderDays(leads.leadFor(g.headlinerId, g.context).days);
       if (left > first) continue; // jeszcze za wcześnie dla tego komika
       const stage = left <= last ? last : first;

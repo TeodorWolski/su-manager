@@ -4,6 +4,7 @@
  * (dzień 1 bliżej startu, ostatni przy celu), a plan wybiera max. jedno granie na dzień tak,
  * żeby jechać cały czas do przodu.
  */
+import { addDays } from "./time";
 
 /** Szerokości korytarza do wyboru (km od linii trasy, w linii prostej). */
 export const ROUTE_CORRIDORS = [30, 50, 80] as const;
@@ -34,9 +35,7 @@ export type RouteDay<T> = {
 
 /** Dni drogi: N dni przed dniem przyjazdu (bez samego dnia przyjazdu). */
 export function routeDays(arriveBy: string, days: number) {
-  return Array.from({ length: days }, (_, i) =>
-    new Date(Date.parse(arriveBy) - (days - i) * 864e5).toISOString().slice(0, 10),
-  );
+  return Array.from({ length: days }, (_, i) => addDays(arriveBy, i - days));
 }
 
 /** Idealny postęp k-tego dnia (1..N): równe odcinki, ostatni dzień tuż przed celem. */

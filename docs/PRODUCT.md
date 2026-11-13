@@ -213,7 +213,7 @@ Basic auth zastąpione, bo w PWA na iOS nie trzymał sesji, a odmowy 401 w tle w
 
 ## Konwencje w kodzie
 
-- **Daty grań** to lokalny czas Warszawy jako string bez strefy: `"2026-10-14T20:00"` albo sama data `"2026-10-14"` (import, brak godziny). „Teraz” to `nowLocal()` z `src/lib/time.ts`. Porównania są stringowe; `effectiveStart()` dokleja 20:00 do samej daty. `createdAt` jest w UTC (`datetime('now')`).
+- **Daty grań** to lokalny czas Warszawy jako string bez strefy: `"2026-10-14T20:00"` albo sama data `"2026-10-14"` (import, brak godziny). „Teraz” to `nowLocal()` z `src/lib/time.ts`. Porównania są stringowe; `effectiveStart()` dokleja 20:00 do samej daty. Arytmetyka na dniach: `addDays`, `daysBetween`, `dayOf` (też w `time.ts`). `createdAt` jest w UTC (`datetime('now')`).
 - **Mutacje to server actions** w `src/app/actions.ts`. Po akcji na tej samej stronie: `refresh()`. Z przejściem: `done(path)` (redirect). Akcje na wydarzeniach unieważniają `EVENTS_TAG`.
 - **Odczyty** są w `src/lib/queries.ts` (`server-only`). Wyjątek: `src/lib/planning.ts` (do ponowienia, rytm, najgorętsze) jest bez `server-only` i bez cache Next, bo używa go też skrypt maila. Logika czysta (rytm, ponawianie, szablony) siedzi w osobnych modułach `src/lib/*`, bez bazy, żeby dało się ją testować.
 - **Etykiety, tony i listy kanałów** są w `src/lib/labels.ts`. Enumy statusów są w `src/db/schema.ts` (`*_STATUSES`). Enumy drizzle na kolumnach `text` nie tworzą CHECK w SQLite, więc nowa wartość nie wymaga migracji.
