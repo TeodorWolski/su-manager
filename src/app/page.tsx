@@ -9,19 +9,21 @@ import { CHANNEL_SHORT } from "@/lib/labels";
 import { HotOpportunities } from "@/components/hot";
 import { RhythmCard } from "@/components/rhythm";
 import { StageCard } from "@/components/stage-card";
+import { WhileThere } from "@/components/while-there";
 import { WritingCard } from "@/components/writing";
 import { getWriting } from "@/lib/planning";
-import { getDashboard, getRhythm, getStageCard } from "@/lib/queries";
+import { getDashboard, getRhythm, getStageCard, getWhileThereCached } from "@/lib/queries";
 import { getGoals } from "@/lib/goals";
 import { fmtDate, fmtDateLong, nowLocal } from "@/lib/time";
 
 export default async function Home() {
-  const [{ upcoming, pipeline, followUps, month, recent }, goals, rhythm, writing, stage] = await Promise.all([
+  const [{ upcoming, pipeline, followUps, month, recent }, goals, rhythm, writing, stage, whileThere] = await Promise.all([
     getDashboard(),
     getGoals(),
     getRhythm(),
     getWriting(),
     getStageCard(),
+    getWhileThereCached(),
   ]);
   const today = nowLocal();
 
@@ -54,6 +56,8 @@ export default async function Home() {
       <RhythmCard rhythm={rhythm} />
 
       <HotOpportunities items={rhythm.hot} />
+
+      <WhileThere stays={whileThere} />
 
       <Section title="Nadchodzące">
         {upcoming.length ? upcoming.map((g) => <GigRow key={g.id} gig={g} showStatus />) : <Empty>Brak potwierdzonych grań.</Empty>}

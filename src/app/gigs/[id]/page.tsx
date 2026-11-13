@@ -18,7 +18,8 @@ import {
 } from "@/lib/labels";
 import type { GigOutcome } from "@/db/schema";
 import { pitchMessage, supportMessage } from "@/lib/messages";
-import { getGig, gigChoicesForTrips, listGigTrips, type GigStatus } from "@/lib/queries";
+import { WhileThere } from "@/components/while-there";
+import { getGig, getWhileThereCached, gigChoicesForTrips, listGigTrips, type GigStatus } from "@/lib/queries";
 import { fmtZl } from "@/lib/ticket-parse";
 import { gigBalance } from "@/lib/trips";
 import { effectiveStart, fmtDate, fmtDateTime, nowLocal } from "@/lib/time";
@@ -43,7 +44,7 @@ const STEP_ACTIVE: Partial<Record<GigStatus, string>> = {
 
 export default async function GigPage({ params }: PageProps<"/gigs/[id]">) {
   const { id } = await params;
-  const [data, gigTrips] = await Promise.all([getGig(Number(id)), listGigTrips(Number(id))]);
+  const [data, gigTrips, whileThere] = await Promise.all([getGig(Number(id)), listGigTrips(Number(id)), getWhileThereCached()]);
   if (!data) notFound();
   const { gig, log } = data;
   const isPast = effectiveStart(gig.startsAt) < nowLocal();
@@ -257,6 +258,8 @@ export default async function GigPage({ params }: PageProps<"/gigs/[id]">) {
           <div className="text-muted-foreground px-4 py-2.5 text-[14px]">Brak biletów i honorarium.</div>
         )}
       </Section>
+
+      <WhileThere stays={whileThere.filter((s) => s.stay.gigs.some((g) => g.id === gig.id))} />
 
       {log ? (
         <>

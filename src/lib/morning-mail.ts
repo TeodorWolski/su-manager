@@ -11,7 +11,7 @@ import { db, events } from "@/db";
 import { sendReport } from "@/scraper/email";
 import { getState, setState } from "./app-state";
 import { getOpportunities } from "./opportunities";
-import { getFollowUps, getMgm, getPlanning, getWriting } from "./planning";
+import { getFollowUps, getMgm, getPlanning, getWhileThere, getWriting } from "./planning";
 import { RECURRING_SOURCE } from "./recurring";
 
 const SENT_KEY = "morning-mail";
@@ -53,9 +53,9 @@ export async function sendMorningMail({
     .where(and(gt(events.firstSeenAt, since), ne(events.source, RECURRING_SOURCE)));
   const ids = new Set(added.map((r) => r.id));
   const fresh = ids.size ? (await getOpportunities(ids)).filter((o) => !o.myGigId && o.tab !== "muted") : [];
-  const [followUps, { hot }, writing, mgm] = await Promise.all([getFollowUps(), getPlanning(), getWriting(), getMgm()]);
+  const [followUps, { hot }, whileThere, writing, mgm] = await Promise.all([getFollowUps(), getPlanning(), getWhileThere(), getWriting(), getMgm()]);
   log(`mail: ${fresh.length} nowych okazji (od ${since} UTC), ${followUps.length} do ponowienia, ${hot.length} gorących`);
-  const sent = await sendReport({ fresh, followUps, hot, writing, mgm }, log);
+  const sent = await sendReport({ fresh, followUps, hot, whileThere, writing, mgm }, log);
   // Dopiero po udanej wysyłce (błąd Resend → zapas na GitHubie spróbuje jeszcze raz).
   await setState(SENT_KEY, today);
   await setState(SINCE_KEY, now);

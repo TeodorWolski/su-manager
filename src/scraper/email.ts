@@ -3,7 +3,7 @@ import { AVAILABILITY_LABEL, CHANNEL_SHORT, RELATION_LABEL } from "@/lib/labels"
 import { pitchMessage } from "@/lib/messages";
 import type { ReadyBit } from "@/lib/bit-ready";
 import type { Mgm } from "@/lib/mgm";
-import type { FollowUp, Writing } from "@/lib/planning";
+import type { FollowUp, WhileThere, Writing } from "@/lib/planning";
 import { groupByPerformer, type Opportunity, type OpportunityGroup } from "@/lib/opportunities";
 import { plural } from "@/lib/text";
 import { fmtDate, fmtDateTime, fmtTravel } from "@/lib/time";
@@ -90,6 +90,30 @@ function hotSection(items: Hot[]) {
     <table style="width:100%;border-collapse:collapse">${rows.join("")}</table>`;
 }
 
+/** „Skoro już jedziesz”: przy pobycie poza domem — co jeszcze gra w okolicy, z gotowym tekstem. */
+function whileThereSection(stays: WhileThere) {
+  return stays
+    .map(({ stay, items }) => {
+      const rows = items.map((o) => {
+        const meta = [fmtDateTime(o.startsAt), [o.venueName, o.cityName].filter(Boolean).join(", "), o.distanceKm > 0 && `${o.distanceKm} km`, o.friend]
+          .filter(Boolean)
+          .join(" · ");
+        const msg = pitchMessage({ startsAt: o.startsAt, cityName: o.cityName, openMic: o.isOpenMic });
+        return `<tr><td style="padding:8px 0;border-bottom:1px solid #e5ece8">
+      <a href="${esc(o.url)}" style="color:#13824a;font-weight:600;text-decoration:none">${esc(o.title)}</a><br>
+      ${muted(esc(meta))}
+      <div style="margin-top:4px;padding:6px 8px;background:#f2f5f3;border-radius:6px;font-size:13px">${esc(msg)}</div>
+    </td></tr>`;
+      });
+      const when = stay.from === stay.to ? fmtDate(stay.from) : `${fmtDate(stay.from)} – ${fmtDate(stay.to)}`;
+      const why = stay.gigs.length ? `przy: ${stay.gigs.map((g) => g.title).join(", ")}` : "prywatna podróż";
+      return `<h3 style="margin:20px 0 4px;font-size:15px">🚆 Skoro już jedziesz · ${esc(stay.city)}</h3>
+    ${muted(esc(`${when} · ${why}`))}
+    <table style="width:100%;border-collapse:collapse">${rows.join("")}</table>`;
+    })
+    .join("");
+}
+
 /** Jedna–dwie linijki o pisaniu: seria treningu puent, tydzień, co czeka na poprawkę po scenie. */
 function writingSection(w: Writing | undefined, mgm: (Mgm & { ready?: ReadyBit[] }) | undefined) {
   if (!w) return "";
@@ -110,9 +134,9 @@ function writingSection(w: Writing | undefined, mgm: (Mgm & { ready?: ReadyBit[]
   return `<p style="margin:16px 0 0;padding:10px 12px;background:#f2f5f3;border-radius:8px;font-size:14px">✍️ ${streak}<br>${muted(week)}${mgmLine}${queue}</p>`;
 }
 
-export type Digest = { fresh: Opportunity[]; followUps: FollowUp[]; hot: Hot[]; writing?: Writing; mgm?: Mgm };
+export type Digest = { fresh: Opportunity[]; followUps: FollowUp[]; hot: Hot[]; whileThere?: WhileThere; writing?: Writing; mgm?: Mgm };
 
-export function renderReport({ fresh: items, followUps, hot, writing, mgm }: Digest) {
+export function renderReport({ fresh: items, followUps, hot, whileThere = [], writing, mgm }: Digest) {
   const friends = groupByPerformer(items.filter((o) => o.tab === "friends"));
   const openMic = groupByPerformer(items.filter((o) => o.tab === "openMic"));
   const inRange = groupByPerformer(items.filter((o) => o.tab === "inRange"));
@@ -126,19 +150,22 @@ export function renderReport({ fresh: items, followUps, hot, writing, mgm }: Dig
   ]
     .filter(Boolean)
     .join(", ");
+  // Pobyt trwa tygodniami z tymi samymi okazjami — sam nie jest powodem, żeby wysłać mail (dokleja się do innych sekcji).
+  const trips = whileThere.length ? `, 🚆 ${whileThere.map((s) => s.stay.city).join(", ")}` : "";
   const html = `<div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:600px;color:#1c2a23">
     <h2 style="margin:0 0 4px">SU Manager · dzień dobry</h2>
     <p style="margin:0;color:#5b6b63"><a href="${APP_URL}" style="color:#13824a">Otwórz aplikację</a></p>
     ${writingSection(writing, mgm)}
     ${followUpSection(followUps)}
     ${hotSection(hot)}
+    ${whileThereSection(whileThere)}
     ${friends.length || openMic.length || inRange.length ? `<h2 style="margin:28px 0 0;font-size:17px">Nowe terminy w bileteriach</h2>` : ""}
     ${section("Grają ludzie z Twojej bazy", friends)}
     ${section("Open miki", openMic)}
     ${section("W zasięgu dojazdu", inRange)}
     ${unknown ? `<p style="margin-top:20px;color:#5b6b63;font-size:13px">${plural(unknown, "miasto", "miasta", "miast")} bez czasu dojazdu — uzupełnij w aplikacji (Okazje → Uzupełnij).</p>` : ""}
   </div>`;
-  return { subject: `SU Manager: ${subject || "nowe miasta do uzupełnienia"}`, html, worthSending: !!subject };
+  return { subject: `SU Manager: ${subject ? subject + trips : "nowe miasta do uzupełnienia"}`, html, worthSending: !!subject };
 }
 
 /** Poranny raport: składa treść i wysyła, jeśli jest co. */

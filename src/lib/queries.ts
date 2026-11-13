@@ -21,7 +21,7 @@ import {
 import { loadUpcomingEventsCached } from "./events-cache";
 import { gigTotals } from "./gig-totals";
 import { typeIssue } from "./gig-types";
-import { getFollowUps, getPlanning } from "./planning";
+import { getFollowUps, getPlanning, getWhileThere } from "./planning";
 import { addDays, DEFAULT_START_TIME, nowLocal } from "./time";
 import { normalize } from "./text";
 
@@ -491,6 +491,9 @@ export async function listCalendarGigs() {
 
 /** Rytm + najgorętsze okazje — z pamięcią podręczną wydarzeń (logika w planning.ts). */
 export const getRhythm = () => getPlanning(loadUpcomingEventsCached);
+
+/** „Skoro już jedziesz” — z pamięcią podręczną wydarzeń (logika w planning.ts). */
+export const getWhileThereCached = () => getWhileThere(loadUpcomingEventsCached);
 
 /** Statystyki: skuteczność pisania (wyniki rozmów, kanały) i jak mi idzie (oceny wg kontekstu, sceny, miesiąca). */
 /** Licznik zagranych występów (potwierdzone, już po starcie) — w Statystykach i w Więcej. */

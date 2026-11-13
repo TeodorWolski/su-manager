@@ -69,6 +69,11 @@ Ocena grania **nie jest** oceną bitu, bo zależy od publiki, line-upu itd. Bit 
   - kiedy: granie „napisałem/czekam” bez odpowiedzi, ok. 1,5 tygodnia (10 dni) przed graniem i min. 2 dni po ostatniej wiadomości; „czekam” dodatkowo już po 5 dniach bez ruchu, nawet gdy granie daleko (`WAITING_FOLLOW_UP_DAYS`),
   - pokazuje, gdzie już pisałem, i podpowiada kolejny kanał: Instagram → FB prywatny → FB fanpage,
   - ponowienie zwykle idzie innym komunikatorem niż pierwsza wiadomość.
+- **Skoro już jedziesz** (`src/lib/while-there.ts`, dane `getWhileThere` w `planning.ts`, karta `components/while-there.tsx`; też na karcie grania i w porannym mailu): przy pobycie poza domem — co jeszcze gra w okolicy, z gotowym „Napisz”:
+  - pobyt = potwierdzone granie w mieście ≥ 80 km od Warszawy (`AWAY_MIN_KM`; bliżej to zwykły wieczorny wypad), dzień przed i dzień po, rozszerzone o bilety podpięte do grania; albo prywatna podróż — od przyjazdu do biletu powrotnego (szukanego do 14 dni), bez powrotu przyjazd i następny dzień; pobyty w tym samym mieście, które się stykają, są łączone,
+  - okazje: do 60 km od miasta pobytu (`WHILE_THERE_RADIUS_KM`), tylko dni bez mojego grania (też w toku), bez ukrytych, pomijanych i wyciszonych komików; zasięg z Warszawy ignorowany jak w „Jestem w…”,
+  - kolejność: znajomi, open miki, potem najbliżej; jeden termin na komika, maks. 3 na pobyt, reszta pod linkiem do „Jestem w…”; 45 dni naprzód,
+  - w mailu sekcja dokleja się do innych — sama nie jest powodem wysyłki (te same okazje wisiałyby codziennie).
 - **Pisanie na Dziś:** karta z treningiem puent i tygodniem generowania / redakcji (ta sama co w zakładce Pisanie, szczegóły niżej).
 - Nadchodzące, W toku (pipeline) i ostatnie „myśli” z logów.
 
@@ -102,7 +107,7 @@ Ocena grania **nie jest** oceną bitu, bo zależy od publiki, line-upu itd. Bit 
 
 ### Okazje (`/events`)
 - **Podsumowanie tygodnia** (niedziela 19:00, `src/lib/weekly.ts`, `scripts/weekly.ts`, `.github/workflows/weekly.yml`): zagrane grania z oceną, bity 👍/👎, wysłane wiadomości i wyniki rozmów, przyszły tydzień względem rytmu 2–3 i balansu, do 3 najgorętszych okazji.
-- **Poranny mail** (10:35 z Vercela razem z porannymi pushami — `/api/notify/morning`, `src/lib/morning-mail.ts`; scraper na GitHubie wysyła go tylko zapasowo; treść `src/scraper/email.ts`; „nowe terminy” = dodane od poprzedniego maila, `app_state` „morning-mail-since”): „Do ponowienia”, „Najgorętsze okazje” z gotowym tekstem i nowe terminy z bileterii, do tego linijki o pisaniu (seria puent, tydzień, kolejka) i MGM (sprawdzone względem celu, rozpiska, bity gotowe do zaliczenia). Wysyłany, gdy którakolwiek sekcja nie jest pusta.
+- **Poranny mail** (10:35 z Vercela razem z porannymi pushami — `/api/notify/morning`, `src/lib/morning-mail.ts`; scraper na GitHubie wysyła go tylko zapasowo; treść `src/scraper/email.ts`; „nowe terminy” = dodane od poprzedniego maila, `app_state` „morning-mail-since”): „Do ponowienia”, „Najgorętsze okazje” z gotowym tekstem, „Skoro już jedziesz” i nowe terminy z bileterii, do tego linijki o pisaniu (seria puent, tydzień, kolejka) i MGM (sprawdzone względem celu, rozpiska, bity gotowe do zaliczenia). Wysyłany, gdy którakolwiek sekcja nie jest pusta.
 - **Źródła:** kupbilecik, evently, Biletyna (`src/scraper/sources/*`). Biletyna: programy z publicznej sitemapy (`/sitemap/sitemap-events.xml`, robots.txt zabrania `/ajax/`), terminy ze schema.org na stronie artysty/programu (do 30 terminów; gdy strona jest pełna, a 30. termin wypada przed horyzontem — dociąga strony miast). „Ostatnie bilety” z `remainingAttendeeCapacity` ≤ 10 (to pula Biletyny, bywa mała przy normalnej sprzedaży).
 - **Duplikaty między serwisami** (`src/lib/dedupe.ts`, `sameShow`): ten sam dzień i miasto, start ±60 min, wspólne nazwisko (słowo spoza ogólnych typu stand-up/festiwal/open mic) albo jeden tytuł zaczyna drugi. Wygrywa serwis wcześniej na liście `SOURCES`; duplikat nie jest zapisywany.
 - **Scraper** (`src/scraper/sources/*`, zewnętrzny cron o 10:30 czasu polskiego; GitHub o 12:00 jako zapas; poranny mail idzie osobno z Vercela o 10:35) zbiera wydarzenia. Klasyfikacja jest w `src/lib/opportunities.ts`.

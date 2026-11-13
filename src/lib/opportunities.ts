@@ -396,6 +396,40 @@ export async function nearOpportunities(
 }
 
 /**
+ * „Skoro już jedziesz”: dla każdego pobytu (miasto + dni) wydarzenia w promieniu `radiusKm`, w dni bez
+ * mojego grania. Jak w „Jestem w…” zasięg z Warszawy jest ignorowany; bez ukrytych, pomijanych
+ * i wyciszonych komików oraz wydarzeń, które już są moim graniem. Jedno wczytanie na wszystkie pobyty.
+ */
+export async function stayOpportunities(
+  stays: { city: string; from: string; to: string }[],
+  radiusKm: number,
+  loadEvents: (today: string) => Promise<EventRow[]> = loadUpcomingEvents,
+) {
+  if (!stays.length) return [];
+  const today = nowLocal().slice(0, 10);
+  const [ctx, rows] = await Promise.all([loadContext(), loadEvents(today)]);
+  const newSince = newSinceUtc();
+  const busyDays = new Set(ctx.myGigs.map((g) => g.startsAt.slice(0, 10)));
+  return stays.map((stay) => {
+    const origin = coords(stay.city);
+    if (!origin) return [];
+    const items: (Opportunity & { distanceKm: number })[] = [];
+    for (const e of rows) {
+      const day = e.startsAt.slice(0, 10);
+      if (day < stay.from || day > stay.to || busyDays.has(day)) continue;
+      const at = coords(e.cityName);
+      if (!at) continue;
+      const km = distanceKm(origin, at);
+      if (km > radiusKm) continue;
+      const o = classify(e, ctx, newSince, true);
+      if (!o || o.myGigId || o.tab === "muted" || (o.note && o.note !== "poza zasięgiem")) continue;
+      items.push({ ...o, note: null, distanceKm: Math.round(km) });
+    }
+    return items;
+  });
+}
+
+/**
  * „Trasa”: grania po drodze z `from` do `to` przez `days` dni przed `arriveBy`, w korytarzu `corridorKm`.
  * Bez pomijanych i wyciszonych komików; dni, w które mam już granie (też w toku), są zajęte.
  */

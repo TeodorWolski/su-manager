@@ -4,16 +4,17 @@
  */
 import { and, asc, eq, gte, inArray, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/sqlite-core";
-import { bits, cities, contacts, db, gigBits, gigLogs, gigs, goals, ideas, venues, writingSessions } from "@/db";
+import { bits, cities, contacts, db, gigBits, gigLogs, gigs, goals, ideas, trips, venues, writingSessions } from "@/db";
 import { daysSince, followUpTiming, lastActivity, nextChannel } from "./follow-up";
 import { hotOpportunities, type HotCandidate } from "./hot";
-import { getOpportunities, loadUpcomingEvents, type EventRow } from "./opportunities";
+import { getOpportunities, loadUpcomingEvents, stayOpportunities, type EventRow } from "./opportunities";
 import { getInsights, type RhythmOpportunity } from "./rhythm";
 import { loadLeadTimes } from "./lead-data";
 import { readyBits } from "./bit-ready";
 import { computeMgm } from "./mgm";
 import { weekStart } from "./rhythm";
 import { addDays, nowLocal } from "./time";
+import { buildStays, pickNearby, WHILE_THERE_RADIUS_KM } from "./while-there";
 import { countInWeek, dayStreak, editQueue, fixedBits, WEEKLY_TARGET, weekDots, weekStreak, type BitReaction } from "./writing";
 
 const headliner = alias(contacts, "headliner");
@@ -68,6 +69,56 @@ export type FollowUp = Awaited<ReturnType<typeof getFollowUps>>[number];
  * Rytm grania (tygodnie wokół dzisiaj + podpowiedzi na luźne tygodnie)
  * + „najgorętsze okazje” z ~2-tygodniowym wyprzedzeniem.
  */
+/**
+ * „Skoro już jedziesz”: pobyty poza domem (potwierdzone grania i prywatne podróże) z okazjami w okolicy.
+ * Tylko pobyty, przy których coś gra.
+ */
+export async function getWhileThere(loadEvents: (today: string) => Promise<EventRow[]> = loadUpcomingEvents) {
+  const today = nowLocal().slice(0, 10);
+  const [gigRows, tripRows] = await Promise.all([
+    db
+      .select({
+        id: gigs.id,
+        title: gigs.title,
+        startsAt: gigs.startsAt,
+        cityName: sql<string | null>`coalesce(
+          (select c.name from cities c where c.id = ${gigs.cityId}),
+          (select c.name from venues v join cities c on c.id = v.city_id where v.id = ${gigs.venueId}))`,
+      })
+      .from(gigs)
+      .where(and(eq(gigs.status, "confirmed"), gte(gigs.startsAt, today))),
+    db
+      .select({ gigId: trips.gigId, fromStation: trips.fromStation, toStation: trips.toStation, departsAt: trips.departsAt, arrivesAt: trips.arrivesAt })
+      .from(trips)
+      // Bilet tam mógł być wczoraj, a pobyt dalej trwa — bierzemy z zapasem.
+      .where(gte(trips.departsAt, addDays(today, -14))),
+  ]);
+  const stays = buildStays(gigRows, tripRows, today);
+  const nearby = await stayOpportunities(stays, WHILE_THERE_RADIUS_KM, loadEvents);
+  return stays
+    .map((stay, i) => ({
+      stay,
+      total: nearby[i].length,
+      items: pickNearby(
+        nearby[i].map((o) => ({
+          eventId: o.event.id,
+          url: o.event.url,
+          title: o.event.title,
+          startsAt: o.event.startsAt,
+          cityName: o.event.cityName,
+          venueName: o.event.venueName,
+          isOpenMic: o.isOpenMic,
+          performer: o.performer,
+          friend: o.tab === "friends" ? (o.matches[0]?.name ?? null) : null,
+          distanceKm: o.distanceKm,
+        })),
+      ),
+    }))
+    .filter((s) => s.items.length > 0);
+}
+
+export type WhileThere = Awaited<ReturnType<typeof getWhileThere>>;
+
 export async function getPlanning(loadEvents: (today: string) => Promise<EventRow[]> = loadUpcomingEvents) {
   const today = nowLocal().slice(0, 10);
   const from = addDays(today, -35);
