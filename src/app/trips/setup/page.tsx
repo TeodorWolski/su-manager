@@ -1,48 +1,10 @@
 import { headers } from "next/headers";
 import { PageHeader, Section } from "@/components/ios";
+import { googleScript } from "@/lib/google-script";
 import { CopyBox } from "./copy-box";
 
 /** Skrypt czytający stronę biletu — ten sam w skrócie iOS i w bookmarklecie. */
 const READ_PAGE = "JSON.stringify({u:location.href,t:(document.querySelector('main')||document.body).innerText.slice(0,8000)})";
-
-/** Skrypt Google Apps Script: maile od KOLEO z Gmaila → /api/ingest/ticket (co 10 min, raz na mail). */
-function gmailScript(app: string) {
-  return `// SU Manager — bilety KOLEO z Gmaila. Wklej na script.google.com, uzupełnij TOKEN, uruchom „setup”.
-const APP = '${app}';
-const TOKEN = 'WKLEJ_TU_CRON_SECRET';
-const QUERY = 'from:kasa.biletowa@koleo.pl -label:su-manager newer_than:14d';
-
-function checkTickets() {
-  const label = GmailApp.getUserLabelByName('su-manager') || GmailApp.createLabel('su-manager');
-  for (const thread of GmailApp.search(QUERY)) {
-    let ok = true;
-    for (const msg of thread.getMessages()) {
-      const pdfs = msg.getAttachments().filter((a) => a.getContentType() === 'application/pdf' || /\\.pdf$/i.test(a.getName()));
-      const bodies = pdfs.length
-        ? pdfs.map((a) => ({ pdf: Utilities.base64Encode(a.getBytes()) }))
-        : [{ text: msg.getPlainBody() }];
-      for (const body of bodies) {
-        const res = UrlFetchApp.fetch(APP + '/api/ingest/ticket', {
-          method: 'post',
-          contentType: 'application/json',
-          headers: { Authorization: 'Bearer ' + TOKEN },
-          payload: JSON.stringify(body),
-          muteHttpExceptions: true,
-        });
-        console.log(res.getResponseCode(), res.getContentText());
-        if (res.getResponseCode() === 401 || res.getResponseCode() >= 500) ok = false;
-      }
-    }
-    if (ok) thread.addLabel(label); // oznaczony = przetworzony, drugi raz go nie weźmie
-  }
-}
-
-function setup() {
-  ScriptApp.getProjectTriggers().forEach((t) => ScriptApp.deleteTrigger(t));
-  ScriptApp.newTrigger('checkTickets').timeBased().everyMinutes(10).create();
-  checkTickets();
-}`;
-}
 
 /** Jak dodawać bilety: automat z Gmaila, wgranie PDF-a, skróty „Udostępnij” (iPhone) i bookmarklet (komputer). */
 export default async function TripSetupPage() {
@@ -58,7 +20,7 @@ export default async function TripSetupPage() {
 
       <Section
         title="Automatycznie z Gmaila (polecane)"
-        footer="Ustawiasz raz. Potem każdy bilet od kasa.biletowa@koleo.pl sam trafia do Podróży (podpięty do grania albo jako prywatna podróż) i dostajesz powiadomienie. Skrypt działa na Twoim koncie Google — nikt poza Tobą go nie widzi."
+        footer="Ustawiasz raz. Potem każdy bilet od kasa.biletowa@koleo.pl sam trafia do Podróży (podpięty do grania albo jako prywatna podróż) i dostajesz powiadomienie. Ten sam skrypt synchronizuje Kalendarz Google (Więcej → Kalendarz). Skrypt działa na Twoim koncie Google — nikt poza Tobą go nie widzi."
       >
         <div className={step}>
           <b>1.</b>
@@ -70,12 +32,12 @@ export default async function TripSetupPage() {
           <span>
             <b>2.</b> Usuń przykładowy kod i wklej ten. W linii <b>TOKEN</b> wpisz swój <b>CRON_SECRET</b> (ten sam co w cron-job.org):
           </span>
-          <CopyBox text={gmailScript(origin)} label="Kopiuj skrypt" />
+          <CopyBox text={googleScript(origin)} label="Kopiuj skrypt" />
         </div>
         <div className={step}>
           <b>3.</b>
           <span>
-            Zapisz, z listy funkcji wybierz <b>setup</b> → <b>Uruchom</b> i zgódź się na dostęp do Gmaila („Zaawansowane → Przejdź do projektu”, bo to Twój własny skrypt). Gotowe — sprawdza co 10 minut.
+            Zapisz, z listy funkcji wybierz <b>setup</b> → <b>Uruchom</b> i zgódź się na dostęp do Gmaila i Kalendarza („Zaawansowane → Przejdź do projektu”, bo to Twój własny skrypt). Gotowe — sprawdza co 10 minut.
           </span>
         </div>
       </Section>

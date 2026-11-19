@@ -16,6 +16,8 @@ import { cn } from "@/lib/utils";
  */
 type MonthGig = { id: number; title: string; startsAt: string; status: string; context: string | null; city: string | null };
 type MonthTrip = { id: number; fromStation: string; toStation: string; departsAt: string; arrivesAt: string | null; gigId: number | null };
+/** Wieczór zajęty w prywatnym kalendarzu (synchronizacja z Google, same godziny). */
+type MonthBusy = { day: string; slots: string[] };
 
 const STORAGE_KEY = "mini-calendar-open";
 const WEEK_MIN = 2;
@@ -90,6 +92,7 @@ export function MiniCalendar() {
   const [month, setMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
   const [gigs, setGigs] = useState<MonthGig[]>([]);
   const [trips, setTrips] = useState<MonthTrip[]>([]);
+  const [busy, setBusy] = useState<MonthBusy[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const today = iso(new Date());
 
@@ -104,11 +107,12 @@ export function MiniCalendar() {
     if (!open) return;
     let cancelled = false;
     fetch(`/api/month?from=${from}&to=${to}`)
-      .then((r) => (r.ok ? r.json() : { gigs: [], trips: [] }))
-      .then((data: { gigs: MonthGig[]; trips: MonthTrip[] }) => {
+      .then((r) => (r.ok ? r.json() : { gigs: [], trips: [], busy: [] }))
+      .then((data: { gigs: MonthGig[]; trips: MonthTrip[]; busy?: MonthBusy[] }) => {
         if (cancelled) return;
         setGigs(data.gigs);
         setTrips(data.trips);
+        setBusy(data.busy ?? []);
       })
       .catch(() => {});
     return () => {
@@ -128,12 +132,15 @@ export function MiniCalendar() {
     return m;
   }, [trips]);
 
+  const busyByDay = useMemo(() => new Map(busy.map((b) => [b.day, b.slots])), [busy]);
+
   const shift = (n: number) => {
     setMonth((m) => new Date(m.getFullYear(), m.getMonth() + n, 1));
     setSelected(null);
   };
   const dayGigs = selected ? (byDay.get(selected) ?? []) : [];
   const dayTrips = selected ? (tripsByDay.get(selected) ?? []) : [];
+  const dayBusy = selected ? busyByDay.get(selected) : undefined;
 
   return (
     <>
@@ -197,7 +204,7 @@ export function MiniCalendar() {
                         key={key}
                         onClick={() => setSelected(selected === key ? null : key)}
                         className="flex h-9 items-center justify-center"
-                        aria-label={`${format(d, "d MMMM", { locale: pl })}${list.length ? `, ${list.length} grań` : ""}`}
+                        aria-label={`${format(d, "d MMMM", { locale: pl })}${list.length ? `, ${list.length} grań` : ""}${busyByDay.has(key) ? ", zajęty w kalendarzu" : ""}`}
                       >
                         <span
                           className={cn(
@@ -211,6 +218,10 @@ export function MiniCalendar() {
                           )}
                         >
                           {d.getDate()}
+                          {/* Wieczór zajęty w prywatnym kalendarzu — mały kwadrat w rogu (kropka to drugie granie, pociąg to podróż). */}
+                          {busyByDay.has(key) && (
+                            <span className="bg-muted-foreground ring-card absolute -top-0.5 -right-0.5 size-2 rounded-[2px] ring-2" aria-hidden />
+                          )}
                           {/* Podróż tego dnia — mały pociąg w rogu. */}
                           {tripsByDay.has(key) && (
                             <span className="absolute -top-1 -left-1 text-[9px] leading-none" aria-hidden>
@@ -252,6 +263,9 @@ export function MiniCalendar() {
             <span className="flex items-center gap-1">
               <span className="ring-foreground/60 size-2.5 rounded-full ring-2 ring-inset" /> w toku
             </span>
+            <span className="flex items-center gap-1">
+              <span className="bg-muted-foreground size-2 rounded-[2px]" /> kalendarz
+            </span>
             <span className="ml-auto">Σ cel 2–3</span>
           </div>
 
@@ -270,6 +284,12 @@ export function MiniCalendar() {
                   </span>
                 </Link>
               ))}
+              {dayBusy && (
+                <div className="text-muted-foreground flex items-center gap-2 px-1 py-1 text-[13px]">
+                  <CalendarDays className="size-3.5 shrink-0" />
+                  <span>W kalendarzu: {dayBusy.join(", ")}</span>
+                </div>
+              )}
               {dayGigs.length ? (
                 <>
                   {dayGigs.map((g) => (
@@ -297,7 +317,7 @@ export function MiniCalendar() {
                 </>
               ) : (
                 <div className="text-muted-foreground px-1 py-1 text-[13px]">
-                  Wolne.{" "}
+                  {dayBusy ? "Bez grań." : "Wolne."}{" "}
                   <Link href={`/events?q=${selected.slice(8, 10)}.${selected.slice(5, 7)}`} className="text-primary">
                     Co gra tego dnia?
                   </Link>

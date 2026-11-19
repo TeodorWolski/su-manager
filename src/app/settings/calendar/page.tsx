@@ -1,5 +1,8 @@
+import { CopyBox } from "@/app/trips/setup/copy-box";
 import { CopyField } from "@/components/copy-field";
 import { PageHeader, Section } from "@/components/ios";
+import { EVENING_FROM, EVENING_TO } from "@/lib/calendar-sync";
+import { googleScript, PENDING_CALENDAR_NAME } from "@/lib/google-script";
 import { ARRIVE_BEFORE_MIN } from "@/lib/ics";
 import { TRAIN_CALENDAR_LEAD_MIN } from "@/lib/trips";
 
@@ -51,6 +54,35 @@ export default function CalendarSettingsPage() {
           <p className="px-4 py-3 text-[15px]">Brak zmiennej CALENDAR_TOKEN — kalendarz jest wyłączony.</p>
         </Section>
       )}
+
+      <Section
+        title="Prośby w toku i zajęte wieczory"
+        footer={`Co 10 minut, przez skrypt na Twoim koncie Google. Wieczór = ${EVENING_FROM}–${EVENING_TO}; wydarzenia całodniowe i odrzucone zaproszenia się nie liczą. Z Twojego kalendarza apka dostaje tylko godziny — bez tytułów, miejsc i uczestników.`}
+      >
+        <ul className="text-muted-foreground list-disc space-y-1.5 py-3 pr-4 pl-9 text-[15px] leading-relaxed">
+          <li>
+            Grania „napisałem” i „czekam” lądują w osobnym, szarym kalendarzu <b className="text-foreground">{PENDING_CALENDAR_NAME}</b> jako „❓ czekam · …”
+            — widać je przy umawianiu się, a zwykły kalendarz grań dalej ma tylko zaklepane. Po zgodzie wpis przechodzi do grań, po odmowie znika.
+          </li>
+          <li>W drugą stronę: wieczory zajęte w Twoim kalendarzu apka pomija w okazjach, pokazuje w mini kalendarzu i ostrzega przy prośbie o granie na taki wieczór.</li>
+        </ul>
+      </Section>
+      <Section title="Jak włączyć" footer="Masz już skrypt od biletów? Podmień w nim cały kod na ten i uruchom setup jeszcze raz — Google zapyta o dostęp do Kalendarza.">
+        <ol className="list-decimal space-y-1.5 py-3 pr-4 pl-9 text-[15px] leading-relaxed">
+          <li>
+            Na komputerze: <b>script.google.com</b> → Twój projekt „SU Manager — bilety” (albo <b>Nowy projekt</b>).
+          </li>
+          <li>
+            Wklej cały kod poniżej. W linii <b>TOKEN</b> wpisz swój <b>CRON_SECRET</b>.
+          </li>
+          <li>
+            Zapisz, wybierz funkcję <b>setup</b> → <b>Uruchom</b> i zgódź się na dostęp do Gmaila i Kalendarza.
+          </li>
+        </ol>
+        <div className="px-2 pb-2">
+          <CopyBox text={googleScript(base)} label="Kopiuj skrypt" />
+        </div>
+      </Section>
     </>
   );
 }

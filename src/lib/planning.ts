@@ -15,6 +15,7 @@ import { computeMgm } from "./mgm";
 import { weekStart } from "./rhythm";
 import { addDays, nowLocal } from "./time";
 import { buildStays, pickNearby, WHILE_THERE_RADIUS_KM } from "./while-there";
+import { loadBusyEvenings } from "./calendar-data";
 import { countInWeek, dayStreak, editQueue, fixedBits, WEEKLY_TARGET, weekDots, weekStreak, type BitReaction } from "./writing";
 
 const headliner = alias(contacts, "headliner");
@@ -94,7 +95,8 @@ export async function getWhileThere(loadEvents: (today: string) => Promise<Event
       .where(gte(trips.departsAt, addDays(today, -14))),
   ]);
   const stays = buildStays(gigRows, tripRows, today);
-  const nearby = await stayOpportunities(stays, WHILE_THERE_RADIUS_KM, loadEvents);
+  const [found, busy] = await Promise.all([stayOpportunities(stays, WHILE_THERE_RADIUS_KM, loadEvents), loadBusyEvenings()]);
+  const nearby = found.map((list) => list.filter((o) => !busy.has(o.event.startsAt.slice(0, 10))));
   return stays
     .map((stay, i) => ({
       stay,
@@ -122,17 +124,19 @@ export type WhileThere = Awaited<ReturnType<typeof getWhileThere>>;
 export async function getPlanning(loadEvents: (today: string) => Promise<EventRow[]> = loadUpcomingEvents) {
   const today = nowLocal().slice(0, 10);
   const from = addDays(today, -35);
-  const [rows, opportunities, leads] = await Promise.all([
+  const [rows, opportunities, leads, busy] = await Promise.all([
     db
       .select({ id: gigs.id, title: gigs.title, startsAt: gigs.startsAt, status: gigs.status, context: gigs.context })
       .from(gigs)
       .where(and(gte(gigs.startsAt, from), inArray(gigs.status, ["confirmed", "interested", "contacted", "waiting"]))),
     getOpportunities(undefined, loadEvents),
     loadLeadTimes(),
+    loadBusyEvenings(),
   ]);
-  // Najpierw znajomi, potem open miki, potem reszta w zasięgu; bez wyciszonych i tych, gdzie już mam granie.
+  // Najpierw znajomi, potem open miki, potem reszta w zasięgu; bez wyciszonych, tych, gdzie już mam granie,
+  // i wieczorów zajętych w prywatnym kalendarzu.
   const order = { friends: 0, openMic: 1, inRange: 2 } as Record<string, number>;
-  const usable = opportunities.filter((o) => o.tab in order && !o.myGigId);
+  const usable = opportunities.filter((o) => o.tab in order && !o.myGigId && !busy.has(o.event.startsAt.slice(0, 10)));
   const ideas: RhythmOpportunity[] = [...usable]
     .sort((a, b) => order[a.tab] - order[b.tab] || a.event.startsAt.localeCompare(b.event.startsAt))
     .map((o) => ({

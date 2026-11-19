@@ -3,9 +3,10 @@ import type { NextRequest } from "next/server";
 import { cities, db, gigs, trips, venues } from "@/db";
 import { eq } from "drizzle-orm";
 import { currentSession } from "@/lib/auth";
+import { loadBusyEvenings } from "@/lib/calendar-data";
 
 /**
- * Grania i podróże do mini kalendarza: /api/month?from=YYYY-MM-DD&to=YYYY-MM-DD (widoczne tygodnie miesiąca).
+ * Grania, podróże i zajęte wieczory do mini kalendarza: /api/month?from=YYYY-MM-DD&to=YYYY-MM-DD (widoczne tygodnie miesiąca).
  * Za basic auth jak cała apka. Bez odrzuconych i odwołanych.
  */
 export async function GET(request: NextRequest) {
@@ -41,5 +42,7 @@ export async function GET(request: NextRequest) {
     .from(trips)
     .where(and(gte(sql`substr(${trips.departsAt}, 1, 10)`, from), lte(sql`substr(${trips.departsAt}, 1, 10)`, to)))
     .orderBy(trips.departsAt);
-  return Response.json({ gigs: rows, trips: tripRows }, { headers: { "Cache-Control": "no-store" } });
+  // Wieczory zajęte w prywatnym kalendarzu (same godziny, bez tytułów).
+  const busy = [...(await loadBusyEvenings()).entries()].filter(([day]) => day >= from && day <= to).map(([day, slots]) => ({ day, slots }));
+  return Response.json({ gigs: rows, trips: tripRows, busy }, { headers: { "Cache-Control": "no-store" } });
 }

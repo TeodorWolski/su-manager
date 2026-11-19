@@ -8,6 +8,7 @@ import { myGigForEvent } from "./dedupe";
 import { alongRoute, coords, distanceKm } from "./geo";
 import { describe as describeSeries, RECURRING_SOURCE, seriesKey } from "./recurring";
 import { loadSeries } from "./recurring-sync";
+import { loadBusyEvenings } from "./calendar-data";
 import { loadLeadTimes } from "./lead-data";
 import { planRoute, routeDays } from "./route";
 import { matchContacts, matchesQuery } from "./match";
@@ -59,6 +60,8 @@ export type Opportunity = {
   myGigId: number | null;
   /** Inne moje grania tego dnia (w toku albo potwierdzone) — „masz już tego dnia…”, ale można dodać kolejne. */
   dayGigs: { id: number; title: string; startsAt: string }[];
+  /** Godziny spotkań z prywatnego kalendarza tego wieczoru (calendar-data.ts); null = wolny albo brak synchronizacji. */
+  calendarBusy: string[] | null;
   /** Kto występuje: kontakt z CRM albo nazwa wyciągnięta z tytułu. Klucz grupuje terminy jednego komika. */
   performer: { key: string; name: string; contactId: number | null };
   tab: Tab;
@@ -130,7 +133,7 @@ const toHim = sql.raw("(i.contact_id = contacts.id or i.gig_id in (select g2.id 
 async function loadContext() {
   const now = nowLocal();
   const today = now.slice(0, 10);
-  const [allCities, people, never, hidden, myGigs, recurring, leads, supportRows] = await Promise.all([
+  const [allCities, people, never, hidden, myGigs, recurring, leads, supportRows, calendarBusy] = await Promise.all([
     db.select().from(cities),
     db
       .select({
@@ -178,6 +181,7 @@ async function loadContext() {
       .innerJoin(contacts, eq(contacts.id, supports.supportId))
       .where(eq(supports.active, true))
       .orderBy(sql`${supports.lastSeen} desc`),
+    loadBusyEvenings(),
   ]);
   const supportsOf = new Map<number, { id: number; name: string }[]>();
   for (const r of supportRows) supportsOf.set(r.headlinerId, [...(supportsOf.get(r.headlinerId) ?? []), { id: r.id, name: r.name }]);
@@ -196,6 +200,7 @@ async function loadContext() {
     blacklist: new Set(never.map((v) => `${normalize(v.name)}|${normalize(v.cityName ?? "")}`)),
     hidden: new Set(hidden.map((h) => h.t)),
     myGigs,
+    calendarBusy,
     series: new Map(recurring.series.map((s) => [s.key, { key: s.key, how: s.how, text: describeSeries(s.interval, s.anchor) }])),
     /** Serie, które sam wyłączyłem — do menu „Cykliczne?” (pokazać „wyłączone”). */
     seriesOff: new Set(recurring.decisions.filter((d) => d.mode === "off").map((d) => d.key)),
@@ -261,6 +266,7 @@ function classify(e: EventRow, ctx: Ctx, newSince: string, force = false): Oppor
     isOpenMic: openMic,
     myGigId,
     dayGigs: others.filter((g) => g.id !== myGigId).map(({ id, title, startsAt }) => ({ id, title, startsAt })),
+    calendarBusy: ctx.calendarBusy.get(e.startsAt.slice(0, 10)) ?? null,
     performer: lead
       ? { key: `c${lead.id}`, name: lead.name, contactId: lead.id }
       : { key: performerKey(e.title), name: performerName(e.title), contactId: null },

@@ -1,3 +1,4 @@
+import { busyLabel } from "@/lib/calendar-sync";
 import { ChevronDown, ExternalLink, MapPin, Navigation, Repeat, Search, Star, X } from "lucide-react";
 import Link from "next/link";
 import { PendingButton, Select } from "@/components/form";
@@ -94,22 +95,30 @@ function GigButton({ o, small }: { o: Opportunity; small?: boolean }) {
   );
 }
 
-/** Inne moje grania tego dnia — informacja, nie blokada (drugie granie jednego wieczoru jest OK). */
+/**
+ * Inne moje grania tego dnia i spotkania z prywatnego kalendarza — informacja, nie blokada
+ * (drugie granie jednego wieczoru jest OK, spotkanie da się przełożyć).
+ */
 function DayGigs({ o }: { o: Opportunity }) {
-  if (o.myGigId || !o.dayGigs.length) return null;
+  if (o.myGigId) return null;
   return (
-    <div className="text-muted-foreground mt-1.5 text-[13px]">
-      Masz już tego dnia:{" "}
-      {o.dayGigs.map((d, i) => (
-        <span key={d.id}>
-          {i > 0 && ", "}
-          <Link href={`/gigs/${d.id}`} className="text-foreground font-medium hover:underline">
-            {d.title}
-            {d.startsAt.length > 10 && ` · ${d.startsAt.slice(11, 16)}`}
-          </Link>
-        </span>
-      ))}
-    </div>
+    <>
+      {o.dayGigs.length > 0 && (
+        <div className="text-muted-foreground mt-1.5 text-[13px]">
+          Masz już tego dnia:{" "}
+          {o.dayGigs.map((d, i) => (
+            <span key={d.id}>
+              {i > 0 && ", "}
+              <Link href={`/gigs/${d.id}`} className="text-foreground font-medium hover:underline">
+                {d.title}
+                {d.startsAt.length > 10 && ` · ${d.startsAt.slice(11, 16)}`}
+              </Link>
+            </span>
+          ))}
+        </div>
+      )}
+      {o.calendarBusy && <div className="text-st-wai mt-1.5 text-[13px]">Zajęty wieczór — {busyLabel(o.calendarBusy)}</div>}
+    </>
   );
 }
 
@@ -281,6 +290,7 @@ function GroupCard({ g }: { g: OpportunityGroup }) {
                 >
                   {where(x)}
                   {!x.myGigId && x.dayGigs.length > 0 && <span className="text-st-wai"> · masz już granie tego dnia</span>}
+                  {!x.myGigId && !x.dayGigs.length && x.calendarBusy && <span className="text-st-wai"> · zajęty w kalendarzu</span>}
                   {x.event.availability && (
                     <span className={x.event.availability === "sold_out" ? "text-st-rej" : "text-st-wai"}>
                       {" "}

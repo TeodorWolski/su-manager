@@ -19,6 +19,8 @@ import {
 import type { GigOutcome } from "@/db/schema";
 import { pitchMessage, supportMessage } from "@/lib/messages";
 import { WhileThere } from "@/components/while-there";
+import { loadBusyEvenings } from "@/lib/calendar-data";
+import { busyLabel } from "@/lib/calendar-sync";
 import { getGig, getWhileThereCached, gigChoicesForTrips, listGigTrips, type GigStatus } from "@/lib/queries";
 import { fmtZl } from "@/lib/ticket-parse";
 import { gigBalance } from "@/lib/trips";
@@ -44,7 +46,12 @@ const STEP_ACTIVE: Partial<Record<GigStatus, string>> = {
 
 export default async function GigPage({ params }: PageProps<"/gigs/[id]">) {
   const { id } = await params;
-  const [data, gigTrips, whileThere] = await Promise.all([getGig(Number(id)), listGigTrips(Number(id)), getWhileThereCached()]);
+  const [data, gigTrips, whileThere, busy] = await Promise.all([
+    getGig(Number(id)),
+    listGigTrips(Number(id)),
+    getWhileThereCached(),
+    loadBusyEvenings(),
+  ]);
   if (!data) notFound();
   const { gig, log } = data;
   const isPast = effectiveStart(gig.startsAt) < nowLocal();
@@ -61,6 +68,7 @@ export default async function GigPage({ params }: PageProps<"/gigs/[id]">) {
   const quiet = daysSince(since, nowLocal());
   const timing = followUpTiming(gig.startsAt, since, nowLocal().slice(0, 10), gig.status);
   const next = nextChannel(used);
+  const busySlots = busy.get(gig.startsAt.slice(0, 10));
 
   return (
     <>
@@ -80,6 +88,13 @@ export default async function GigPage({ params }: PageProps<"/gigs/[id]">) {
           </Button>
         }
       />
+
+      {/* Prośba o granie na wieczór, na który mam już coś w prywatnym kalendarzu — podpowiedź, nie blokada. */}
+      {asking && busySlots && (
+        <div className="bg-st-wai/14 text-st-wai mb-4 rounded-xl px-4 py-3 text-[14px] leading-snug">
+          Ten wieczór masz zajęty — {busyLabel(busySlots)}. Jak komik się zgodzi, coś trzeba będzie przełożyć.
+        </div>
+      )}
 
       {/* Pipeline statusów: zainteresowany → napisałem → czekam → potwierdzone */}
       {!log && (
