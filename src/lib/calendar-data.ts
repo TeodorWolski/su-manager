@@ -1,24 +1,35 @@
 /**
- * Zajęte wieczory z Kalendarza Google (app_state „calendar-busy”) i prośby do kalendarza „w toku”.
+ * Wydarzenia z Kalendarza Google (app_state „calendar-events”) i prośby do kalendarza „w toku”.
  * Bez server-only — używa tego też planowanie (mail) i trasa dla skryptu.
  */
 import { and, gte, inArray, sql } from "drizzle-orm";
 import { db, gigs } from "@/db";
 import { getState, setState } from "./app-state";
-import { PENDING_SYNC_STATUSES, type BusyEvening, type PendingGig } from "./calendar-sync";
+import { busyEvenings, calendarDays, PENDING_SYNC_STATUSES, type CalendarEvent, type PendingGig } from "./calendar-sync";
+import { nowLocal } from "./time";
 
-const BUSY_KEY = "calendar-busy";
+const EVENTS_KEY = "calendar-events";
 
 /** Zapisuje całą listę na nowo — skrypt zawsze wysyła pełny obraz, więc odwołane spotkania same znikają. */
-export async function saveBusyEvenings(evenings: BusyEvening[]) {
-  await setState(BUSY_KEY, JSON.stringify(evenings));
+export async function saveCalendarEvents(events: CalendarEvent[]) {
+  await setState(EVENTS_KEY, JSON.stringify(events));
 }
 
-/** Dzień → godziny spotkań. Pusto, gdy skrypt jeszcze nic nie wysłał. */
+/** Pusto, gdy skrypt jeszcze nic nie wysłał. */
+async function loadCalendarEvents(): Promise<CalendarEvent[]> {
+  const raw = await getState(EVENTS_KEY);
+  return raw ? (JSON.parse(raw) as CalendarEvent[]) : [];
+}
+
+/** Zajęte wieczory od dziś: dzień → spotkania („18:30–19:30 Dietetyk”). */
 export async function loadBusyEvenings(): Promise<Map<string, string[]>> {
-  const raw = await getState(BUSY_KEY);
-  const list = raw ? (JSON.parse(raw) as BusyEvening[]) : [];
-  return new Map(list.map((e) => [e.day, e.slots]));
+  const evenings = busyEvenings(await loadCalendarEvents(), nowLocal().slice(0, 10));
+  return new Map(evenings.map((e) => [e.day, e.slots]));
+}
+
+/** Co jest w prywatnym kalendarzu w dniach od–do (mini kalendarz). */
+export async function loadCalendarDays(from: string, to: string) {
+  return calendarDays(await loadCalendarEvents(), from, to);
 }
 
 export async function loadPendingGigs(today: string): Promise<PendingGig[]> {

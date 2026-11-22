@@ -1,6 +1,7 @@
 /**
  * Synchronizacja z Kalendarzem Google (skrypt Apps Script, instrukcja: /settings/calendar):
- * - do apki: kiedy mam wieczór zajęty w prywatnym kalendarzu (same godziny, bez tytułów),
+ * - do apki: wydarzenia z prywatnego kalendarza (godziny i tytuły) — mini kalendarz pokazuje, co jest
+ *   danego dnia, a wieczory z czymś w środku liczą się jako zajęte,
  * - do Google: prośby o granie „napisałem / czekam” jako wpisy w osobnym kalendarzu „SU · w toku”,
  *   żeby przy umawianiu się z kimś było widać, że wieczór jest jeszcze niepewny.
  * Czysta logika; zapis i odczyt: calendar-data.ts.
@@ -16,43 +17,75 @@ export const CALENDAR_AHEAD_DAYS = 90;
 export const PENDING_EVENT_MIN = 150;
 /** Statusy, które trafiają do kalendarza „w toku”. „Zainteresowany” nie — to tylko pomysł, nikogo jeszcze nie pytałem. */
 export const PENDING_SYNC_STATUSES = ["contacted", "waiting"] as const;
+/** Dłuższe tytuły przycinamy — w mini kalendarzu i tak mieści się jedna linijka. */
+export const CALENDAR_TITLE_MAX = 80;
 
 /** Lokalny czas Warszawy, jak przy graniach. */
 const LOCAL = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/;
 
-export type BusyInterval = { start: string; end: string };
-/** Zajęty wieczór: dzień i godziny spotkań („19:00–21:00”; „…” = zaczęło się wcześniej / kończy później). */
+/** Wydarzenie z prywatnego kalendarza; całodniowe trwa od północy do północy (koniec bez tego dnia). */
+export type CalendarEvent = { start: string; end: string; title: string; allDay: boolean };
+/** Zajęty wieczór: dzień i spotkania („19:00–21:00 Dietetyk”; „…” = zaczęło się wcześniej / kończy później). */
 export type BusyEvening = { day: string; slots: string[] };
+/** Dzień w mini kalendarzu: co jest w prywatnym kalendarzu (bez godziny = całodniowe). */
+export type CalendarDay = { day: string; items: { time: string | null; title: string }[] };
 
-/** Tylko poprawne przedziały z przyszłości (skrypt jest nasz, ale wejście z sieci sprawdzamy). */
-export function parseBusy(input: unknown, today: string): BusyInterval[] {
+/**
+ * Tylko poprawne wydarzenia z okna synchronizacji (skrypt jest nasz, ale wejście z sieci sprawdzamy).
+ * Stary skrypt wysyła same godziny ({ start, end }) — wtedy bez tytułu i jako zwykłe spotkanie.
+ */
+export function parseEvents(input: unknown, today: string): CalendarEvent[] {
   if (!Array.isArray(input)) return [];
   const until = addDays(today, CALENDAR_AHEAD_DAYS + 1);
-  return input.filter(
-    (x): x is BusyInterval =>
-      !!x &&
-      typeof x.start === "string" &&
-      typeof x.end === "string" &&
-      LOCAL.test(x.start) &&
-      LOCAL.test(x.end) &&
-      x.start < x.end &&
-      dayOf(x.end) >= today &&
-      dayOf(x.start) <= until,
-  );
+  return input.flatMap((x): CalendarEvent[] => {
+    if (!x || typeof x.start !== "string" || typeof x.end !== "string") return [];
+    if (!LOCAL.test(x.start) || !LOCAL.test(x.end) || x.start >= x.end) return [];
+    if (dayOf(x.end) < today || dayOf(x.start) > until) return [];
+    const title = typeof x.title === "string" ? x.title.trim().slice(0, CALENDAR_TITLE_MAX) : "";
+    return [{ start: x.start, end: x.end, title, allDay: x.allDay === true }];
+  });
 }
 
-/** Które wieczory są zajęte: przedział nachodzi na EVENING_FROM–EVENING_TO danego dnia. Od dziś, posortowane. */
-export function busyEvenings(intervals: BusyInterval[], today: string): BusyEvening[] {
+/** Dni, na które przypada wydarzenie; koniec równo o północy nie zajmuje już następnego dnia. */
+function daysOf({ start, end }: CalendarEvent) {
+  const first = dayOf(start);
+  const last = end.endsWith("T00:00") && dayOf(end) > first ? addDays(dayOf(end), -1) : dayOf(end);
+  const days: string[] = [];
+  for (let d = first; d <= last; d = addDays(d, 1)) days.push(d);
+  return days;
+}
+
+/** „19:00–21:00”, a przy wydarzeniu na kilka dni „15:00–…” / „…–…” / „…–12:00”. */
+const timeOn = (e: CalendarEvent, day: string) =>
+  `${dayOf(e.start) === day ? e.start.slice(11, 16) : "…"}–${dayOf(e.end) === day ? e.end.slice(11, 16) : "…"}`;
+
+const withTitle = (time: string, title: string) => (title ? `${time} ${title}` : time);
+
+/** Które wieczory są zajęte: spotkanie nachodzi na EVENING_FROM–EVENING_TO danego dnia. Całodniowe się nie liczą. Od dziś, posortowane. */
+export function busyEvenings(events: CalendarEvent[], today: string): BusyEvening[] {
   const byDay = new Map<string, string[]>();
-  for (const { start, end } of intervals) {
-    for (let day = dayOf(start); day <= dayOf(end); day = addDays(day, 1)) {
-      if (day < today || !(start < `${day}T${EVENING_TO}` && end > `${day}T${EVENING_FROM}`)) continue;
-      const from = dayOf(start) === day ? start.slice(11, 16) : "…";
-      const to = dayOf(end) === day ? end.slice(11, 16) : "…";
-      byDay.set(day, [...(byDay.get(day) ?? []), `${from}–${to}`]);
+  for (const e of events) {
+    if (e.allDay) continue;
+    for (const day of daysOf(e)) {
+      if (day < today || !(e.start < `${day}T${EVENING_TO}` && e.end > `${day}T${EVENING_FROM}`)) continue;
+      byDay.set(day, [...(byDay.get(day) ?? []), withTitle(timeOn(e, day), e.title)]);
     }
   }
   return [...byDay.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([day, slots]) => ({ day, slots: [...new Set(slots)].sort() }));
+}
+
+/** Wszystko z prywatnego kalendarza dzień po dniu (do mini kalendarza): całodniowe na górze, potem wg godziny. */
+export function calendarDays(events: CalendarEvent[], from: string, to: string): CalendarDay[] {
+  const byDay = new Map<string, CalendarDay["items"]>();
+  for (const e of events) {
+    for (const day of daysOf(e)) {
+      if (day < from || day > to) continue;
+      byDay.set(day, [...(byDay.get(day) ?? []), { time: e.allDay ? null : timeOn(e, day), title: e.title }]);
+    }
+  }
+  return [...byDay.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([day, items]) => ({ day, items: items.sort((a, b) => (a.time ?? "").localeCompare(b.time ?? "")) }));
 }
 
 export type PendingGig = { id: number; title: string; startsAt: string; status: string; cityName: string | null };
@@ -81,5 +114,5 @@ export function pendingEvents(gigs: PendingGig[], today: string, appUrl: string)
     });
 }
 
-/** „w kalendarzu: 19:00–21:00” — do ostrzeżeń przy graniu i okazjach. */
+/** „w kalendarzu: 18:30–19:30 Dietetyk” — do ostrzeżeń przy graniu i okazjach. */
 export const busyLabel = (slots: string[]) => `w kalendarzu: ${slots.join(", ")}`;

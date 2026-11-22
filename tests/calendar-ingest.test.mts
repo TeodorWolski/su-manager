@@ -1,5 +1,5 @@
 /**
- * /api/ingest/calendar na tymczasowej bazie: token, zapis zajętych wieczorów i prośby „w toku” w odpowiedzi.
+ * /api/ingest/calendar na tymczasowej bazie: token, zapis wydarzeń z kalendarza i prośby „w toku” w odpowiedzi.
  */
 import assert from "node:assert/strict";
 import { mkdtempSync } from "node:fs";
@@ -15,7 +15,7 @@ process.env.APP_URL = "https://app.test";
 const { db, gigs, cities } = await import("@/db");
 const { migrate } = await import("drizzle-orm/libsql/migrator");
 const { POST } = await import("@/app/api/ingest/calendar/route");
-const { loadBusyEvenings } = await import("@/lib/calendar-data");
+const { loadBusyEvenings, loadCalendarDays } = await import("@/lib/calendar-data");
 const { addDays, nowLocal } = await import("@/lib/time");
 
 const today = nowLocal().slice(0, 10);
@@ -41,25 +41,43 @@ before(async () => {
 });
 
 test("bez tokenu albo ze złym — 401, nic nie zapisane", async () => {
-  assert.equal((await call({ busy: [] }, "zly")).status, 401);
+  assert.equal((await call({ events: [] }, "zly")).status, 401);
   assert.equal((await loadBusyEvenings()).size, 0);
 });
 
-test("zapisuje zajęte wieczory i oddaje prośby „w toku” (bez zainteresowanych i potwierdzonych)", async () => {
-  const res = await call({ busy: [{ start: `${day(3)}T19:00`, end: `${day(3)}T21:00` }, { start: `${day(4)}T09:00`, end: `${day(4)}T10:00` }] });
+test("zapisuje wydarzenia i oddaje prośby „w toku” (bez zainteresowanych i potwierdzonych)", async () => {
+  const res = await call({
+    events: [
+      { start: `${day(3)}T19:00`, end: `${day(3)}T21:00`, title: "Dietetyk", allDay: false },
+      { start: `${day(4)}T09:00`, end: `${day(4)}T10:00`, title: "Kardiolog", allDay: false },
+    ],
+  });
   assert.equal(res.status, 200);
   const body = await res.json();
-  assert.equal(body.busyEvenings, 1);
+  assert.deepEqual([body.events, body.busyEvenings], [2, 1]);
   assert.deepEqual(
     body.pending.map((p: { title: string; start: string; url: string }) => [p.title, p.start, p.url.replace(/\d+$/, "N")]),
     [["❓ czekam · Czekam na odpowiedź · Lublin", `${day(5)}T19:00`, "https://app.test/gigs/N"]],
   );
+  assert.deepEqual([...(await loadBusyEvenings()).entries()], [[day(3), ["19:00–21:00 Dietetyk"]]]);
+  assert.deepEqual(
+    (await loadCalendarDays(day(0), day(10))).map((d) => [d.day, d.items.map((i) => i.title)]),
+    [
+      [day(3), ["Dietetyk"]],
+      [day(4), ["Kardiolog"]],
+    ],
+  );
+});
+
+test("poprzednia wersja skryptu (same godziny w `busy`) dalej działa", async () => {
+  assert.equal((await call({ busy: [{ start: `${day(3)}T19:00`, end: `${day(3)}T21:00` }] })).status, 200);
   assert.deepEqual([...(await loadBusyEvenings()).entries()], [[day(3), ["19:00–21:00"]]]);
 });
 
 test("kolejna synchronizacja zastępuje listę — odwołane spotkanie znika", async () => {
-  await call({ busy: [] });
+  await call({ events: [] });
   assert.equal((await loadBusyEvenings()).size, 0);
+  assert.equal((await loadCalendarDays(day(0), day(10))).length, 0);
 });
 
 test("zły kształt danych — 400", async () => {

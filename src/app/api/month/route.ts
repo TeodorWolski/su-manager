@@ -3,10 +3,10 @@ import type { NextRequest } from "next/server";
 import { cities, db, gigs, trips, venues } from "@/db";
 import { eq } from "drizzle-orm";
 import { currentSession } from "@/lib/auth";
-import { loadBusyEvenings } from "@/lib/calendar-data";
+import { loadCalendarDays } from "@/lib/calendar-data";
 
 /**
- * Grania, podróże i zajęte wieczory do mini kalendarza: /api/month?from=YYYY-MM-DD&to=YYYY-MM-DD (widoczne tygodnie miesiąca).
+ * Grania, podróże i wydarzenia z prywatnego kalendarza do mini kalendarza: /api/month?from=YYYY-MM-DD&to=YYYY-MM-DD (widoczne tygodnie miesiąca).
  * Za basic auth jak cała apka. Bez odrzuconych i odwołanych.
  */
 export async function GET(request: NextRequest) {
@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
     .from(trips)
     .where(and(gte(sql`substr(${trips.departsAt}, 1, 10)`, from), lte(sql`substr(${trips.departsAt}, 1, 10)`, to)))
     .orderBy(trips.departsAt);
-  // Wieczory zajęte w prywatnym kalendarzu (same godziny, bez tytułów).
-  const busy = [...(await loadBusyEvenings()).entries()].filter(([day]) => day >= from && day <= to).map(([day, slots]) => ({ day, slots }));
-  return Response.json({ gigs: rows, trips: tripRows, busy }, { headers: { "Cache-Control": "no-store" } });
+  // Co jest w prywatnym kalendarzu (synchronizacja z Google) — ikonka przy dniu i lista pod dniem.
+  const calendar = await loadCalendarDays(from, to);
+  return Response.json({ gigs: rows, trips: tripRows, calendar }, { headers: { "Cache-Control": "no-store" } });
 }
