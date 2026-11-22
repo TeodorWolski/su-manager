@@ -10,7 +10,7 @@ import { describe as describeSeries, RECURRING_SOURCE, seriesKey } from "./recur
 import { loadSeries } from "./recurring-sync";
 import { gigWindow } from "./away";
 import { loadCalendarEvents } from "./calendar-data";
-import { overlapping } from "./calendar-sync";
+import { overlapping, type CalendarSlot } from "./calendar-sync";
 import { loadLeadTimes } from "./lead-data";
 import { planRoute, routeDays } from "./route";
 import { matchContacts, matchesQuery } from "./match";
@@ -66,7 +66,7 @@ export type Opportunity = {
    * Spotkania z prywatnego kalendarza w czasie, który zajęłoby to granie (away.ts: wieczór albo cały wyjazd);
    * null = wolne albo brak synchronizacji.
    */
-  calendarBusy: { away: boolean; slots: string[] } | null;
+  calendarBusy: { away: boolean; slots: CalendarSlot[] } | null;
   /** Kto występuje: kontakt z CRM albo nazwa wyciągnięta z tytułu. Klucz grupuje terminy jednego komika. */
   performer: { key: string; name: string; contactId: number | null };
   tab: Tab;

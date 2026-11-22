@@ -19,9 +19,9 @@ import {
 import type { GigOutcome } from "@/db/schema";
 import { pitchMessage, supportMessage } from "@/lib/messages";
 import { WhileThere } from "@/components/while-there";
+import { ConflictSlots } from "@/components/calendar-conflicts";
 import { describeWindow } from "@/lib/away";
 import { loadGigConflicts } from "@/lib/calendar-data";
-import { busyLabel } from "@/lib/calendar-sync";
 import { getGig, getWhileThereCached, gigChoicesForTrips, listGigTrips, type GigStatus } from "@/lib/queries";
 import { fmtZl } from "@/lib/ticket-parse";
 import { gigBalance } from "@/lib/trips";
@@ -92,9 +92,10 @@ export default async function GigPage({ params }: PageProps<"/gigs/[id]">) {
 
       {/* Granie (prośba albo potwierdzone) koliduje z prywatnym kalendarzem — wieczór albo cały wyjazd. Podpowiedź, nie blokada. */}
       {conflict && (
-        <div className="bg-st-wai/14 text-st-wai mb-4 rounded-xl px-4 py-3 text-[14px] leading-snug">
-          <b className="font-semibold">Kolizja:</b> {describeWindow(conflict.window, conflict.gig.cityName)} — {busyLabel(conflict.slots)}.{" "}
+        <div className="bg-st-wai/14 text-st-wai mb-4 rounded-xl px-4 py-3 text-[14px] leading-snug has-[[data-pending]]:opacity-50">
+          <b className="font-semibold">Kolizja:</b> {describeWindow(conflict.window, conflict.gig.cityName)}.{" "}
           {gig.status === "confirmed" ? "Przełóż spotkanie albo odpuść granie." : "Jak komik się zgodzi, coś trzeba będzie przełożyć."}
+          <ConflictSlots slots={conflict.slots} />
         </div>
       )}
 

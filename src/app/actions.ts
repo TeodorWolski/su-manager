@@ -10,6 +10,7 @@ import { seriesKey } from "@/lib/recurring";
 import { syncRecurring } from "@/lib/recurring-sync";
 import { normalize } from "@/lib/text";
 import { headlinerFromTitle } from "@/lib/gig-types";
+import { setRoutine } from "@/lib/calendar-data";
 import { tripContext } from "@/lib/trip-ingest";
 import { parseZl } from "@/lib/trips";
 import { nowLocal } from "@/lib/time";
@@ -886,6 +887,14 @@ export async function setTripGig(id: number, fd: FormData) {
 export async function deleteTrip(id: number) {
   await requireSession();
   await db.delete(trips).where(eq(trips.id, id));
+  refresh();
+}
+
+/** Wpis z Kalendarza Google to rutyna (nie koliduje z graniami) albo z powrotem zwykłe spotkanie — po tytule. */
+export async function setCalendarRoutine(title: string, routine: boolean) {
+  await requireSession();
+  if (!title.trim()) return;
+  await setRoutine(title, routine);
   refresh();
 }
 

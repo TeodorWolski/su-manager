@@ -15,7 +15,7 @@ process.env.APP_URL = "https://app.test";
 const { db, gigs, cities } = await import("@/db");
 const { migrate } = await import("drizzle-orm/libsql/migrator");
 const { POST } = await import("@/app/api/ingest/calendar/route");
-const { loadCalendarDays, loadGigConflicts } = await import("@/lib/calendar-data");
+const { loadCalendarDays, loadGigConflicts, setRoutine, loadRoutineTitles } = await import("@/lib/calendar-data");
 const { getState } = await import("@/lib/app-state");
 const { addDays, nowLocal } = await import("@/lib/time");
 
@@ -65,7 +65,7 @@ test("zapisuje wydarzenia, liczy kolizje (wieczór w Warszawie, popołudnie przy
     [["❓ czekam · Czekam na odpowiedź · Lublin (wyjazd)", `${day(5)}T15:30`, `${day(6)}T00:00`, "https://app.test/gigs/N"]],
   );
   assert.deepEqual(
-    (await loadGigConflicts()).map((c) => [c.gig.title, c.window.away, c.slots]),
+    (await loadGigConflicts()).map((c) => [c.gig.title, c.window.away, c.slots.map((s) => s.label)]),
     [
       ["Open mic w Warszawie", false, ["18:30–19:30 Dietetyk"]],
       ["Zaklepane w Gdańsku", true, ["15:45–16:30 Kardiolog"]],
@@ -87,10 +87,23 @@ test("bez urządzenia (i kluczy push) kolizja nie jest odhaczana — push pójdz
   assert.equal(await getState("calendar-conflicts-notified"), "[]");
 });
 
+test("„to rutyna”: wpis przestaje kolidować (wszystkie o tym tytule), ale zostaje w mini kalendarzu; cofnięcie przywraca", async () => {
+  await setRoutine("dietetyk", true);
+  assert.deepEqual(await loadRoutineTitles(), ["dietetyk"]);
+  assert.deepEqual(
+    (await loadGigConflicts()).map((c) => c.gig.title),
+    ["Zaklepane w Gdańsku"],
+  );
+  assert.deepEqual((await loadCalendarDays(day(3), day(3)))[0].items, [{ time: "18:30–19:30", title: "Dietetyk", routine: true }]);
+  await setRoutine("Dietetyk", false);
+  assert.deepEqual(await loadRoutineTitles(), []);
+  assert.equal((await loadGigConflicts()).length, 2);
+});
+
 test("poprzednia wersja skryptu (same godziny w `busy`) dalej działa", async () => {
   assert.equal((await call({ busy: [{ start: `${day(3)}T19:00`, end: `${day(3)}T21:00` }] })).status, 200);
   assert.deepEqual(
-    (await loadGigConflicts()).map((c) => c.slots),
+    (await loadGigConflicts()).map((c) => c.slots.map((s) => s.label)),
     [["19:00–21:00"]],
   );
 });

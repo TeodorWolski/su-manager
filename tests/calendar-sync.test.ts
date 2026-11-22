@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   busyLabel,
+  isRoutine,
+  routineKey,
   CALENDAR_TITLE_MAX,
   calendarDays,
   overlapping,
@@ -25,8 +27,20 @@ test("kolizje z oknem grania: spotkania nachodzące na okno (z tytułem); stykaj
     ev("2026-11-20T23:00", "2026-11-21T01:00"), // zaczyna się równo z końcem
     ev("2026-11-20T00:00", "2026-11-21T00:00", "Urodziny", true),
   ];
-  assert.deepEqual(overlapping(events, evening), ["17:30–18:30", "19:00–21:00 Kolacja"]);
+  assert.deepEqual(
+    overlapping(events, evening).map((s) => s.label),
+    ["17:30–18:30", "19:00–21:00 Kolacja"],
+  );
+  assert.deepEqual(overlapping(events, evening)[1], { label: "19:00–21:00 Kolacja", title: "Kolacja" });
   assert.equal(busyLabel(overlapping(events, evening)), "w kalendarzu: 17:30–18:30, 19:00–21:00 Kolacja");
+});
+
+test("rutyna po tytule: bez względu na wielkość liter, ogonki i spacje; wpis bez tytułu nigdy nie jest rutyną", () => {
+  const routines = new Set([routineKey("Siłownia  rano")]);
+  assert.equal(isRoutine({ title: "siłownia rano" }, routines), true);
+  assert.equal(isRoutine({ title: "SILOWNIA RANO" }, routines), true);
+  assert.equal(isRoutine({ title: "Siłownia z Kubą" }, routines), false);
+  assert.equal(isRoutine({ title: "" }, new Set([""])), false);
 });
 
 test("kolizje z wyjazdem: popołudniowa wizyta i ranne spotkanie następnego dnia (z datą)", () => {
@@ -36,7 +50,10 @@ test("kolizje z wyjazdem: popołudniowa wizyta i ranne spotkanie następnego dni
     ev("2026-12-10T09:00", "2026-12-10T10:00", "Bank"),
     ev("2026-12-10T13:00", "2026-12-10T14:00", "Po powrocie"),
   ];
-  assert.deepEqual(overlapping(events, trip), ["15:45–16:30 Kardiolog", "10.12 09:00–10:00 Bank"]);
+  assert.deepEqual(
+    overlapping(events, trip).map((s) => s.label),
+    ["15:45–16:30 Kardiolog", "10.12 09:00–10:00 Bank"],
+  );
 });
 
 test("lista dnia do mini kalendarza: wszystko, też dzienne i całodniowe; całodniowe na górze, koniec o północy nie zajmuje kolejnego dnia", () => {
@@ -51,19 +68,20 @@ test("lista dnia do mini kalendarza: wszystko, też dzienne i całodniowe; cało
     ],
     "2026-12-01",
     "2026-12-15",
+    new Set([routineKey("BANK")]),
   );
   assert.deepEqual(days, [
-    { day: "2026-12-07", items: [{ time: "18:30–19:30", title: "Dietetyk" }] },
+    { day: "2026-12-07", items: [{ time: "18:30–19:30", title: "Dietetyk", routine: false }] },
     {
       day: "2026-12-09",
       items: [
-        { time: null, title: "Urodziny mamy" },
-        { time: "09:00–09:30", title: "Bank" },
-        { time: "15:45–16:30", title: "Kardiolog" },
+        { time: null, title: "Urodziny mamy", routine: false },
+        { time: "09:00–09:30", title: "Bank", routine: true },
+        { time: "15:45–16:30", title: "Kardiolog", routine: false },
       ],
     },
-    { day: "2026-12-12", items: [{ time: null, title: "Wyjazd" }] },
-    { day: "2026-12-13", items: [{ time: null, title: "Wyjazd" }] },
+    { day: "2026-12-12", items: [{ time: null, title: "Wyjazd", routine: false }] },
+    { day: "2026-12-13", items: [{ time: null, title: "Wyjazd", routine: false }] },
   ]);
 });
 

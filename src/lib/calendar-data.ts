@@ -6,10 +6,22 @@ import { and, gte, inArray, lte, sql } from "drizzle-orm";
 import { db, gigs, trips } from "@/db";
 import { getState, setState } from "./app-state";
 import { gigWindow, type GigWindow } from "./away";
-import { CALENDAR_AHEAD_DAYS, calendarDays, overlapping, PENDING_SYNC_STATUSES, type CalendarEvent, type PendingGig } from "./calendar-sync";
+import {
+  CALENDAR_AHEAD_DAYS,
+  calendarDays,
+  isRoutine,
+  overlapping,
+  PENDING_SYNC_STATUSES,
+  routineKey,
+  type CalendarEvent,
+  type CalendarSlot,
+  type PendingGig,
+} from "./calendar-sync";
 import { addDays, nowLocal } from "./time";
 
 const EVENTS_KEY = "calendar-events";
+/** Tytuły wpisów oznaczonych jako rutyna (tak, jak były w kalendarzu — do listy w ustawieniach). */
+const ROUTINES_KEY = "calendar-routines";
 
 /** Zapisuje całą listę na nowo — skrypt zawsze wysyła pełny obraz, więc odwołane spotkania same znikają. */
 export async function saveCalendarEvents(events: CalendarEvent[]) {
@@ -17,14 +29,34 @@ export async function saveCalendarEvents(events: CalendarEvent[]) {
 }
 
 /** Pusto, gdy skrypt jeszcze nic nie wysłał. */
-export async function loadCalendarEvents(): Promise<CalendarEvent[]> {
+async function loadAllCalendarEvents(): Promise<CalendarEvent[]> {
   const raw = await getState(EVENTS_KEY);
   return raw ? (JSON.parse(raw) as CalendarEvent[]) : [];
 }
 
-/** Co jest w prywatnym kalendarzu w dniach od–do (mini kalendarz). */
+export async function loadRoutineTitles(): Promise<string[]> {
+  return JSON.parse((await getState(ROUTINES_KEY)) ?? "[]") as string[];
+}
+
+const routineSet = (titles: string[]) => new Set(titles.map(routineKey));
+
+/** Rutyna ↔ zwykłe spotkanie (jeden tap); wszystkie wpisy o tym tytule naraz. */
+export async function setRoutine(title: string, routine: boolean) {
+  const titles = (await loadRoutineTitles()).filter((t) => routineKey(t) !== routineKey(title));
+  await setState(ROUTINES_KEY, JSON.stringify(routine ? [...titles, title.trim()] : titles));
+}
+
+/** Wydarzenia, które mogą kolidować z graniem — bez rutyn. */
+export async function loadCalendarEvents(): Promise<CalendarEvent[]> {
+  const [events, routines] = await Promise.all([loadAllCalendarEvents(), loadRoutineTitles()]);
+  const set = routineSet(routines);
+  return events.filter((e) => !isRoutine(e, set));
+}
+
+/** Co jest w prywatnym kalendarzu w dniach od–do (mini kalendarz), z rutynami oznaczonymi. */
 export async function loadCalendarDays(from: string, to: string) {
-  return calendarDays(await loadCalendarEvents(), from, to);
+  const [events, routines] = await Promise.all([loadAllCalendarEvents(), loadRoutineTitles()]);
+  return calendarDays(events, from, to, routineSet(routines));
 }
 
 /** Miasto grania z miasta albo sceny — z czasem dojazdu i noclegiem (do okna wyjazdu). */
@@ -53,8 +85,8 @@ export async function loadPendingGigs(today: string): Promise<PendingGig[]> {
 export type GigConflict = {
   gig: { id: number; title: string; startsAt: string; status: string; cityName: string | null };
   window: GigWindow;
-  /** Spotkania z kalendarza w oknie grania („15:45–16:30 Kardiolog”). */
-  slots: string[];
+  /** Spotkania z kalendarza w oknie grania („15:45–16:30 Kardiolog”), bez rutyn. */
+  slots: CalendarSlot[];
 };
 
 /**

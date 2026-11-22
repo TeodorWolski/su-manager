@@ -6,6 +6,7 @@ import { CalendarDays, ChevronLeft, ChevronRight, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { setCalendarRoutine } from "@/app/actions";
 import { cn } from "@/lib/utils";
 
 /**
@@ -17,7 +18,7 @@ import { cn } from "@/lib/utils";
 type MonthGig = { id: number; title: string; startsAt: string; status: string; context: string | null; city: string | null };
 type MonthTrip = { id: number; fromStation: string; toStation: string; departsAt: string; arrivesAt: string | null; gigId: number | null };
 /** Dzień z prywatnego kalendarza (synchronizacja z Google); bez godziny = całodniowe. */
-type MonthCalendarDay = { day: string; items: { time: string | null; title: string }[] };
+type MonthCalendarDay = { day: string; items: { time: string | null; title: string; routine: boolean }[] };
 
 const STORAGE_KEY = "mini-calendar-open";
 const WEEK_MIN = 2;
@@ -94,6 +95,8 @@ export function MiniCalendar() {
   const [trips, setTrips] = useState<MonthTrip[]>([]);
   const [calendar, setCalendar] = useState<MonthCalendarDay[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
+  // Po „to rutyna” / „nie rutyna” — pobierz miesiąc jeszcze raz.
+  const [reload, setReload] = useState(0);
   const today = iso(new Date());
 
   const toggle = writeOpen;
@@ -118,7 +121,7 @@ export function MiniCalendar() {
     return () => {
       cancelled = true;
     };
-  }, [open, from, to, pathname]);
+  }, [open, from, to, pathname, reload]);
 
   const byDay = useMemo(() => {
     const m = new Map<string, MonthGig[]>();
@@ -133,6 +136,12 @@ export function MiniCalendar() {
   }, [trips]);
 
   const calendarByDay = useMemo(() => new Map(calendar.map((c) => [c.day, c.items])), [calendar]);
+  // 📅 tylko przy dniach z czymś prawdziwym — same rutyny nie zaśmiecają kalendarza.
+  const meetingDays = useMemo(() => new Set(calendar.filter((c) => c.items.some((i) => !i.routine)).map((c) => c.day)), [calendar]);
+  const toggleRoutine = async (title: string, routine: boolean) => {
+    await setCalendarRoutine(title, routine);
+    setReload((n) => n + 1);
+  };
 
   const shift = (n: number) => {
     setMonth((m) => new Date(m.getFullYear(), m.getMonth() + n, 1));
@@ -204,7 +213,7 @@ export function MiniCalendar() {
                         key={key}
                         onClick={() => setSelected(selected === key ? null : key)}
                         className="flex h-9 items-center justify-center"
-                        aria-label={`${format(d, "d MMMM", { locale: pl })}${list.length ? `, ${list.length} grań` : ""}${calendarByDay.has(key) ? ", coś w kalendarzu" : ""}`}
+                        aria-label={`${format(d, "d MMMM", { locale: pl })}${list.length ? `, ${list.length} grań` : ""}${meetingDays.has(key) ? ", coś w kalendarzu" : ""}`}
                       >
                         <span
                           className={cn(
@@ -219,7 +228,7 @@ export function MiniCalendar() {
                         >
                           {d.getDate()}
                           {/* Coś w prywatnym kalendarzu — kartka w prawym rogu (pociąg w lewym, kropka drugiego grania na dole). */}
-                          {calendarByDay.has(key) && (
+                          {meetingDays.has(key) && (
                             <span className="absolute -top-1 -right-1 text-[9px] leading-none" aria-hidden>
                               📅
                             </span>
@@ -290,10 +299,21 @@ export function MiniCalendar() {
                 </Link>
               ))}
               {dayCalendar.map((c, i) => (
-                <div key={`c${i}`} className="flex items-center gap-2 px-1 py-1 text-[13px]">
-                  <span aria-hidden>📅</span>
+                <div key={`c${i}`} className={cn("flex items-center gap-2 px-1 py-1 text-[13px]", c.routine && "text-muted-foreground")}>
+                  <span aria-hidden className={cn(c.routine && "opacity-40 grayscale")}>
+                    📅
+                  </span>
                   <span className="min-w-0 flex-1 truncate">{c.title || "Bez tytułu"}</span>
                   <span className="text-muted-foreground shrink-0 tabular-nums">{c.time ?? "cały dzień"}</span>
+                  {c.title && (
+                    <button
+                      onClick={() => toggleRoutine(c.title, !c.routine)}
+                      className="text-muted-foreground hover:text-foreground shrink-0 rounded-full border px-1.5 text-[11px]"
+                      title={c.routine ? "Rutyna — nie koliduje z graniami. Dotknij, żeby znowu liczyła się jako spotkanie." : "Stały wpis (siłownia, czytanie…)? Nie będzie kolidował z graniami."}
+                    >
+                      {c.routine ? "rutyna ↺" : "rutyna?"}
+                    </button>
+                  )}
                 </div>
               ))}
               {dayGigs.length ? (
@@ -323,7 +343,7 @@ export function MiniCalendar() {
                 </>
               ) : (
                 <div className="text-muted-foreground px-1 py-1 text-[13px]">
-                  {dayCalendar.length ? "Bez grań." : "Wolne."}{" "}
+                  {dayCalendar.some((c) => !c.routine) ? "Bez grań." : "Wolne."}{" "}
                   <Link href={`/events?q=${selected.slice(8, 10)}.${selected.slice(5, 7)}`} className="text-primary">
                     Co gra tego dnia?
                   </Link>

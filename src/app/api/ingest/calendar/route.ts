@@ -33,13 +33,13 @@ export async function POST(request: NextRequest) {
   const notified = new Set<string>(JSON.parse((await getState(NOTIFIED_KEY)) ?? "[]"));
   const stillNotified: string[] = [];
   for (const c of conflicts) {
-    const keys = c.slots.map((s) => `${c.gig.id}|${s}`);
+    const keys = c.slots.map((s) => `${c.gig.id}|${s.label}`);
     stillNotified.push(...keys.filter((k) => notified.has(k)));
     const fresh = c.slots.filter((_, i) => !notified.has(keys[i]));
     if (!fresh.length) continue;
     const devices = await sendPush({
       title: `⚠️ Kolizja: ${c.gig.title}`,
-      body: `${fmtDate(c.gig.startsAt.slice(0, 10))}, ${describeWindow(c.window, c.gig.cityName)} — w kalendarzu: ${fresh.join(", ")}`,
+      body: `${fmtDate(c.gig.startsAt.slice(0, 10))}, ${describeWindow(c.window, c.gig.cityName)} — w kalendarzu: ${fresh.map((s) => s.label).join(", ")}`,
       url: `/gigs/${c.gig.id}`,
       tag: `conflict-${c.gig.id}`,
     }).catch(() => 0);

@@ -7,6 +7,7 @@
  * Czysta logika; zapis i odczyt: calendar-data.ts.
  */
 import { gigWindow, GIG_LENGTH_MIN, type WindowGig } from "./away";
+import { normalize } from "./text";
 import { addDays, addMinutes, dayOf, effectiveStart } from "./time";
 /** Ile dni naprzód skrypt czyta prywatny kalendarz i ile naprzód wysyłamy prośby „w toku”. */
 export const CALENDAR_AHEAD_DAYS = 90;
@@ -20,8 +21,17 @@ const LOCAL = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/;
 
 /** Wydarzenie z prywatnego kalendarza; całodniowe trwa od północy do północy (koniec bez tego dnia). */
 export type CalendarEvent = { start: string; end: string; title: string; allDay: boolean };
-/** Dzień w mini kalendarzu: co jest w prywatnym kalendarzu (bez godziny = całodniowe). */
-export type CalendarDay = { day: string; items: { time: string | null; title: string }[] };
+/** Dzień w mini kalendarzu: co jest w prywatnym kalendarzu (bez godziny = całodniowe; rutyna = nie koliduje). */
+export type CalendarDay = { day: string; items: { time: string | null; title: string; routine: boolean }[] };
+/** Spotkanie w oknie grania: opis do ostrzeżeń („15:45–16:30 Kardiolog”) i tytuł (do „to rutyna”). */
+export type CalendarSlot = { label: string; title: string };
+
+/**
+ * Rutyna (siłownia, czytanie…) — wpis w kalendarzu, który nie jest prawdziwym spotkaniem: widać go w mini
+ * kalendarzu, ale nie koliduje z graniami. Rozpoznajemy po tytule, więc jeden tap łapie wszystkie powtórzenia.
+ */
+export const routineKey = (title: string) => normalize(title).replace(/\s+/g, " ");
+export const isRoutine = (e: Pick<CalendarEvent, "title">, routines: Set<string>) => !!e.title && routines.has(routineKey(e.title));
 
 /**
  * Tylko poprawne wydarzenia z okna synchronizacji (skrypt jest nasz, ale wejście z sieci sprawdzamy).
@@ -58,7 +68,7 @@ const withTitle = (time: string, title: string) => (title ? `${time} ${title}` :
  * Spotkania, które nachodzą na okno grania (away.ts: wieczór w Warszawie albo cały wyjazd), jako
  * „15:45–16:30 Kardiolog”; z innego dnia niż start okna — z datą („10.12 09:00–10:00 …”). Całodniowe się nie liczą.
  */
-export function overlapping(events: CalendarEvent[], window: { from: string; to: string }): string[] {
+export function overlapping(events: CalendarEvent[], window: { from: string; to: string }): CalendarSlot[] {
   const shortDate = (d: string) => `${Number(d.slice(8, 10))}.${d.slice(5, 7)}`;
   return events
     .filter((e) => !e.allDay && e.start < window.to && e.end > window.from)
@@ -66,17 +76,17 @@ export function overlapping(events: CalendarEvent[], window: { from: string; to:
     .map((e) => {
       const day = dayOf(e.start);
       const label = withTitle(timeOn(e, day), e.title);
-      return day === dayOf(window.from) ? label : `${shortDate(day)} ${label}`;
+      return { label: day === dayOf(window.from) ? label : `${shortDate(day)} ${label}`, title: e.title };
     });
 }
 
 /** Wszystko z prywatnego kalendarza dzień po dniu (do mini kalendarza): całodniowe na górze, potem wg godziny. */
-export function calendarDays(events: CalendarEvent[], from: string, to: string): CalendarDay[] {
+export function calendarDays(events: CalendarEvent[], from: string, to: string, routines = new Set<string>()): CalendarDay[] {
   const byDay = new Map<string, CalendarDay["items"]>();
   for (const e of events) {
     for (const day of daysOf(e)) {
       if (day < from || day > to) continue;
-      byDay.set(day, [...(byDay.get(day) ?? []), { time: e.allDay ? null : timeOn(e, day), title: e.title }]);
+      byDay.set(day, [...(byDay.get(day) ?? []), { time: e.allDay ? null : timeOn(e, day), title: e.title, routine: isRoutine(e, routines) }]);
     }
   }
   return [...byDay.entries()]
@@ -114,4 +124,4 @@ export function pendingEvents(gigs: PendingGig[], today: string, appUrl: string)
 }
 
 /** „w kalendarzu: 18:30–19:30 Dietetyk” — do ostrzeżeń przy graniu i okazjach. */
-export const busyLabel = (slots: string[]) => `w kalendarzu: ${slots.join(", ")}`;
+export const busyLabel = (slots: CalendarSlot[]) => `w kalendarzu: ${slots.map((s) => s.label).join(", ")}`;

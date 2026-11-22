@@ -1,11 +1,15 @@
+import { setCalendarRoutine } from "@/app/actions";
 import { CopyBox } from "@/app/trips/setup/copy-box";
+import { PendingButton } from "@/components/form";
 import { CopyField } from "@/components/copy-field";
 import { PageHeader, Section } from "@/components/ios";
 import { ARRIVE_BEFORE_MIN, EVENING_FROM, EVENING_TO } from "@/lib/away";
+import { loadRoutineTitles } from "@/lib/calendar-data";
 import { googleScript, PENDING_CALENDAR_NAME } from "@/lib/google-script";
 import { TRAIN_CALENDAR_LEAD_MIN } from "@/lib/trips";
 
-export default function CalendarSettingsPage() {
+export default async function CalendarSettingsPage() {
+  const routines = await loadRoutineTitles();
   const token = process.env.CALENDAR_TOKEN;
   const base = process.env.APP_URL ?? "https://su-manager.vercel.app";
   const url = token ? `${base}/calendar/${token}.ics` : null;
@@ -74,6 +78,24 @@ export default function CalendarSettingsPage() {
           </li>
         </ul>
       </Section>
+      <Section
+        title="Rutyny"
+        footer="Stałe wpisy (siłownia, czytanie…) oznaczone „to rutyna” — widać je w mini kalendarzu, ale nie kolidują z graniami. Rozpoznawane po tytule, więc dotyczy to wszystkich powtórzeń."
+      >
+        {routines.length ? (
+          routines.map((t) => (
+            <div key={t} className="border-border/70 flex items-center gap-3 px-4 py-2.5 text-[15px] has-[[data-pending]]:opacity-50 [&:not(:last-child)]:border-b">
+              <span className="min-w-0 flex-1 truncate">{t}</span>
+              <form action={setCalendarRoutine.bind(null, t, false)}>
+                <PendingButton className="text-primary text-[14px]">Licz jako spotkanie</PendingButton>
+              </form>
+            </div>
+          ))
+        ) : (
+          <p className="text-muted-foreground px-4 py-3 text-[14px]">Brak — oznaczysz je przy kolizji albo w mini kalendarzu („rutyna?”).</p>
+        )}
+      </Section>
+
       <Section title="Jak włączyć" footer="Masz już skrypt od biletów? Podmień w nim cały kod na ten i uruchom setup jeszcze raz. W Dzienniku wykonywania po każdej synchronizacji jest linijka „kalendarz: … wydarzeń”.">
         <ol className="list-decimal space-y-1.5 py-3 pr-4 pl-9 text-[15px] leading-relaxed">
           <li>
