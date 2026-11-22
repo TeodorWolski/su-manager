@@ -19,7 +19,8 @@ import {
 import type { GigOutcome } from "@/db/schema";
 import { pitchMessage, supportMessage } from "@/lib/messages";
 import { WhileThere } from "@/components/while-there";
-import { loadBusyEvenings } from "@/lib/calendar-data";
+import { describeWindow } from "@/lib/away";
+import { loadGigConflicts } from "@/lib/calendar-data";
 import { busyLabel } from "@/lib/calendar-sync";
 import { getGig, getWhileThereCached, gigChoicesForTrips, listGigTrips, type GigStatus } from "@/lib/queries";
 import { fmtZl } from "@/lib/ticket-parse";
@@ -46,11 +47,11 @@ const STEP_ACTIVE: Partial<Record<GigStatus, string>> = {
 
 export default async function GigPage({ params }: PageProps<"/gigs/[id]">) {
   const { id } = await params;
-  const [data, gigTrips, whileThere, busy] = await Promise.all([
+  const [data, gigTrips, whileThere, conflicts] = await Promise.all([
     getGig(Number(id)),
     listGigTrips(Number(id)),
     getWhileThereCached(),
-    loadBusyEvenings(),
+    loadGigConflicts(),
   ]);
   if (!data) notFound();
   const { gig, log } = data;
@@ -68,7 +69,7 @@ export default async function GigPage({ params }: PageProps<"/gigs/[id]">) {
   const quiet = daysSince(since, nowLocal());
   const timing = followUpTiming(gig.startsAt, since, nowLocal().slice(0, 10), gig.status);
   const next = nextChannel(used);
-  const busySlots = busy.get(gig.startsAt.slice(0, 10));
+  const conflict = !log ? conflicts.find((c) => c.gig.id === gig.id) : undefined;
 
   return (
     <>
@@ -89,10 +90,11 @@ export default async function GigPage({ params }: PageProps<"/gigs/[id]">) {
         }
       />
 
-      {/* Prośba o granie na wieczór, na który mam już coś w prywatnym kalendarzu — podpowiedź, nie blokada. */}
-      {asking && busySlots && (
+      {/* Granie (prośba albo potwierdzone) koliduje z prywatnym kalendarzem — wieczór albo cały wyjazd. Podpowiedź, nie blokada. */}
+      {conflict && (
         <div className="bg-st-wai/14 text-st-wai mb-4 rounded-xl px-4 py-3 text-[14px] leading-snug">
-          Ten wieczór masz zajęty — {busyLabel(busySlots)}. Jak komik się zgodzi, coś trzeba będzie przełożyć.
+          <b className="font-semibold">Kolizja:</b> {describeWindow(conflict.window, conflict.gig.cityName)} — {busyLabel(conflict.slots)}.{" "}
+          {gig.status === "confirmed" ? "Przełóż spotkanie albo odpuść granie." : "Jak komik się zgodzi, coś trzeba będzie przełożyć."}
         </div>
       )}
 

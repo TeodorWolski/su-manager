@@ -117,7 +117,11 @@ function DayGigs({ o }: { o: Opportunity }) {
           ))}
         </div>
       )}
-      {o.calendarBusy && <div className="text-st-wai mt-1.5 text-[13px]">Zajęty wieczór — {busyLabel(o.calendarBusy)}</div>}
+      {o.calendarBusy && (
+        <div className="text-st-wai mt-1.5 text-[13px]">
+          {o.calendarBusy.away ? "Koliduje z wyjazdem" : "Zajęty wieczór"} — {busyLabel(o.calendarBusy.slots)}
+        </div>
+      )}
     </>
   );
 }

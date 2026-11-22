@@ -36,6 +36,12 @@ export const dayOf = (stamp: string) => stamp.slice(0, 10);
  */
 export const addDays = (date: string, n: number) => new Date(Date.parse(dayOf(date)) + n * DAY_MS).toISOString().slice(0, 10);
 
+/**
+ * Lokalny znacznik ("YYYY-MM-DDTHH:mm") przesunięty o `n` minut. Liczone „na papierze”, jak w UTC —
+ * to czas bez strefy, więc zmiana czasu go nie przesuwa (granie o 19:00 zostaje o 19:00).
+ */
+export const addMinutes = (local: string, n: number) => new Date(Date.parse(`${effectiveStart(local)}:00Z`) + n * 60_000).toISOString().slice(0, 16);
+
 /** Ile dni kalendarzowych od `from` do `to` — ujemne, gdy `to` jest wcześniej; godziny pomijamy. */
 export const daysBetween = (from: string, to: string) => Math.round((Date.parse(dayOf(to)) - Date.parse(dayOf(from))) / DAY_MS);
 

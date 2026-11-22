@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
-  busyEvenings,
   busyLabel,
   CALENDAR_TITLE_MAX,
   calendarDays,
+  overlapping,
   parseEvents,
   pendingEvents,
   type CalendarEvent,
@@ -15,40 +15,28 @@ const today = "2026-11-19";
 
 const ev = (start: string, end: string, title = "", allDay = false): CalendarEvent => ({ start, end, title, allDay });
 
-test("zajęty wieczór: spotkanie nachodzące na 18–23 (z tytułem); dzienne, późnonocne i całodniowe się nie liczą", () => {
-  const evenings = busyEvenings(
-    [
-      ev("2026-11-20T19:00", "2026-11-20T21:00", "Kolacja"),
-      ev("2026-11-21T10:00", "2026-11-21T12:00", "Kardiolog"),
-      ev("2026-11-22T17:00", "2026-11-22T18:00"), // kończy się równo o 18 — nie zabiera wieczoru
-      ev("2026-11-23T17:30", "2026-11-23T18:30"), // zahacza
-      ev("2026-11-24T23:00", "2026-11-25T01:00"), // zaczyna się równo o 23
-      ev("2026-11-26T00:00", "2026-11-27T00:00", "Urodziny", true),
-    ],
-    today,
-  );
-  assert.deepEqual(evenings, [
-    { day: "2026-11-20", slots: ["19:00–21:00 Kolacja"] },
-    { day: "2026-11-23", slots: ["17:30–18:30"] },
-  ]);
+test("kolizje z oknem grania: spotkania nachodzące na okno (z tytułem); stykające się i całodniowe nie", () => {
+  const evening = { from: "2026-11-20T18:00", to: "2026-11-20T23:00" };
+  const events = [
+    ev("2026-11-20T19:00", "2026-11-20T21:00", "Kolacja"),
+    ev("2026-11-20T10:00", "2026-11-20T12:00", "Kardiolog"),
+    ev("2026-11-20T17:00", "2026-11-20T18:00"), // kończy się równo, gdy zaczyna się wieczór
+    ev("2026-11-20T17:30", "2026-11-20T18:30"), // zahacza
+    ev("2026-11-20T23:00", "2026-11-21T01:00"), // zaczyna się równo z końcem
+    ev("2026-11-20T00:00", "2026-11-21T00:00", "Urodziny", true),
+  ];
+  assert.deepEqual(overlapping(events, evening), ["17:30–18:30", "19:00–21:00 Kolacja"]);
+  assert.equal(busyLabel(overlapping(events, evening)), "w kalendarzu: 17:30–18:30, 19:00–21:00 Kolacja");
 });
 
-test("kilka spotkań jednego wieczoru i wyjazd na kilka dni; nic sprzed dziś", () => {
-  const evenings = busyEvenings(
-    [
-      ev("2026-11-20T20:30", "2026-11-20T22:00", "Dietetyk"),
-      ev("2026-11-20T18:00", "2026-11-20T19:00"),
-      ev("2026-11-27T15:00", "2026-11-29T12:00", "Wyjazd"),
-      ev("2026-11-17T19:00", "2026-11-18T19:30"),
-    ],
-    today,
-  );
-  assert.deepEqual(evenings, [
-    { day: "2026-11-20", slots: ["18:00–19:00", "20:30–22:00 Dietetyk"] },
-    { day: "2026-11-27", slots: ["15:00–… Wyjazd"] },
-    { day: "2026-11-28", slots: ["…–… Wyjazd"] },
-  ]);
-  assert.equal(busyLabel(evenings[0].slots), "w kalendarzu: 18:00–19:00, 20:30–22:00 Dietetyk");
+test("kolizje z wyjazdem: popołudniowa wizyta i ranne spotkanie następnego dnia (z datą)", () => {
+  const trip = { from: "2026-12-09T15:10", to: "2026-12-10T12:00" };
+  const events = [
+    ev("2026-12-09T15:45", "2026-12-09T16:30", "Kardiolog"),
+    ev("2026-12-10T09:00", "2026-12-10T10:00", "Bank"),
+    ev("2026-12-10T13:00", "2026-12-10T14:00", "Po powrocie"),
+  ];
+  assert.deepEqual(overlapping(events, trip), ["15:45–16:30 Kardiolog", "10.12 09:00–10:00 Bank"]);
 });
 
 test("lista dnia do mini kalendarza: wszystko, też dzienne i całodniowe; całodniowe na górze, koniec o północy nie zajmuje kolejnego dnia", () => {
@@ -102,12 +90,14 @@ test("wejście ze skryptu: tylko poprawne wydarzenia w oknie; długi tytuł przy
 });
 
 test("prośby do kalendarza „w toku”: napisałem / czekam od dziś, bez zainteresowanych i minionych; 2,5 h, granie bez godziny o 20:00", () => {
-  const gig = (id: number, startsAt: string, status: string, cityName: string | null = "Lublin"): PendingGig => ({
+  const gig = (id: number, startsAt: string, status: string, cityName: string | null = "Warszawa"): PendingGig => ({
     id,
     title: `Komik ${id}`,
     startsAt,
     status,
     cityName,
+    travelMinutes: 0,
+    hasLodging: false,
   });
   const events = pendingEvents(
     [
@@ -122,12 +112,21 @@ test("prośby do kalendarza „w toku”: napisałem / czekam od dziś, bez zain
   );
   assert.deepEqual(events, [
     { id: 2, title: "❓ napisałem · Komik 2", start: "2026-11-21T20:00", end: "2026-11-21T22:30", url: "https://app.test/gigs/2" },
-    { id: 1, title: "❓ czekam · Komik 1 · Lublin", start: "2026-11-28T19:00", end: "2026-11-28T21:30", url: "https://app.test/gigs/1" },
-    { id: 5, title: "❓ napisałem · Komik 5 · Lublin", start: "2026-11-30T22:30", end: "2026-12-01T01:00", url: "https://app.test/gigs/5" },
+    { id: 1, title: "❓ czekam · Komik 1 · Warszawa", start: "2026-11-28T19:00", end: "2026-11-28T21:30", url: "https://app.test/gigs/1" },
+    { id: 5, title: "❓ napisałem · Komik 5 · Warszawa", start: "2026-11-30T22:30", end: "2026-12-01T01:00", url: "https://app.test/gigs/5" },
   ]);
 });
 
 test("wpis w dniu zmiany czasu nie przesuwa się o godzinę (czas lokalny, bez strefy)", () => {
-  const [e] = pendingEvents([{ id: 1, title: "X", startsAt: "2027-03-28T01:00", status: "waiting", cityName: null }], "2027-03-20", "");
+  const [e] = pendingEvents([{ id: 1, title: "X", startsAt: "2027-03-28T01:00", status: "waiting", cityName: null, travelMinutes: null, hasLodging: false }], "2027-03-20", "");
   assert.deepEqual([e.start, e.end], ["2027-03-28T01:00", "2027-03-28T03:30"]);
+});
+
+test("prośba o granie poza Warszawą zajmuje w kalendarzu cały wyjazd, z dopiskiem „(wyjazd)”", () => {
+  const [e] = pendingEvents(
+    [{ id: 7, title: "Stand-up", startsAt: "2026-12-09T19:00", status: "waiting", cityName: "Gdańsk", travelMinutes: 170, hasLodging: true }],
+    today,
+    "https://app.test",
+  );
+  assert.deepEqual([e.title, e.start, e.end], ["❓ czekam · Stand-up · Gdańsk (wyjazd)", "2026-12-09T15:10", "2026-12-10T12:00"]);
 });

@@ -1,13 +1,13 @@
 /**
  * Feed iCalendar (.ics) z potwierdzonymi graniami i podróżami — subskrybowany w Google Calendar.
  * Wpis zaczyna się ARRIVE_BEFORE_MIN przed startem na scenie (tyle wcześniej trzeba być na miejscu).
+ * Granie poza Warszawą dostaje drugi wpis „🧳 Wyjazd” na cały czas poza domem (away.ts) — samo „🎤 19:00”
+ * nie mówiło, że po południu mnie nie ma.
  */
 
+import { ARRIVE_BEFORE_MIN, describeWindow, gigWindow } from "./away";
 import { addDays } from "./time";
 import { TRAIN_CALENDAR_LEAD_MIN } from "./trips";
-
-/** Ile minut przed startem sceny zaczyna się wpis w kalendarzu. */
-export const ARRIVE_BEFORE_MIN = 60;
 /** Ile minut po starcie sceny kończy się wpis (orientacyjny koniec wieczoru). */
 const SHOW_LENGTH_MIN = 120;
 
@@ -21,6 +21,8 @@ export type CalendarGig = {
   notes: string | null;
   headlinerName: string | null;
   context: string | null;
+  travelMinutes: number | null;
+  hasLodging: boolean;
 };
 
 /** Przesunięcie Europe/Warsaw względem UTC (w minutach) w danej chwili — uwzględnia czas letni. */
@@ -139,6 +141,21 @@ export function buildCalendar(gigs: CalendarGig[], appUrl: string, trips: Calend
       "TRANSP:OPAQUE",
       "END:VEVENT",
     );
+    const away = hasTime ? gigWindow(g, trips.filter((t) => t.gigId === g.id)) : null;
+    if (away?.away) {
+      lines.push(
+        "BEGIN:VEVENT",
+        `UID:away-${g.id}@su-manager`,
+        `DTSTAMP:${now}`,
+        `DTSTART:${utcStamp(warsawToUtc(away.from))}`,
+        `DTEND:${utcStamp(warsawToUtc(away.to))}`,
+        `SUMMARY:${escape(`🧳 Wyjazd${g.cityName ? `: ${g.cityName}` : ""} (${g.title})`)}`,
+        `DESCRIPTION:${escape(`Poza domem — ${describeWindow(away, g.cityName)}. Scena o ${stageTime}.\n${appUrl}/gigs/${g.id}`)}`,
+        "STATUS:CONFIRMED",
+        "TRANSP:OPAQUE",
+        "END:VEVENT",
+      );
+    }
   }
   // Pociągi: wpis TRAIN_CALENDAR_LEAD_MIN przed odjazdem (17:10 → 17:00), do przyjazdu.
   for (const t of trips) {

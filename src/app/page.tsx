@@ -8,22 +8,25 @@ import { FOLLOW_UP_BEFORE_DAYS } from "@/lib/follow-up";
 import { CHANNEL_SHORT } from "@/lib/labels";
 import { HotOpportunities } from "@/components/hot";
 import { RhythmCard } from "@/components/rhythm";
+import { CalendarConflicts } from "@/components/calendar-conflicts";
 import { StageCard } from "@/components/stage-card";
 import { WhileThere } from "@/components/while-there";
 import { WritingCard } from "@/components/writing";
 import { getWriting } from "@/lib/planning";
 import { getDashboard, getRhythm, getStageCard, getWhileThereCached } from "@/lib/queries";
 import { getGoals } from "@/lib/goals";
+import { loadGigConflicts } from "@/lib/calendar-data";
 import { fmtDate, fmtDateLong, nowLocal } from "@/lib/time";
 
 export default async function Home() {
-  const [{ upcoming, pipeline, followUps, month, recent }, goals, rhythm, writing, stage, whileThere] = await Promise.all([
+  const [{ upcoming, pipeline, followUps, month, recent }, goals, rhythm, writing, stage, whileThere, conflicts] = await Promise.all([
     getDashboard(),
     getGoals(),
     getRhythm(),
     getWriting(),
     getStageCard(),
     getWhileThereCached(),
+    loadGigConflicts(),
   ]);
   const today = nowLocal();
 
@@ -42,6 +45,8 @@ export default async function Home() {
       />
 
       {stage && <StageCard data={stage} />}
+
+      <CalendarConflicts items={conflicts} />
 
       <div className="mb-7 space-y-2.5">
         <GigGoalCard goals={goals} />

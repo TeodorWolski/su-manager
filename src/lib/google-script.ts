@@ -81,7 +81,7 @@ function syncCalendar() {
     ev.setTag('su-gig', String(p.id));
   }
   // Same liczby — żeby w dzienniku było widać, że synchronizacja działa.
-  console.log('kalendarz: ' + events.length + ' wydarzeń, zajęte wieczory: ' + reply.busyEvenings + ', w toku: ' + reply.pending.length + ' (dodane ' + want.size + ', usunięte ' + removed + ')');
+  console.log('kalendarz: ' + events.length + ' wydarzeń, kolizje z graniami: ' + reply.conflicts + ', w toku: ' + reply.pending.length + ' (dodane ' + want.size + ', usunięte ' + removed + ')');
 }
 
 function setup() {

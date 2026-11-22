@@ -8,7 +8,9 @@ import { myGigForEvent } from "./dedupe";
 import { alongRoute, coords, distanceKm } from "./geo";
 import { describe as describeSeries, RECURRING_SOURCE, seriesKey } from "./recurring";
 import { loadSeries } from "./recurring-sync";
-import { loadBusyEvenings } from "./calendar-data";
+import { gigWindow } from "./away";
+import { loadCalendarEvents } from "./calendar-data";
+import { overlapping } from "./calendar-sync";
 import { loadLeadTimes } from "./lead-data";
 import { planRoute, routeDays } from "./route";
 import { matchContacts, matchesQuery } from "./match";
@@ -60,8 +62,11 @@ export type Opportunity = {
   myGigId: number | null;
   /** Inne moje grania tego dnia (w toku albo potwierdzone) — „masz już tego dnia…”, ale można dodać kolejne. */
   dayGigs: { id: number; title: string; startsAt: string }[];
-  /** Godziny spotkań z prywatnego kalendarza tego wieczoru (calendar-data.ts); null = wolny albo brak synchronizacji. */
-  calendarBusy: string[] | null;
+  /**
+   * Spotkania z prywatnego kalendarza w czasie, który zajęłoby to granie (away.ts: wieczór albo cały wyjazd);
+   * null = wolne albo brak synchronizacji.
+   */
+  calendarBusy: { away: boolean; slots: string[] } | null;
   /** Kto występuje: kontakt z CRM albo nazwa wyciągnięta z tytułu. Klucz grupuje terminy jednego komika. */
   performer: { key: string; name: string; contactId: number | null };
   tab: Tab;
@@ -133,7 +138,7 @@ const toHim = sql.raw("(i.contact_id = contacts.id or i.gig_id in (select g2.id 
 async function loadContext() {
   const now = nowLocal();
   const today = now.slice(0, 10);
-  const [allCities, people, never, hidden, myGigs, recurring, leads, supportRows, calendarBusy] = await Promise.all([
+  const [allCities, people, never, hidden, myGigs, recurring, leads, supportRows, calendarEvents] = await Promise.all([
     db.select().from(cities),
     db
       .select({
@@ -181,7 +186,7 @@ async function loadContext() {
       .innerJoin(contacts, eq(contacts.id, supports.supportId))
       .where(eq(supports.active, true))
       .orderBy(sql`${supports.lastSeen} desc`),
-    loadBusyEvenings(),
+    loadCalendarEvents(),
   ]);
   const supportsOf = new Map<number, { id: number; name: string }[]>();
   for (const r of supportRows) supportsOf.set(r.headlinerId, [...(supportsOf.get(r.headlinerId) ?? []), { id: r.id, name: r.name }]);
@@ -200,7 +205,7 @@ async function loadContext() {
     blacklist: new Set(never.map((v) => `${normalize(v.name)}|${normalize(v.cityName ?? "")}`)),
     hidden: new Set(hidden.map((h) => h.t)),
     myGigs,
-    calendarBusy,
+    calendarEvents,
     series: new Map(recurring.series.map((s) => [s.key, { key: s.key, how: s.how, text: describeSeries(s.interval, s.anchor) }])),
     /** Serie, które sam wyłączyłem — do menu „Cykliczne?” (pokazać „wyłączone”). */
     seriesOff: new Set(recurring.decisions.filter((d) => d.mode === "off").map((d) => d.key)),
@@ -208,6 +213,14 @@ async function loadContext() {
 }
 
 type Ctx = Awaited<ReturnType<typeof loadContext>>;
+
+/** Co z prywatnego kalendarza koliduje z zagraniem na tym wydarzeniu (wieczór albo cały wyjazd). */
+function calendarClash(e: EventRow, city: City | null, events: Ctx["calendarEvents"]) {
+  if (!events.length) return null;
+  const window = gigWindow({ startsAt: e.startsAt, cityName: e.cityName, travelMinutes: city?.travelMinutes ?? null, hasLodging: city?.hasLodging ?? false });
+  const slots = overlapping(events, window);
+  return slots.length ? { away: window.away, slots } : null;
+}
 
 /** Notka wyszukiwarki dla wydarzeń samych pomijanych komików — te idą do osobnej listy. */
 export const IGNORED_NOTE = "komik pomijany";
@@ -266,7 +279,7 @@ function classify(e: EventRow, ctx: Ctx, newSince: string, force = false): Oppor
     isOpenMic: openMic,
     myGigId,
     dayGigs: others.filter((g) => g.id !== myGigId).map(({ id, title, startsAt }) => ({ id, title, startsAt })),
-    calendarBusy: ctx.calendarBusy.get(e.startsAt.slice(0, 10)) ?? null,
+    calendarBusy: calendarClash(e, city, ctx.calendarEvents),
     performer: lead
       ? { key: `c${lead.id}`, name: lead.name, contactId: lead.id }
       : { key: performerKey(e.title), name: performerName(e.title), contactId: null },

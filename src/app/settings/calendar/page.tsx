@@ -1,9 +1,8 @@
 import { CopyBox } from "@/app/trips/setup/copy-box";
 import { CopyField } from "@/components/copy-field";
 import { PageHeader, Section } from "@/components/ios";
-import { EVENING_FROM, EVENING_TO } from "@/lib/calendar-sync";
+import { ARRIVE_BEFORE_MIN, EVENING_FROM, EVENING_TO } from "@/lib/away";
 import { googleScript, PENDING_CALENDAR_NAME } from "@/lib/google-script";
-import { ARRIVE_BEFORE_MIN } from "@/lib/ics";
 import { TRAIN_CALENDAR_LEAD_MIN } from "@/lib/trips";
 
 export default function CalendarSettingsPage() {
@@ -42,6 +41,10 @@ export default function CalendarSettingsPage() {
               </li>
               <li>Granie bez godziny — wydarzenie całodniowe z dopiskiem „godzina nieznana”.</li>
               <li>
+                Granie poza Warszawą ma drugi wpis <b className="text-foreground">🧳 Wyjazd</b> na cały czas poza domem: z biletów, a bez nich z
+                czasu dojazdu (i noclegu, jeśli miasto go ma) — żeby przy umawianiu się na popołudnie było widać, że Cię nie ma.
+              </li>
+              <li>
                 Pociąg zaczyna się <b className="text-foreground">{TRAIN_CALENDAR_LEAD_MIN} min przed odjazdem</b> (odjazd 17:10 → w kalendarzu
                 17:00) i kończy przy przyjeździe; w opisie godzina odjazdu, pociąg, miejsce i granie.
               </li>
@@ -56,17 +59,18 @@ export default function CalendarSettingsPage() {
       )}
 
       <Section
-        title="Prośby w toku i zajęte wieczory"
-        footer={`Co 10 minut, przez skrypt na Twoim koncie Google. Wieczór = ${EVENING_FROM}–${EVENING_TO}; całodniowe wydarzenia i odrzucone zaproszenia go nie zajmują. Z Twojego kalendarza apka dostaje godziny i tytuły — bez opisów, miejsc i uczestników; trzyma je tylko w swojej bazie.`}
+        title="Prośby w toku i kolizje"
+        footer={`Co 10 minut, przez skrypt na Twoim koncie Google. Granie w Warszawie zajmuje wieczór (${EVENING_FROM}–${EVENING_TO}), poza nią cały wyjazd; całodniowe wydarzenia i odrzucone zaproszenia nie kolidują. Z Twojego kalendarza apka dostaje godziny i tytuły — bez opisów, miejsc i uczestników; trzyma je tylko w swojej bazie.`}
       >
         <ul className="text-muted-foreground list-disc space-y-1.5 py-3 pr-4 pl-9 text-[15px] leading-relaxed">
           <li>
             Grania „napisałem” i „czekam” lądują w osobnym, szarym kalendarzu <b className="text-foreground">{PENDING_CALENDAR_NAME}</b> jako „❓ czekam · …”
-            — widać je przy umawianiu się, a zwykły kalendarz grań dalej ma tylko zaklepane. Po zgodzie wpis przechodzi do grań, po odmowie znika.
+            — widać je przy umawianiu się, a zwykły kalendarz grań dalej ma tylko zaklepane. Granie poza Warszawą zajmuje cały wyjazd. Po zgodzie wpis przechodzi do grań, po odmowie znika.
           </li>
           <li>
-            W drugą stronę: mini kalendarz pokazuje 📅 przy dniach z czymś w Twoim kalendarzu (po kliknięciu — co i o której), a zajęte wieczory apka
-            pomija w okazjach i ostrzega przy prośbie o granie na taki wieczór.
+            W drugą stronę: mini kalendarz pokazuje 📅 przy dniach z czymś w Twoim kalendarzu (po kliknięciu — co i o której). Spotkanie w czasie
+            grania albo wyjazdu to kolizja: okazje na ten czas apka pomija, a przy graniu (też potwierdzonym) ostrzega na karcie, na Dziś i od razu
+            pushem.
           </li>
         </ul>
       </Section>

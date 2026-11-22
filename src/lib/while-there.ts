@@ -3,14 +3,12 @@
  * w okolicy w dniach, kiedy tam jestem (i dzień przed / po graniu). Czysta logika;
  * dane: getWhileThere w planning.ts.
  */
-import { coords, distanceKm, placeKey } from "./geo";
+import { AWAY_MIN_KM, kmFromHome } from "./away";
+import { coords, placeKey } from "./geo";
 import { addDays, dayOf } from "./time";
-import { HOME_CITY } from "./trips";
 
 /** Jak daleko od miasta pobytu szukamy (km w linii prostej) — tyle, żeby dojechać i wrócić na nocleg. */
 export const WHILE_THERE_RADIUS_KM = 60;
-/** Bliżej domu to zwykły wieczorny wypad (wracam na noc), a okazje z okolicy to po prostu okazje z Warszawy. */
-export const AWAY_MIN_KM = 80;
 /** Wokół grania bez biletów zakładamy, że mogę przyjechać dzień wcześniej albo zostać dzień dłużej. */
 export const WHILE_THERE_MARGIN_DAYS = 1;
 /** Patrzymy tyle dni naprzód — dalej line-upy i tak nie są jeszcze ułożone. */
@@ -43,11 +41,8 @@ export function stationCity(station: string): string | null {
 }
 
 const sameCity = (a: string, b: string) => placeKey(a) === placeKey(b);
-/** Miasto z mapy, dość daleko od domu, żeby wyjazd był pobytem. */
-function isAway(city: string) {
-  const [at, home] = [coords(city), coords(HOME_CITY)];
-  return !!at && !!home && distanceKm(home, at) >= AWAY_MIN_KM;
-}
+/** Miasto z mapy, dość daleko od domu (AWAY_MIN_KM), żeby wyjazd był pobytem — bliżej to wieczorny wypad. */
+const isAway = (city: string) => (kmFromHome(city) ?? 0) >= AWAY_MIN_KM;
 const min = (a: string, b: string) => (a < b ? a : b);
 const max = (a: string, b: string) => (a > b ? a : b);
 

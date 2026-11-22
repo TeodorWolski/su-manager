@@ -480,6 +480,8 @@ export async function listCalendarGigs() {
       venueName: gigListSelect.venueName,
       cityName: gigListSelect.cityName,
       headlinerName: gigListSelect.headlinerName,
+      travelMinutes: sql<number | null>`coalesce(${cities.travelMinutes}, (select c.travel_minutes from cities c where c.id = ${venues.cityId}))`,
+      hasLodging: sql<boolean>`coalesce(${cities.hasLodging}, (select c.has_lodging from cities c where c.id = ${venues.cityId}), 0) = 1`.mapWith(Boolean),
     })
     .from(gigs)
     .leftJoin(venues, eq(gigs.venueId, venues.id))

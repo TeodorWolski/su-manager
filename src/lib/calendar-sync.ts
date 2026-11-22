@@ -1,20 +1,15 @@
 /**
  * Synchronizacja z Kalendarzem Google (skrypt Apps Script, instrukcja: /settings/calendar):
  * - do apki: wydarzenia z prywatnego kalendarza (godziny i tytuły) — mini kalendarz pokazuje, co jest
- *   danego dnia, a wieczory z czymś w środku liczą się jako zajęte,
+ *   danego dnia, a spotkania w czasie grania (wieczór albo cały wyjazd, away.ts) to kolizje,
  * - do Google: prośby o granie „napisałem / czekam” jako wpisy w osobnym kalendarzu „SU · w toku”,
- *   żeby przy umawianiu się z kimś było widać, że wieczór jest jeszcze niepewny.
+ *   żeby przy umawianiu się z kimś było widać, że ten czas jest jeszcze niepewny.
  * Czysta logika; zapis i odczyt: calendar-data.ts.
  */
-import { addDays, dayOf, effectiveStart } from "./time";
-
-/** Wieczór, który może zająć granie (lokalnie). Spotkanie, które na niego nachodzi, robi z niego „zajęty”. */
-export const EVENING_FROM = "18:00";
-export const EVENING_TO = "23:00";
+import { gigWindow, GIG_LENGTH_MIN, type WindowGig } from "./away";
+import { addDays, addMinutes, dayOf, effectiveStart } from "./time";
 /** Ile dni naprzód skrypt czyta prywatny kalendarz i ile naprzód wysyłamy prośby „w toku”. */
 export const CALENDAR_AHEAD_DAYS = 90;
-/** Długość wpisu „w toku” w kalendarzu — mniej więcej tyle, ile zajmuje wieczór z open mikiem. */
-export const PENDING_EVENT_MIN = 150;
 /** Statusy, które trafiają do kalendarza „w toku”. „Zainteresowany” nie — to tylko pomysł, nikogo jeszcze nie pytałem. */
 export const PENDING_SYNC_STATUSES = ["contacted", "waiting"] as const;
 /** Dłuższe tytuły przycinamy — w mini kalendarzu i tak mieści się jedna linijka. */
@@ -25,8 +20,6 @@ const LOCAL = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/;
 
 /** Wydarzenie z prywatnego kalendarza; całodniowe trwa od północy do północy (koniec bez tego dnia). */
 export type CalendarEvent = { start: string; end: string; title: string; allDay: boolean };
-/** Zajęty wieczór: dzień i spotkania („19:00–21:00 Dietetyk”; „…” = zaczęło się wcześniej / kończy później). */
-export type BusyEvening = { day: string; slots: string[] };
 /** Dzień w mini kalendarzu: co jest w prywatnym kalendarzu (bez godziny = całodniowe). */
 export type CalendarDay = { day: string; items: { time: string | null; title: string }[] };
 
@@ -61,17 +54,20 @@ const timeOn = (e: CalendarEvent, day: string) =>
 
 const withTitle = (time: string, title: string) => (title ? `${time} ${title}` : time);
 
-/** Które wieczory są zajęte: spotkanie nachodzi na EVENING_FROM–EVENING_TO danego dnia. Całodniowe się nie liczą. Od dziś, posortowane. */
-export function busyEvenings(events: CalendarEvent[], today: string): BusyEvening[] {
-  const byDay = new Map<string, string[]>();
-  for (const e of events) {
-    if (e.allDay) continue;
-    for (const day of daysOf(e)) {
-      if (day < today || !(e.start < `${day}T${EVENING_TO}` && e.end > `${day}T${EVENING_FROM}`)) continue;
-      byDay.set(day, [...(byDay.get(day) ?? []), withTitle(timeOn(e, day), e.title)]);
-    }
-  }
-  return [...byDay.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([day, slots]) => ({ day, slots: [...new Set(slots)].sort() }));
+/**
+ * Spotkania, które nachodzą na okno grania (away.ts: wieczór w Warszawie albo cały wyjazd), jako
+ * „15:45–16:30 Kardiolog”; z innego dnia niż start okna — z datą („10.12 09:00–10:00 …”). Całodniowe się nie liczą.
+ */
+export function overlapping(events: CalendarEvent[], window: { from: string; to: string }): string[] {
+  const shortDate = (d: string) => `${Number(d.slice(8, 10))}.${d.slice(5, 7)}`;
+  return events
+    .filter((e) => !e.allDay && e.start < window.to && e.end > window.from)
+    .sort((a, b) => a.start.localeCompare(b.start))
+    .map((e) => {
+      const day = dayOf(e.start);
+      const label = withTitle(timeOn(e, day), e.title);
+      return day === dayOf(window.from) ? label : `${shortDate(day)} ${label}`;
+    });
 }
 
 /** Wszystko z prywatnego kalendarza dzień po dniu (do mini kalendarza): całodniowe na górze, potem wg godziny. */
@@ -88,27 +84,30 @@ export function calendarDays(events: CalendarEvent[], from: string, to: string):
     .map(([day, items]) => ({ day, items: items.sort((a, b) => (a.time ?? "").localeCompare(b.time ?? "")) }));
 }
 
-export type PendingGig = { id: number; title: string; startsAt: string; status: string; cityName: string | null };
+export type PendingGig = WindowGig & { id: number; title: string; status: string };
 /** Wpis do kalendarza „SU · w toku” — czasy lokalne Warszawy, skrypt czyta je w tej strefie. */
 export type PendingEvent = { id: number; title: string; start: string; end: string; url: string };
 
 const STATUS_WORD: Record<string, string> = { contacted: "napisałem", waiting: "czekam" };
 
-/** Prośby „napisałem / czekam” od dziś na CALENDAR_AHEAD_DAYS dni, jako wpisy do kalendarza. */
+/**
+ * Prośby „napisałem / czekam” od dziś na CALENDAR_AHEAD_DAYS dni, jako wpisy do kalendarza.
+ * W Warszawie wpis trwa GIG_LENGTH_MIN od sceny; wyjazd zajmuje cały czas poza domem (away.ts) — żeby
+ * przy umawianiu się na popołudnie było widać, że mnie nie ma.
+ */
 export function pendingEvents(gigs: PendingGig[], today: string, appUrl: string): PendingEvent[] {
   const until = addDays(today, CALENDAR_AHEAD_DAYS);
   return gigs
     .filter((g) => STATUS_WORD[g.status] && dayOf(g.startsAt) >= today && dayOf(g.startsAt) <= until)
     .sort((a, b) => a.startsAt.localeCompare(b.startsAt))
     .map((g) => {
-      const start = effectiveStart(g.startsAt);
-      const endMs = Date.parse(`${start}:00Z`) + PENDING_EVENT_MIN * 60_000;
+      const window = gigWindow(g);
+      const start = window.away ? window.from : effectiveStart(g.startsAt);
       return {
         id: g.id,
-        title: [`❓ ${STATUS_WORD[g.status]}`, g.title, g.cityName].filter(Boolean).join(" · "),
+        title: [`❓ ${STATUS_WORD[g.status]}`, g.title, g.cityName && (window.away ? `${g.cityName} (wyjazd)` : g.cityName)].filter(Boolean).join(" · "),
         start,
-        // Przesunięcie liczone „na papierze” (jak w UTC) — to czas lokalny, bez strefy, więc zmiana czasu go nie rusza.
-        end: new Date(endMs).toISOString().slice(0, 16),
+        end: window.away ? window.to : addMinutes(start, GIG_LENGTH_MIN),
         url: `${appUrl}/gigs/${g.id}`,
       };
     });
